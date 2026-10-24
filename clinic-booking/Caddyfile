@@ -1,0 +1,17 @@
+# Caddy tự xin chứng chỉ HTTPS cho tên miền trong biến DOMAIN.
+# Chạy local: đặt DOMAIN=localhost
+{$DOMAIN} {
+	encode gzip
+
+	# API và Swagger
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	# Web app (React build ra web/dist)
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,0 +1,224 @@
+// Schema CSDL cho hệ thống đặt lịch khám
+// Chạy: npx prisma migrate dev --name init
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  PATIENT
+  RECEPTIONIST
+  DOCTOR
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+/// Bệnh nhân đến từ đâu: đặt online hay đến trực tiếp
+enum VisitSource {
+  ONLINE
+  WALK_IN
+}
+
+/// Cách vào hàng đợi: tự quét QR hoặc qua lễ tân
+enum CheckinMethod {
+  QR
+  RECEPTION
+}
+
+enum VisitStatus {
+  WAITING
+  IN_PROGRESS
+  DONE
+  LEFT
+}
+
+enum PrescriptionStatus {
+  DRAFT
+  FINALIZED
+}
+
+/// Tài khoản đăng nhập của cả 4 vai trò
+model User {
+  id           String   @id @default(uuid())
+  email        String?  @unique
+  phone        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  patient Patient?
+  doctor  Doctor?
+}
+
+model Specialty {
+  id      String   @id @default(uuid())
+  name    String   @unique
+  doctors Doctor[]
+}
+
+model Doctor {
+  id          String  @id @default(uuid())
+  userId      String  @unique
+  specialtyId String
+  fullName    String
+  title       String?
+  bio         String?
+
+  user          User           @relation(fields: [userId], references: [id])
+  specialty     Specialty      @relation(fields: [specialtyId], references: [id])
+  schedules     Schedule[]
+  visits        Visit[]
+  prescriptions Prescription[]
+}
+
+/// Khung giờ bác sĩ mở cho đặt lịch.
+/// Chống đặt trùng: khi đặt, chạy updateMany({ where: { id, isBooked: false }, data: { isBooked: true } })
+/// trong transaction; count = 0 nghĩa là khung giờ vừa bị người khác đặt.
+model Schedule {
+  id        String   @id @default(uuid())
+  doctorId  String
+  date      DateTime @db.Date
+  startTime DateTime
+  endTime   DateTime
+  isBooked  Boolean  @default(false)
+
+  doctor       Doctor        @relation(fields: [doctorId], references: [id])
+  appointments Appointment[]
+
+  @@unique([doctorId, startTime])
+  @@index([doctorId, date])
+}
+
+model Appointment {
+  id         String            @id @default(uuid())
+  patientId  String
+  scheduleId String
+  status     AppointmentStatus @default(PENDING)
+  reason     String?
+  createdAt  DateTime          @default(now())
+
+  patient  Patient  @relation(fields: [patientId], references: [id])
+  schedule Schedule @relation(fields: [scheduleId], references: [id])
+  visit    Visit?
+}
+
+/// Hồ sơ hành chính. userId null = bệnh nhân đến trực tiếp, chưa có tài khoản app;
+/// khi đăng ký app bằng cùng SĐT thì gắn userId vào hồ sơ này.
+model Patient {
+  id          String   @id @default(uuid())
+  userId      String?  @unique
+  fullName    String
+  dateOfBirth DateTime @db.Date
+  gender      Gender
+  phone       String   @unique
+  nationalId  String?  @unique
+  address     String?
+  insuranceNo String?
+  allergies   String?
+  createdAt   DateTime @default(now())
+
+  user         User?         @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+  visits       Visit[]
+}
+
+/// Phiếu khám = một vị trí trong hàng đợi chung.
+/// Cấp số trong transaction; unique (doctorId, date, queueNumber) chặn trùng số.
+model Visit {
+  id            String        @id @default(uuid())
+  patientId     String
+  doctorId      String
+  date          DateTime      @db.Date
+  queueNumber   Int
+  source        VisitSource
+  checkinMethod CheckinMethod
+  status        VisitStatus   @default(WAITING)
+  reason        String?
+  appointmentId String?       @unique
+  createdAt     DateTime      @default(now())
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  doctor        Doctor         @relation(fields: [doctorId], references: [id])
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id])
+  medicalRecord MedicalRecord?
+  prescriptions Prescription[]
+
+  @@unique([doctorId, date, queueNumber])
+  @@index([patientId, date])
+}
+
+/// Chỉ bác sĩ được ghi
+model MedicalRecord {
+  id        String   @id @default(uuid())
+  visitId   String   @unique
+  symptoms  String
+  diagnosis String
+  orders    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  visit Visit @relation(fields: [visitId], references: [id])
+}
+
+/// Danh mục thuốc do admin quản lý
+model Medicine {
+  id               String  @id @default(uuid())
+  name             String
+  activeIngredient String?
+  strength         String?
+  unit             String
+
+  items PrescriptionItem[]
+}
+
+/// Đơn thuốc. Khóa khi FINALIZED; cần sửa thì tạo đơn mới với replacesId trỏ về đơn cũ.
+model Prescription {
+  id          String             @id @default(uuid())
+  visitId     String
+  doctorId    String
+  advice      String?
+  status      PrescriptionStatus @default(DRAFT)
+  finalizedAt DateTime?
+  replacesId  String?            @unique
+  createdAt   DateTime           @default(now())
+
+  visit      Visit              @relation(fields: [visitId], references: [id])
+  doctor     Doctor             @relation(fields: [doctorId], references: [id])
+  replaces   Prescription?      @relation("PrescriptionReplacement", fields: [replacesId], references: [id])
+  replacedBy Prescription?      @relation("PrescriptionReplacement")
+  items      PrescriptionItem[]
+}
+
+model PrescriptionItem {
+  id             String  @id @default(uuid())
+  prescriptionId String
+  medicineId     String
+  quantity       Int
+  dosePerTime    String
+  timesPerDay    Int
+  days           Int
+  note           String?
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medicine     Medicine     @relation(fields: [medicineId], references: [id])
+}
