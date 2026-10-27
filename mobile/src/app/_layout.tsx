@@ -31,6 +31,7 @@ export default function RootLayout() {
             <Stack.Screen name="register" options={{ title: 'Đăng ký tài khoản' }} />
             <Stack.Screen name="book/[doctorId]" options={{ title: 'Đặt lịch' }} />
             <Stack.Screen name="scan" options={{ title: 'Quét mã QR' }} />
+            <Stack.Screen name="visit/[id]" options={{ title: 'Chi tiết lần khám' }} />
           </Stack>
         </AuthProvider>
       </QueryClientProvider>
