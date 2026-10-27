@@ -1,4 +1,9 @@
 import { Navigate, type RouteObject } from 'react-router';
+import { DoctorsPage } from './features/admin/DoctorsPage';
+import { MedicinesPage } from './features/admin/MedicinesPage';
+import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
+import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
+import { LoginPage } from './features/auth/LoginPage';
 import { AppLayout } from './layout/AppLayout';
 import { ComingSoon, RequireRole } from './layout/guards';
 import { HOME_BY_ROLE, useAuth } from './lib/auth';
@@ -18,7 +23,7 @@ function Home() {
  */
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
-  { path: '/login', element: <ComingSoon title="Đăng nhập" /> },
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/counter',
     element: (
@@ -34,10 +39,10 @@ export const routes: RouteObject[] = [
         path: '/admin',
         element: <RequireRole roles={['ADMIN']}><Navigate to="/admin/specialties" replace /></RequireRole>,
       },
-      { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><ComingSoon title="Chuyên khoa" /></RequireRole> },
-      { path: '/admin/doctors', element: <RequireRole roles={['ADMIN']}><ComingSoon title="Bác sĩ" /></RequireRole> },
-      { path: '/admin/receptionists', element: <RequireRole roles={['ADMIN']}><ComingSoon title="Lễ tân" /></RequireRole> },
-      { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><ComingSoon title="Danh mục thuốc" /></RequireRole> },
+      { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><SpecialtiesPage /></RequireRole> },
+      { path: '/admin/doctors', element: <RequireRole roles={['ADMIN']}><DoctorsPage /></RequireRole> },
+      { path: '/admin/receptionists', element: <RequireRole roles={['ADMIN']}><ReceptionistsPage /></RequireRole> },
+      { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><MedicinesPage /></RequireRole> },
       { path: '/doctor/queue', element: <RequireRole roles={['DOCTOR']}><ComingSoon title="Khám bệnh" /></RequireRole> },
       { path: '/doctor/schedule', element: <RequireRole roles={['DOCTOR']}><ComingSoon title="Lịch làm việc" /></RequireRole> },
       { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ComingSoon title="Tiếp đón" /></RequireRole> },

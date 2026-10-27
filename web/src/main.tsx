@@ -27,6 +27,9 @@ createRoot(document.getElementById('root')!).render(
           borderRadius: 8,
           fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
         },
+        components: {
+          Menu: { itemSelectedBg: '#ccfbf1', itemSelectedColor: '#115e59', itemBorderRadius: 8 },
+        },
       }}
     >
       <AntApp>
