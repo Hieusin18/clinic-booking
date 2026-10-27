@@ -102,6 +102,7 @@ npm test
 ```
 
 - Sửa `expo.extra.apiUrl` trong `mobile/app.json` thành IP LAN của máy chạy backend, ví dụ `http://192.168.1.10:3000/api` (điện thoại và máy tính cùng mạng Wi-Fi). Không dùng `localhost`.
+- Thử nhanh trên máy tính (không cần điện thoại): `npx expo start --web --port 8081` rồi mở http://localhost:8081. Bản web gọi `/api` cùng địa chỉ trang, Metro tự chuyển sang backend `http://localhost:3000` (đổi bằng biến `API_PROXY_TARGET`), nên **không** đặt `EXPO_PUBLIC_API_URL` khi chạy bản web.
 - Cài thêm thư viện Expo bằng `npx expo install <tên>` (không dùng `npm install`) để đúng phiên bản với SDK.
 - Màn hình nằm trong `mobile/src/app/` (Expo Router: mỗi file là một màn hình).
 - Build APK để nộp và demo: `eas build -p android --profile preview`, đặt `EXPO_PUBLIC_API_URL=https://<tên-miền>/api`.
