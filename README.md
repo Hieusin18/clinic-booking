@@ -40,7 +40,7 @@ npm install
 cp .env.example .env
 
 # 3. Tạo bảng và sinh Prisma Client
-npx prisma migrate dev --name init
+npx prisma migrate deploy
 npx prisma generate
 
 # 4. Chạy
@@ -49,7 +49,21 @@ npm run start:dev
 
 Mở http://localhost:3000/api/docs để xem Swagger.
 
-Lưu ý Prisma 7: `migrate dev` **không** tự chạy `generate`. Mỗi lần sửa `schema.prisma`, chạy cả hai lệnh ở bước 3. Lần `migrate dev` đầu tiên tạo thư mục `prisma/migrations`; nhớ commit thư mục này để server dùng `migrate deploy`.
+Lưu ý Prisma 7: `migrate dev` **không** tự chạy `generate`. Khi sửa `schema.prisma`, chạy `npx prisma migrate dev --name <mo-ta>` rồi `npx prisma generate`, và commit thư mục migration mới.
+
+## Chạy test
+
+Test chạy với PostgreSQL thật (CSDL riêng `clinic_test`, bị xóa dữ liệu mỗi lần chạy):
+
+```bash
+docker exec clinic-db psql -U clinic -c "CREATE DATABASE clinic_test"
+cd backend
+DATABASE_URL=postgresql://clinic:clinic@localhost:5432/clinic_test npx prisma migrate deploy
+npm test            # chạy toàn bộ test
+npm run typecheck   # kiểm tra kiểu cả src lẫn test
+```
+
+CI chạy đúng các bước này trên mỗi pull request, kèm kiểm tra migration khớp với `schema.prisma`.
 
 ## Khởi tạo web (người 3 và 4)
 

@@ -1,0 +1,91 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic
+          POSTGRES_DB: clinic_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U clinic -d clinic_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://clinic:clinic@localhost:5432/clinic_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Kiểm tra schema
+        run: npx prisma validate
+      - run: npx prisma generate
+      - name: Áp dụng migration vào CSDL test
+        run: npx prisma migrate deploy
+      - name: Migration phải khớp schema.prisma
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Kiểm tra kiểu (gồm cả test)
+        run: npm run typecheck
+      - run: npm run build
+      - name: Chạy test
+        run: npm test
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: hashFiles('web/package.json') != ''
+        with:
+          node-version: 22
+      - name: Build và test web
+        if: hashFiles('web/package.json') != ''
+        working-directory: web
+        run: npm ci && npm run build && npm test --if-present
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: hashFiles('mobile/package.json') != ''
+        with:
+          node-version: 22
+      - name: Kiểm tra kiểu và test mobile
+        if: hashFiles('mobile/package.json') != ''
+        working-directory: mobile
+        run: npm ci && npm run typecheck && npm test --if-present
+
+  deploy:
+    # Chỉ deploy khi code đã vào main, mọi job kiểm tra đều xanh và đã cấu hình VPS
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    needs: [backend, web, mobile]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy lên VPS qua SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/clinic-booking
+            git pull --ff-only
+            if [ -f web/package.json ]; then (cd web && npm ci && npm run build); fi
+            docker compose up -d --build
+            docker image prune -f

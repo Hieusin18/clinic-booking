@@ -1,5 +1,5 @@
 // Schema CSDL cho hệ thống đặt lịch khám
-// Chạy: npx prisma migrate dev --name init
+// Sửa schema xong: npx prisma migrate dev --name <mo-ta> && npx prisma generate
 
 generator client {
   provider            = "prisma-client"
@@ -60,10 +60,12 @@ enum PrescriptionStatus {
 /// Tài khoản đăng nhập của cả 4 vai trò
 model User {
   id           String   @id @default(uuid())
+  fullName     String
   email        String?  @unique
   phone        String   @unique
   passwordHash String
   role         Role
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   patient Patient?
@@ -71,16 +73,16 @@ model User {
 }
 
 model Specialty {
-  id      String   @id @default(uuid())
-  name    String   @unique
-  doctors Doctor[]
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  doctors     Doctor[]
 }
 
 model Doctor {
   id          String  @id @default(uuid())
   userId      String  @unique
   specialtyId String
-  fullName    String
   title       String?
   bio         String?
 
@@ -187,6 +189,7 @@ model Medicine {
   activeIngredient String?
   strength         String?
   unit             String
+  isActive         Boolean @default(true)
 
   items PrescriptionItem[]
 }
