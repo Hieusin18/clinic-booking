@@ -13,9 +13,10 @@ import {
 import { Avatar, Button, Flex, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import type { ReactNode } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { ROLE_LABEL, useAuth } from '../lib/auth';
 import type { Role } from '../lib/types';
+import { PatientOnly } from './guards';
 
 type Item = Required<MenuProps>['items'][number] & { key: string };
 const item = (key: string, label: string, icon: ReactNode): Item => ({ key, label, icon });
@@ -43,7 +44,9 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  if (!user || user.role === 'PATIENT') return null;
+  // Đăng xuất hoặc token hết hạn (401) → về trang đăng nhập, không để trang trắng
+  if (!user) return <Navigate to="/login" replace state={{ from: pathname }} />;
+  if (user.role === 'PATIENT') return <PatientOnly />;
 
   const items = MENU_BY_ROLE[user.role];
   // Mục đang chọn = mục có đường dẫn dài nhất khớp với trang hiện tại
