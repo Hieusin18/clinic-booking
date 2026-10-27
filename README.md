@@ -17,8 +17,8 @@ clinic-booking/
 │       ├── health/          GET /api/health
 │       ├── qr/              Ký và kiểm tra token QR động (HMAC, hết hạn sau 60 giây)
 │       └── queue/           Cấp số thứ tự an toàn khi nhiều người lấy cùng lúc, quét QR
-├── web/                     (chưa có: khởi tạo theo hướng dẫn bên dưới)
-├── mobile/                  (chưa có: khởi tạo theo hướng dẫn bên dưới)
+├── web/                     React + Vite + Ant Design (admin, bác sĩ, lễ tân)
+├── mobile/                  Expo + Expo Router (bệnh nhân)
 ├── docker-compose.yml       db + backend + caddy
 ├── Caddyfile                HTTPS tự động, /api → backend, còn lại → web
 └── .github/workflows/       CI kiểm tra mỗi pull request, tự deploy khi vào main
@@ -79,25 +79,32 @@ npm run typecheck   # kiểm tra kiểu cả src lẫn test
 
 CI chạy đúng các bước này trên mỗi pull request, kèm kiểm tra migration khớp với `schema.prisma`.
 
-## Khởi tạo web (người 3 và 4)
+## Chạy web (trang quản lý cho admin, bác sĩ, lễ tân)
 
 ```bash
-npm create vite@latest web -- --template react-ts
 cd web
-npm install antd @tanstack/react-query axios qrcode.react
+npm install
+npm run dev        # http://localhost:5173, tự chuyển /api sang backend cổng 3000
+npm test           # test giao diện (Vitest + Testing Library)
+npm run build      # build ra web/dist để Caddy phục vụ
 ```
 
-Trong dev, cấu hình proxy `/api` của Vite sang `http://localhost:3000`. Khi deploy, Caddy phục vụ thư mục `web/dist`.
+Mã nguồn chia theo chức năng trong `web/src/features/<chức-năng>/`; phần dùng chung ở `web/src/lib` (gọi API, đăng nhập, định dạng) và `web/src/layout` (khung trang, phân quyền trang).
 
-## Khởi tạo mobile (người 5)
+## Chạy app mobile (bệnh nhân)
 
 ```bash
-npx create-expo-app@latest mobile
 cd mobile
-npx expo install expo-camera expo-notifications expo-secure-store
+npm install
+npx expo start     # quét QR bằng app Expo Go trên điện thoại
+npm run typecheck
+npm test
 ```
 
-Khi chạy trên điện thoại thật, trỏ API về IP máy tính trong mạng LAN (không dùng `localhost`). Build APK để nộp và demo bằng EAS Build (`eas build -p android --profile preview`).
+- Sửa `expo.extra.apiUrl` trong `mobile/app.json` thành IP LAN của máy chạy backend, ví dụ `http://192.168.1.10:3000/api` (điện thoại và máy tính cùng mạng Wi-Fi). Không dùng `localhost`.
+- Cài thêm thư viện Expo bằng `npx expo install <tên>` (không dùng `npm install`) để đúng phiên bản với SDK.
+- Màn hình nằm trong `mobile/src/app/` (Expo Router: mỗi file là một màn hình).
+- Build APK để nộp và demo: `eas build -p android --profile preview`, đặt `EXPO_PUBLIC_API_URL=https://<tên-miền>/api`.
 
 ## Deploy lên VPS (người 2)
 
