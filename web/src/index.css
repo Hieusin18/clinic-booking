@@ -1,0 +1,6 @@
+/* Khi in phiếu số: chỉ in phần .ticket */
+@media print {
+  body * { visibility: hidden; }
+  .ticket, .ticket * { visibility: visible; }
+  .ticket { position: fixed; inset: 0 auto auto 0; width: 80mm; border: none !important; }
+}

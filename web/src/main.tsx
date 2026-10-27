@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from './lib/auth';
 import { routes } from './routes';
+import './index.css';
 
 dayjs.locale('vi');
 

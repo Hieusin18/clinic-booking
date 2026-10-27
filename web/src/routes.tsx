@@ -4,6 +4,9 @@ import { MedicinesPage } from './features/admin/MedicinesPage';
 import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
 import { LoginPage } from './features/auth/LoginPage';
+import { CounterPage } from './features/reception/CounterPage';
+import { QueueBoardPage } from './features/reception/QueueBoardPage';
+import { ReceptionPage } from './features/reception/ReceptionPage';
 import { SchedulePage } from './features/schedule/SchedulePage';
 import { AppLayout } from './layout/AppLayout';
 import { ComingSoon, RequireRole } from './layout/guards';
@@ -29,7 +32,7 @@ export const routes: RouteObject[] = [
     path: '/counter',
     element: (
       <RequireRole roles={['RECEPTIONIST', 'ADMIN']}>
-        <ComingSoon title="Màn hình quầy" />
+        <CounterPage />
       </RequireRole>
     ),
   },
@@ -46,8 +49,8 @@ export const routes: RouteObject[] = [
       { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><MedicinesPage /></RequireRole> },
       { path: '/doctor/queue', element: <RequireRole roles={['DOCTOR']}><ComingSoon title="Khám bệnh" /></RequireRole> },
       { path: '/doctor/schedule', element: <RequireRole roles={['DOCTOR']}><SchedulePage /></RequireRole> },
-      { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ComingSoon title="Tiếp đón" /></RequireRole> },
-      { path: '/reception/queue', element: <RequireRole roles={['RECEPTIONIST']}><ComingSoon title="Hàng đợi hôm nay" /></RequireRole> },
+      { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ReceptionPage /></RequireRole> },
+      { path: '/reception/queue', element: <RequireRole roles={['RECEPTIONIST']}><QueueBoardPage /></RequireRole> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
