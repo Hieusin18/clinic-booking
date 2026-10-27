@@ -13,6 +13,7 @@ import { QueueService } from './queue/queue.service.js';
 import { SchedulesModule } from './schedules/schedules.js';
 import { SpecialtiesModule } from './specialties/specialties.js';
 import { StaffModule } from './staff/staff.js';
+import { VisitsModule } from './visits/visits.js';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { StaffModule } from './staff/staff.js';
     SchedulesModule,
     AppointmentsModule,
     PatientsModule,
+    VisitsModule,
   ],
   controllers: [HealthController, QrController, QueueController],
   providers: [QueueService],
