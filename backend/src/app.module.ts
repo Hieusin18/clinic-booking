@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { DoctorsModule } from './doctors/doctors.js';
 import { HealthController } from './health/health.controller.js';
 import { MedicinesModule } from './medicines/medicines.js';
+import { PatientsModule } from './patients/patients.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { QrController } from './qr/qr.controller.js';
 import { QueueController } from './queue/queue.controller.js';
@@ -12,6 +13,7 @@ import { QueueService } from './queue/queue.service.js';
 import { SchedulesModule } from './schedules/schedules.js';
 import { SpecialtiesModule } from './specialties/specialties.js';
 import { StaffModule } from './staff/staff.js';
+import { VisitsModule } from './visits/visits.js';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { StaffModule } from './staff/staff.js';
     MedicinesModule,
     SchedulesModule,
     AppointmentsModule,
+    PatientsModule,
+    VisitsModule,
   ],
   controllers: [HealthController, QrController, QueueController],
   providers: [QueueService],
