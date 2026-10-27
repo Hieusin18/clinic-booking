@@ -3,11 +3,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import type { CheckinMethod, VisitSource } from '../generated/prisma/enums.js';
 
-/** Ngày hôm nay theo giờ Việt Nam, dạng Date lúc 00:00 UTC (khớp cột @db.Date). */
-export function todayVN(now = new Date()): Date {
-  const ymd = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
-  return new Date(`${ymd}T00:00:00Z`);
-}
+export { todayVN } from '../common/time.js';
+import { todayVN } from '../common/time.js';
 
 export interface IssueTicketInput {
   patientId: string;

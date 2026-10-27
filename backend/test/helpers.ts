@@ -10,7 +10,8 @@ export async function createTestApp(): Promise<{ app: INestApplication; prisma: 
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  await app.init();
+  // Lắng nghe cổng ngẫu nhiên để nhiều request đồng thời dùng chung một server
+  await app.listen(0);
   return { app, prisma: app.get(PrismaService) };
 }
 
