@@ -17,3 +17,18 @@ describe('định dạng ngày giờ trên app', () => {
   });
   it('tên bác sĩ kèm học vị', () => expect(doctorName({ title: 'BS', user: { fullName: 'An' } })).toBe('BS An'));
 });
+
+import { parseVnDate, toVnDateInput } from './format';
+
+describe('nhập ngày sinh', () => {
+  it('đổi DD/MM/YYYY sang YYYY-MM-DD', () => {
+    expect(parseVnDate('5/3/1998')).toBe('1998-03-05');
+    expect(parseVnDate('20/12/2001')).toBe('2001-12-20');
+  });
+  it('từ chối ngày không có thật, sai định dạng hoặc ở tương lai', () => {
+    expect(parseVnDate('31/02/2000')).toBeNull();
+    expect(parseVnDate('2000-01-01')).toBeNull();
+    expect(parseVnDate('01/01/2999')).toBeNull();
+  });
+  it('hiện lại ngày sinh từ API vào ô nhập', () => expect(toVnDateInput('1998-03-05T00:00:00.000Z')).toBe('05/03/1998'));
+});

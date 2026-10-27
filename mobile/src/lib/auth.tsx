@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, setApiToken, setUnauthorizedHandler } from './api';
+import { AppError } from './errors';
 import { tokenStorage } from './storage';
 import type { Gender, User } from './types';
 
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const accept = useCallback(async (data: { accessToken: string; user: User }) => {
     if (data.user.role !== 'PATIENT') {
-      throw new Error('Ứng dụng dành cho bệnh nhân. Nhân viên vui lòng dùng trang web quản lý.');
+      throw new AppError('Ứng dụng dành cho bệnh nhân. Nhân viên vui lòng dùng trang web quản lý.');
     }
     setApiToken(data.accessToken);
     await tokenStorage.set(data.accessToken);

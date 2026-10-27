@@ -70,7 +70,7 @@ export function AppLayout() {
       <Layout>
         <Layout.Header style={{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0' }}>
           <Flex justify="flex-end" align="center" gap={12} style={{ height: '100%' }}>
-            <Avatar style={{ background: '#0f766e' }}>{user.fullName.trim().split(' ').pop()?.[0]}</Avatar>
+            <Avatar style={{ background: '#0f766e' }}>{user.fullName.trim().split(' ').pop()?.[0]?.toUpperCase()}</Avatar>
             <Typography.Text>{user.fullName}</Typography.Text>
             <Button icon={<LogoutOutlined />} onClick={logout}>Đăng xuất</Button>
           </Flex>
