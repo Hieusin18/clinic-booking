@@ -43,11 +43,25 @@ cp .env.example .env
 npx prisma migrate deploy
 npx prisma generate
 
-# 4. Chạy
+# 4. Tạo dữ liệu mẫu (chạy lại nhiều lần không bị trùng)
+npx prisma db seed
+
+# 5. Chạy
 npm run start:dev
 ```
 
-Mở http://localhost:3000/api/docs để xem Swagger.
+Mở http://localhost:3000/api/docs để xem Swagger. Bấm **Authorize** và dán `accessToken` lấy từ `POST /api/auth/login` để thử các API cần đăng nhập.
+
+Tài khoản mẫu (mật khẩu đều là `123456`):
+
+| Vai trò | SĐT |
+| --- | --- |
+| Admin | 0900000001 |
+| Lễ tân | 0900000002 |
+| Bệnh nhân | 0900000003 |
+| Bác sĩ | 0910000001 → 0910000006 |
+
+Phân quyền: mọi API mặc định cần đăng nhập; API công khai gắn `@Public()`, API giới hạn vai trò gắn `@Roles('ADMIN', …)` (xem `src/auth/decorators.ts`).
 
 Lưu ý Prisma 7: `migrate dev` **không** tự chạy `generate`. Khi sửa `schema.prisma`, chạy `npx prisma migrate dev --name <mo-ta>` rồi `npx prisma generate`, và commit thư mục migration mới.
 
