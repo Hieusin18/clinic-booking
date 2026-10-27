@@ -25,8 +25,3 @@ export function PatientOnly() {
     />
   );
 }
-
-/** Trang giữ chỗ, được thay bằng trang thật trong PR của từng chức năng. */
-export function ComingSoon({ title }: { title: string }) {
-  return <Result status="404" title={title} subTitle="Trang này sẽ có trong PR của chức năng tương ứng." />;
-}
