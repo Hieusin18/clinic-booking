@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Phòng khám",
+    "slug": "clinic-booking",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "vn.edu.cmc.clinicbooking"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "vn.edu.cmc.clinicbooking"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Ứng dụng cần camera để quét mã QR lấy số tại quầy",
+          "barcodeScannerEnabled": true
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "scheme": "clinicbooking",
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiUrl": "http://192.168.1.10:3000/api"
+    }
+  }
+}
