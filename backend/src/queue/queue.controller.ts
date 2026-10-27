@@ -1,6 +1,8 @@
 import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IsOptional, IsString } from 'class-validator';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators.js';
 import { verifyQrToken } from '../qr/qr-token.js';
 import { QueueService, todayVN } from './queue.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -14,6 +16,8 @@ class ScanQrDto {
   @IsOptional() @IsString() reason?: string;
 }
 
+@ApiTags('queue')
+@ApiBearerAuth()
 @Controller('queue')
 export class QueueController {
   constructor(
@@ -23,6 +27,7 @@ export class QueueController {
   ) {}
 
   /** Bệnh nhân quét QR tại quầy: tự check-in nếu đã đặt lịch hôm nay, nếu chưa thì lấy số mới. */
+  @Roles('PATIENT')
   @Post('scan')
   async scan(@Body() dto: ScanQrDto) {
     const check = verifyQrToken(dto.token, {

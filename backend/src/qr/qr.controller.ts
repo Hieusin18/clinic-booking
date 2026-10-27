@@ -1,15 +1,20 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators.js';
 import { createQrToken } from './qr-token.js';
 
+@ApiTags('queue')
+@ApiBearerAuth()
 @Controller('qr')
 export class QrController {
   constructor(private readonly config: ConfigService) {}
 
   /**
    * Màn hình quầy gọi API này mỗi 30 giây để vẽ mã QR mới.
-   * TODO (tuần 1): chỉ cho tài khoản lễ tân/admin gọi, sau khi có guard phân quyền.
+   * Máy ở quầy đăng nhập bằng tài khoản lễ tân.
    */
+  @Roles('RECEPTIONIST', 'ADMIN')
   @Get('current')
   current() {
     const ttl = Number(this.config.get('QR_TTL_SECONDS') ?? 60);
