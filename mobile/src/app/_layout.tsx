@@ -29,6 +29,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="register" options={{ title: 'Đăng ký tài khoản' }} />
+            <Stack.Screen name="book/[doctorId]" options={{ title: 'Đặt lịch' }} />
           </Stack>
         </AuthProvider>
       </QueryClientProvider>
