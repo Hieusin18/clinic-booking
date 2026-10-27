@@ -1,13 +1,18 @@
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 /**
  * Địa chỉ API, ưu tiên theo thứ tự:
  * 1. Biến môi trường EXPO_PUBLIC_API_URL (vd. khi build APK trỏ về server HTTPS)
- * 2. expo.extra.apiUrl trong app.json (IP LAN của máy chạy backend khi dev)
+ * 2. Bản web khi dev: '/api' cùng địa chỉ trang, Metro chuyển tiếp sang backend (metro.config.js)
+ * 3. expo.extra.apiUrl trong app.json (IP LAN của máy chạy backend, cho điện thoại thật)
  */
 export const API_URL: string =
-  process.env.EXPO_PUBLIC_API_URL ?? (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:3000/api';
+  process.env.EXPO_PUBLIC_API_URL ??
+  (Platform.OS === 'web' && __DEV__ ? '/api' : undefined) ??
+  (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
+  'http://localhost:3000/api';
 
 export const api = axios.create({ baseURL: API_URL, timeout: 15_000 });
 
