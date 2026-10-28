@@ -29,6 +29,21 @@ services:
       QR_TTL_SECONDS: ${QR_TTL_SECONDS:-60}
       CLINIC_ID: ${CLINIC_ID}
 
+  # Tạo dữ liệu mẫu (admin, bác sĩ, thuốc…) — chỉ chạy khi gọi tay, sau khi backend đã migrate:
+  #   docker compose run --rm seed
+  # Dùng stage "build" của Dockerfile vì seed cần tsx và mã nguồn (image chạy thật không có).
+  seed:
+    build:
+      context: ./backend
+      target: build
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    command: ["npx", "prisma", "db", "seed"]
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
