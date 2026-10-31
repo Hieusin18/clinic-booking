@@ -91,6 +91,22 @@ npm run build      # build ra web/dist để Caddy phục vụ
 
 Mã nguồn chia theo chức năng trong `web/src/features/<chức-năng>/`; phần dùng chung ở `web/src/lib` (gọi API, đăng nhập, định dạng) và `web/src/layout` (khung trang, phân quyền trang).
 
+## Chạy demo trên một laptop (không cần VPS, tên miền)
+
+Cần Docker Desktop, Node 22 và Git. Các máy khác và điện thoại vào cùng mạng Wi-Fi với laptop.
+
+```bash
+cp .env.example .env                      # giữ DOMAIN=:80, đổi các mật khẩu/khoá bí mật
+cd web && npm ci && npm run build && cd ..
+docker compose up -d --build              # db + backend (tự migrate) + caddy ở cổng 80
+docker compose run --rm seed              # tài khoản và dữ liệu mẫu
+```
+
+- Web: `http://<IP-laptop>` (xem IP bằng `ipconfig`). Trên chính laptop: `http://localhost`.
+- App bệnh nhân (Expo Go): `set EXPO_PUBLIC_API_URL=http://<IP-laptop>/api` rồi `npx expo start`.
+- Windows chặn cổng 80 từ máy khác thì mở bằng CMD quyền Administrator:
+  `netsh advfirewall firewall add rule name="Clinic demo" dir=in action=allow protocol=TCP localport=80`
+
 ## Chạy app mobile (bệnh nhân)
 
 ```bash
