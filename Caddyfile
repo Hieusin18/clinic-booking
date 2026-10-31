@@ -1,5 +1,5 @@
 # Caddy tự xin chứng chỉ HTTPS cho tên miền trong biến DOMAIN.
-# Chạy local: đặt DOMAIN=localhost
+# Demo trên laptop qua mạng LAN: đặt DOMAIN=:80 (HTTP, không cần tên miền)
 {$DOMAIN} {
 	encode gzip
 
