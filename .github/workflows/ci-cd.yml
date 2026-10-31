@@ -85,7 +85,7 @@ jobs:
       - name: Dựng db + backend + caddy
         run: |
           cp .env.example .env
-          docker compose up -d --build --wait
+          docker compose up -d --build --wait --wait-timeout 180
       - name: Tạo dữ liệu mẫu
         run: docker compose run --rm seed
       - name: Kiểm tra qua Caddy ở cổng 80
@@ -96,7 +96,13 @@ jobs:
             -d '{"phone":"0900000001","password":"123456"}' | grep -q accessToken
       - name: Log khi lỗi
         if: failure()
-        run: docker compose logs --tail 100
+        run: |
+          docker compose ps -a
+          docker compose logs --tail 100
+          # Gộp log thành một annotation để xem được ngay trên trang PR
+          for s in backend caddy db; do
+            echo "::error title=log $s::$(docker compose logs --no-color --tail 25 $s 2>&1 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"
+          done
 
   deploy:
     # Chỉ deploy khi code đã vào main, mọi job kiểm tra đều xanh và đã cấu hình VPS
