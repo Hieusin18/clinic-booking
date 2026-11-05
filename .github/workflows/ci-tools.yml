@@ -31,6 +31,12 @@ jobs:
         if: failure()
         run: |
           docker compose -f ci/docker-compose.yml ps -a
-          for s in jenkins sonarqube sonar-db; do
+          docker compose -f ci/docker-compose.yml ps -a > ps.txt 2>&1
+          echo "::error title=ps::$(sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g' ps.txt)"
+          for f in sonar.log es.log web.log ce.log; do
+            docker compose -f ci/docker-compose.yml cp sonarqube:/opt/sonarqube/logs/$f $f 2>/dev/null || continue
+            echo "::error title=$f::$(grep -E 'WARN|ERROR|Exception|stopped|max_map|bootstrap' $f | tail -n 20 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"
+          done
+          for s in sonarqube; do
             echo "::error title=log $s::$(docker compose -f ci/docker-compose.yml logs --no-color --tail 25 $s 2>&1 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"
           done
