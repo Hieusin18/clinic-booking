@@ -15,6 +15,7 @@ import { SchedulesModule } from './schedules/schedules.js';
 import { SpecialtiesModule } from './specialties/specialties.js';
 import { StaffModule } from './staff/staff.js';
 import { VisitsModule } from './visits/visits.js';
+import { Icd10Module } from './icd10/icd10.js';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { VisitsModule } from './visits/visits.js';
     AppointmentsModule,
     PatientsModule,
     VisitsModule,
+    Icd10Module,
     MetricsModule,
   ],
   controllers: [HealthController, QrController, QueueController],

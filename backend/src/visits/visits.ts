@@ -1,18 +1,100 @@
-import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, Patch, Post, Put, Query, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { randomInt } from 'node:crypto';
+import { ArrayMinSize, IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { patientIdOf } from '../appointments/appointments.js';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { clinicInfo } from '../common/clinic.js';
+import { dateOnly } from '../common/time.js';
+import { ICD_REGEX } from '../icd10/icd10.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { visitView } from '../queue/queue.service.js';
+import { buildPrintDoc, renderDocx, renderPdf } from './record-export.js';
 
+const ICD_MESSAGE = 'Mã ICD-10 không hợp lệ (ví dụ J02.9)';
+/** Ô để trống trên form gửi "" hoặc null: coi như không nhập. */
+const EmptyToUndefined = () => Transform(({ value }) => (value === '' || value === null ? undefined : value));
+/** Mã ICD: bỏ khoảng trắng thừa, viết hoa; ô trống coi như không nhập. */
+const IcdInput = () =>
+  Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() || undefined : value === null ? undefined : value));
+const ICD_LIST = /^[A-Z]\d{2}(\.\d{1,2})?(\s*,\s*[A-Z]\d{2}(\.\d{1,2})?)*$/;
+
+/** Bệnh án ngoại trú, bố cục theo mẫu bệnh án của Bộ Y tế. Chỉ quá trình bệnh lý và chẩn đoán là bắt buộc. */
 export class RecordDto {
+  // III. Hỏi bệnh
+  @IsOptional() @IsString() @MaxLength(500) reason?: string;
+  /** Quá trình bệnh lý (bệnh sử, triệu chứng) */
   @IsString() @MinLength(2) @MaxLength(2000) symptoms: string;
-  @IsString() @MinLength(2) @MaxLength(1000) diagnosis: string;
-  /** Chỉ định: xét nghiệm, tái khám… */
+  @IsOptional() @IsString() @MaxLength(1000) personalHistory?: string;
+  @IsOptional() @IsString() @MaxLength(1000) familyHistory?: string;
+
+  // IV. Khám bệnh
+  @IsOptional() @Type(() => Number) @IsInt() @Min(20) @Max(250) pulse?: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 1 }) @Min(30) @Max(45) temperature?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(40) @Max(300) bpSystolic?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(20) @Max(200) bpDiastolic?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(5) @Max(80) respiratoryRate?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(50) @Max(100) spo2?: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 1 }) @Min(0.5) @Max(400) weight?: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 1 }) @Min(30) @Max(250) height?: number;
+  @IsOptional() @IsString() @MaxLength(2000) generalExam?: string;
+  @IsOptional() @IsString() @MaxLength(2000) organExam?: string;
+  @IsOptional() @IsString() @MaxLength(2000) labSummary?: string;
+  /** Chỉ định cận lâm sàng: xét nghiệm, chẩn đoán hình ảnh… */
   @IsOptional() @IsString() @MaxLength(2000) orders?: string;
+
+  // V. Chẩn đoán
+  @IsString() @MinLength(2) @MaxLength(1000) diagnosis: string;
+  @IcdInput() @IsOptional() @Matches(ICD_REGEX, { message: ICD_MESSAGE }) icdCode?: string;
+  @IsOptional() @IsString() @MaxLength(1000) secondaryDiagnosis?: string;
+  /** Mã ICD-10 bệnh kèm theo, cách nhau bởi dấu phẩy */
+  @IcdInput() @IsOptional() @Matches(ICD_LIST, { message: ICD_MESSAGE }) secondaryIcdCodes?: string;
+
+  // VI. Điều trị
+  @IsOptional() @IsString() @MaxLength(2000) treatment?: string;
+  /** Hẹn tái khám, YYYY-MM-DD */
+  @EmptyToUndefined() @IsOptional() @IsDateString({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Ngày tái khám dạng YYYY-MM-DD' }) followUpDate?: string;
+}
+
+/** Chuỗi rỗng từ form nghĩa là bỏ trống: lưu null để xóa được giá trị cũ. */
+function recordData(dto: RecordDto) {
+  const blank = (v?: string) => (v?.trim() ? v.trim() : null);
+  return {
+    reason: blank(dto.reason),
+    symptoms: dto.symptoms.trim(),
+    personalHistory: blank(dto.personalHistory),
+    familyHistory: blank(dto.familyHistory),
+    pulse: dto.pulse ?? null,
+    temperature: dto.temperature ?? null,
+    bpSystolic: dto.bpSystolic ?? null,
+    bpDiastolic: dto.bpDiastolic ?? null,
+    respiratoryRate: dto.respiratoryRate ?? null,
+    spo2: dto.spo2 ?? null,
+    weight: dto.weight ?? null,
+    height: dto.height ?? null,
+    generalExam: blank(dto.generalExam),
+    organExam: blank(dto.organExam),
+    labSummary: blank(dto.labSummary),
+    orders: blank(dto.orders),
+    diagnosis: dto.diagnosis.trim(),
+    icdCode: blank(dto.icdCode),
+    secondaryDiagnosis: blank(dto.secondaryDiagnosis),
+    secondaryIcdCodes: blank(dto.secondaryIcdCodes)?.split(/\s*,\s*/).join(', ') ?? null,
+    treatment: blank(dto.treatment),
+    followUpDate: dto.followUpDate ? dateOnly(dto.followUpDate) : null,
+  };
+}
+
+const CODE_CHARS = '0123456789abcdefghijklmnopqrstuvwxyz';
+/**
+ * Mã đơn thuốc theo Thông tư 26/2025/TT-BYT: xxxxxyyyyyyy-z gồm 5 ký tự mã cơ sở,
+ * 7 ký tự ngẫu nhiên và loại đơn (C = đơn thuốc thông thường).
+ */
+export function prescriptionCode() {
+  const random = Array.from({ length: 7 }, () => CODE_CHARS[randomInt(CODE_CHARS.length)]).join('');
+  return `${clinicInfo().code}${random}-C`;
 }
 
 export class PrescriptionItemDto {
@@ -41,6 +123,7 @@ export class HistoryQuery {
 
 const prescriptionView = {
   id: true,
+  code: true,
   status: true,
   advice: true,
   createdAt: true,
@@ -89,11 +172,17 @@ export class VisitsService {
   }
 
   async saveRecord(user: AuthUser, visitId: string, dto: RecordDto) {
-    await this.ownVisit(user, visitId);
+    const { visit } = await this.ownVisit(user, visitId);
+    const data = recordData(dto);
+    if (data.followUpDate && data.followUpDate <= visit.date) throw new BadRequestException('Ngày tái khám phải sau ngày khám');
+    if ((data.bpSystolic == null) !== (data.bpDiastolic == null)) throw new BadRequestException('Nhập đủ cả huyết áp tâm thu và tâm trương');
+    if (data.bpSystolic != null && data.bpDiastolic != null && data.bpSystolic <= data.bpDiastolic) {
+      throw new BadRequestException('Huyết áp tâm thu phải lớn hơn tâm trương');
+    }
     return this.prisma.medicalRecord.upsert({
       where: { visitId },
-      create: { visitId, ...dto },
-      update: dto,
+      create: { visitId, ...data },
+      update: data,
     });
   }
 
@@ -133,6 +222,24 @@ export class VisitsService {
     }
     if (visit.doctor.id !== (await this.doctorIdOf(user))) throw new NotFoundException('Không tìm thấy phiếu khám');
     return { ...visit, prescription: currentPrescription(visit.prescriptions) };
+  }
+
+  /**
+   * Bản điện tử bệnh án + đơn thuốc (PDF hoặc Word). Cùng quyền với xem chi tiết:
+   * bệnh nhân của lượt khám hoặc bác sĩ phụ trách.
+   */
+  async export(user: AuthUser, visitId: string, format: 'pdf' | 'docx') {
+    const visit = await this.detail(user, visitId);
+    if (!visit.medicalRecord) throw new ConflictException('Lượt khám chưa có bệnh án');
+    const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: visit.patient.id } });
+    // Bác sĩ không ghi lại lý do khám thì dùng lý do bệnh nhân khai lúc đặt lịch/lấy số
+    const doc = buildPrintDoc({ ...visit, patient, medicalRecord: { ...visit.medicalRecord, reason: visit.medicalRecord.reason ?? visit.reason } });
+    const buffer = format === 'pdf' ? await renderPdf(doc) : await renderDocx(doc);
+    return new StreamableFile(buffer, {
+      type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      disposition: `attachment; filename="${doc.fileName}.${format}"`,
+      length: buffer.length,
+    });
   }
 
   /** Lịch sử khám của bệnh nhân đang đăng nhập (mới nhất trước). */
@@ -212,7 +319,7 @@ export class VisitsService {
     await this.ownDraft(user, id);
     const { count } = await this.prisma.prescription.updateMany({
       where: { id, status: 'DRAFT' },
-      data: { status: 'FINALIZED', finalizedAt: new Date() },
+      data: { status: 'FINALIZED', finalizedAt: new Date(), code: prescriptionCode() },
     });
     if (count === 0) throw new ConflictException('Đơn đã hoàn tất');
     return this.prisma.prescription.findUniqueOrThrow({ where: { id }, select: prescriptionView });
@@ -248,6 +355,20 @@ export class VisitsController {
   @Get('visits/:id')
   detail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.detail(user, id);
+  }
+
+  /** Tải bệnh án và đơn thuốc dạng PDF */
+  @Roles('DOCTOR', 'PATIENT')
+  @Get('visits/:id/record.pdf')
+  exportPdf(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.export(user, id, 'pdf');
+  }
+
+  /** Tải bệnh án và đơn thuốc dạng Word (.docx) */
+  @Roles('DOCTOR', 'PATIENT')
+  @Get('visits/:id/record.docx')
+  exportDocx(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.export(user, id, 'docx');
   }
 
   /** Ghi hoặc sửa bệnh án (chỉ bác sĩ phụ trách) */

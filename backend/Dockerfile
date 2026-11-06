@@ -12,6 +12,8 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev && npm i --no-save prisma@7
 COPY --from=build /app/dist ./dist
+# Font tiếng Việt (Tinos, giống Times New Roman) để xuất bệnh án PDF
+COPY assets ./assets
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 EXPOSE 3000

@@ -54,7 +54,12 @@ export interface Patient {
   nationalId: string | null;
   address: string | null;
   insuranceNo: string | null;
+  insuranceExpiry: string | null;
   allergies: string | null;
+  occupation: string | null;
+  ethnicity: string | null;
+  relativeName: string | null;
+  relativePhone: string | null;
   userId: string | null;
 }
 
@@ -102,11 +107,33 @@ export interface Appointment {
   visit?: { id: string; queueNumber: number; status: VisitStatus } | null;
 }
 
+/** Bệnh án ngoại trú theo bố cục mẫu Bộ Y tế */
 export interface MedicalRecord {
   id: string;
+  reason: string | null;
+  /** Quá trình bệnh lý */
   symptoms: string;
-  diagnosis: string;
+  personalHistory: string | null;
+  familyHistory: string | null;
+  pulse: number | null;
+  temperature: number | null;
+  bpSystolic: number | null;
+  bpDiastolic: number | null;
+  respiratoryRate: number | null;
+  spo2: number | null;
+  weight: number | null;
+  height: number | null;
+  generalExam: string | null;
+  organExam: string | null;
+  labSummary: string | null;
+  /** Chỉ định cận lâm sàng */
   orders: string | null;
+  diagnosis: string;
+  icdCode: string | null;
+  secondaryDiagnosis: string | null;
+  secondaryIcdCodes: string | null;
+  treatment: string | null;
+  followUpDate: string | null;
 }
 
 export interface PrescriptionItem {
@@ -121,6 +148,8 @@ export interface PrescriptionItem {
 
 export interface Prescription {
   id: string;
+  /** Mã đơn thuốc, cấp khi hoàn tất đơn */
+  code: string | null;
   status: 'DRAFT' | 'FINALIZED';
   advice: string | null;
   createdAt: string;

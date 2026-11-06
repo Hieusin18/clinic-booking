@@ -136,7 +136,14 @@ model Patient {
   nationalId  String?  @unique
   address     String?
   insuranceNo String?
+  /// Hạn dùng thẻ BHYT
+  insuranceExpiry DateTime? @db.Date
   allergies   String?
+  occupation  String?
+  ethnicity   String?
+  /// Người nhà cần báo tin (với trẻ em: người đưa trẻ đến khám)
+  relativeName  String?
+  relativePhone String?
   createdAt   DateTime @default(now())
 
   user         User?         @relation(fields: [userId], references: [id])
@@ -169,13 +176,53 @@ model Visit {
   @@index([patientId, date])
 }
 
-/// Chỉ bác sĩ được ghi
+/// Bệnh án ngoại trú của một lượt khám, theo bố cục mẫu bệnh án Bộ Y tế. Chỉ bác sĩ phụ trách được ghi.
 model MedicalRecord {
   id        String   @id @default(uuid())
   visitId   String   @unique
-  symptoms  String
-  diagnosis String
-  orders    String?
+
+  // III. Hỏi bệnh
+  /// Lý do đến khám
+  reason          String?
+  /// Quá trình bệnh lý (bệnh sử, triệu chứng)
+  symptoms        String
+  personalHistory String?
+  familyHistory   String?
+
+  // IV. Khám bệnh: dấu hiệu sinh tồn
+  /// lần/phút
+  pulse           Int?
+  /// °C
+  temperature     Float?
+  /// mmHg
+  bpSystolic      Int?
+  bpDiastolic     Int?
+  /// lần/phút
+  respiratoryRate Int?
+  /// %
+  spo2            Int?
+  /// kg
+  weight          Float?
+  /// cm
+  height          Float?
+  generalExam     String?
+  organExam       String?
+  /// Tóm tắt kết quả cận lâm sàng
+  labSummary      String?
+  /// Chỉ định cận lâm sàng
+  orders          String?
+
+  // V. Chẩn đoán (mã ICD-10)
+  diagnosis          String
+  icdCode            String?
+  secondaryDiagnosis String?
+  /// Mã ICD-10 bệnh kèm theo, cách nhau bởi dấu phẩy
+  secondaryIcdCodes  String?
+
+  // VI. Điều trị
+  treatment    String?
+  followUpDate DateTime? @db.Date
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -197,6 +244,8 @@ model Medicine {
 /// Đơn thuốc. Khóa khi FINALIZED; cần sửa thì tạo đơn mới với replacesId trỏ về đơn cũ.
 model Prescription {
   id          String             @id @default(uuid())
+  /// Mã đơn thuốc dạng xxxxxyyyyyyy-z (Thông tư 26/2025/TT-BYT), cấp khi hoàn tất đơn
+  code        String?            @unique
   visitId     String
   doctorId    String
   advice      String?

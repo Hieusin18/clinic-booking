@@ -16,8 +16,13 @@ type NewPatient = {
   gender: Gender;
   nationalId?: string;
   insuranceNo?: string;
+  insuranceExpiry?: Dayjs | null;
   address?: string;
   allergies?: string;
+  occupation?: string;
+  ethnicity?: string;
+  relativeName?: string;
+  relativePhone?: string;
 };
 
 /** Lễ tân: tìm hoặc tạo hồ sơ, cấp số cho người đến trực tiếp, check-in người đã đặt lịch. */
@@ -53,6 +58,11 @@ export function ReceptionPage() {
           insuranceNo: v.insuranceNo || undefined,
           address: v.address || undefined,
           allergies: v.allergies || undefined,
+          insuranceExpiry: v.insuranceExpiry ? v.insuranceExpiry.format('YYYY-MM-DD') : undefined,
+          occupation: v.occupation || undefined,
+          ethnicity: v.ethnicity || undefined,
+          relativeName: v.relativeName || undefined,
+          relativePhone: v.relativePhone || undefined,
         })
       ).data,
     { success: 'Đã tạo hồ sơ bệnh nhân', invalidate: ['patients'] },
@@ -251,13 +261,38 @@ export function ReceptionPage() {
               </Form.Item>
             </Col>
             <Col span={12}>
+              <Form.Item label="Nghề nghiệp" name="occupation">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Dân tộc" name="ethnicity">
+                <Input placeholder="Kinh" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
               <Form.Item label="Mã thẻ BHYT" name="insuranceNo">
                 <Input />
               </Form.Item>
             </Col>
             <Col span={12}>
+              <Form.Item label="BHYT giá trị đến" name="insuranceExpiry">
+                <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
               <Form.Item label="Địa chỉ" name="address">
                 <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Người nhà (báo tin / đưa trẻ đến khám)" name="relativeName">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="SĐT người nhà" name="relativePhone" rules={[{ pattern: /^0\d{9}$/, message: 'SĐT gồm 10 chữ số, bắt đầu bằng 0' }]}>
+                <Input inputMode="tel" />
               </Form.Item>
             </Col>
             <Col span={24}>

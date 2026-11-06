@@ -30,6 +30,10 @@ services:
       QR_SECRET: ${QR_SECRET}
       QR_TTL_SECONDS: ${QR_TTL_SECONDS:-60}
       CLINIC_ID: ${CLINIC_ID}
+      CLINIC_NAME: ${CLINIC_NAME:-}
+      CLINIC_ADDRESS: ${CLINIC_ADDRESS:-}
+      CLINIC_PHONE: ${CLINIC_PHONE:-}
+      CLINIC_CODE: ${CLINIC_CODE:-}
 
   # Tạo dữ liệu mẫu (admin, bác sĩ, thuốc…) — chỉ chạy khi gọi tay, sau khi backend đã migrate:
   #   docker compose run --rm seed

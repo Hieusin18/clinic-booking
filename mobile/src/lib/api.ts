@@ -18,6 +18,7 @@ export const api = axios.create({ baseURL: API_URL, timeout: 15_000 });
 
 let currentToken: string | null = null;
 export const setApiToken = (token: string | null) => (currentToken = token);
+export const getApiToken = () => currentToken;
 
 api.interceptors.request.use((config) => {
   if (currentToken) config.headers.Authorization = `Bearer ${currentToken}`;
