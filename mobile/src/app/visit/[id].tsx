@@ -1,14 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Text, View } from 'react-native';
 import { Button, Card, Empty, ErrorBox, Loading, Muted, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
-import { downloadRecord } from '@/lib/download';
+import { RecordActions } from '@/components/RecordActions';
 import { errorMessage } from '@/lib/errors';
 import { doctorName, formatDate, formatDay } from '@/lib/format';
 import { medicineName, usage } from '@/lib/prescription';
-import { exportFileName, vitals, withIcd, type ExportFormat } from '@/lib/record';
+import { vitals, withIcd } from '@/lib/record';
 import type { VisitDetail } from '@/lib/types';
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -29,22 +28,12 @@ function Section({ title }: { title: string }) {
 export default function VisitScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const visit = useQuery({ queryKey: ['visit', id], queryFn: async () => (await api.get<VisitDetail>(`/visits/${id}`)).data });
-  const [busy, setBusy] = useState<ExportFormat | null>(null);
   const v = visit.data;
 
   if (visit.isLoading) return <Screen><Loading /></Screen>;
   if (!v) return <Screen><ErrorBox message={visit.error ? errorMessage(visit.error) : 'Không tìm thấy lần khám'} /></Screen>;
 
-  const download = async (format: ExportFormat) => {
-    setBusy(format);
-    try {
-      await downloadRecord(v.id, format, exportFileName(v.date, format));
-    } catch (e) {
-      Alert.alert('Không tải được', e instanceof Error ? e.message : errorMessage(e));
-    } finally {
-      setBusy(null);
-    }
-  };
+
 
   const r = v.medicalRecord;
   const p = v.prescription;
@@ -134,15 +123,9 @@ export default function VisitScreen() {
       {r && (
         <Card>
           <Text style={styles.title}>Bản điện tử</Text>
-          <Muted>Bệnh án và đơn thuốc theo mẫu in của phòng khám. Lưu vào máy, in hoặc gửi cho bác sĩ khác.</Muted>
-          <View style={[styles.row, { gap: 10 }]}>
-            <View style={{ flex: 1 }}>
-              <Button title="Tải PDF" loading={busy === 'pdf'} disabled={!!busy} onPress={() => download('pdf')} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button title="Tải Word" variant="secondary" loading={busy === 'docx'} disabled={!!busy} onPress={() => download('docx')} />
-            </View>
-          </View>
+          <Muted>Bệnh án và đơn thuốc theo mẫu in của phòng khám. Xem trước rồi tải về để lưu, in hoặc gửi cho bác sĩ khác.</Muted>
+          <Button title="Xem trước" onPress={() => router.push({ pathname: '/preview/[id]', params: { id: v.id, date: v.date } })} />
+          <RecordActions visitId={v.id} visitDate={v.date} />
         </Card>
       )}
     </Screen>

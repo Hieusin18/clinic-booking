@@ -1,4 +1,4 @@
-import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, HttpCode, Injectable, Module, NotFoundException, Param, Patch, Post, Put, Query, StreamableFile } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, Injectable, Module, NotFoundException, Param, Patch, Post, Put, Query, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { randomInt } from 'node:crypto';
@@ -11,7 +11,7 @@ import { dateOnly } from '../common/time.js';
 import { ICD_REGEX } from '../icd10/icd10.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { visitView } from '../queue/queue.service.js';
-import { buildPrintDoc, renderDocx, renderPdf } from './record-export.js';
+import { buildPrintDoc, renderDocx, renderHtml, renderPdf } from './record-export.js';
 
 const ICD_MESSAGE = 'Mã ICD-10 không hợp lệ (ví dụ J02.9)';
 /** Ô để trống trên form gửi "" hoặc null: coi như không nhập. */
@@ -228,18 +228,31 @@ export class VisitsService {
    * Bản điện tử bệnh án + đơn thuốc (PDF hoặc Word). Cùng quyền với xem chi tiết:
    * bệnh nhân của lượt khám hoặc bác sĩ phụ trách.
    */
-  async export(user: AuthUser, visitId: string, format: 'pdf' | 'docx') {
+  private async printDoc(user: AuthUser, visitId: string) {
     const visit = await this.detail(user, visitId);
     if (!visit.medicalRecord) throw new ConflictException('Lượt khám chưa có bệnh án');
     const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: visit.patient.id } });
     // Bác sĩ không ghi lại lý do khám thì dùng lý do bệnh nhân khai lúc đặt lịch/lấy số
-    const doc = buildPrintDoc({ ...visit, patient, medicalRecord: { ...visit.medicalRecord, reason: visit.medicalRecord.reason ?? visit.reason } });
+    return buildPrintDoc({ ...visit, patient, medicalRecord: { ...visit.medicalRecord, reason: visit.medicalRecord.reason ?? visit.reason } });
+  }
+
+  /**
+   * Bản điện tử bệnh án + đơn thuốc (PDF hoặc Word). Cùng quyền với xem chi tiết:
+   * bệnh nhân của lượt khám hoặc bác sĩ phụ trách.
+   */
+  async export(user: AuthUser, visitId: string, format: 'pdf' | 'docx') {
+    const doc = await this.printDoc(user, visitId);
     const buffer = format === 'pdf' ? await renderPdf(doc) : await renderDocx(doc);
     return new StreamableFile(buffer, {
       type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       disposition: `attachment; filename="${doc.fileName}.${format}"`,
       length: buffer.length,
     });
+  }
+
+  /** Bản xem trước dạng HTML (cùng nội dung với PDF/Word) cho app và web hiển thị trước khi tải. */
+  async preview(user: AuthUser, visitId: string) {
+    return renderHtml(await this.printDoc(user, visitId));
   }
 
   /** Lịch sử khám của bệnh nhân đang đăng nhập (mới nhất trước). */
@@ -355,6 +368,16 @@ export class VisitsController {
   @Get('visits/:id')
   detail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.detail(user, id);
+  }
+
+  /** Xem trước bệnh án và đơn thuốc (HTML, không có JavaScript) */
+  @Roles('DOCTOR', 'PATIENT')
+  @Get('visits/:id/record.html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors *")
+  @Header('Cache-Control', 'no-store')
+  previewHtml(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.preview(user, id);
   }
 
   /** Tải bệnh án và đơn thuốc dạng PDF */

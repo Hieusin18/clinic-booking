@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api';
@@ -79,6 +79,30 @@ describe('Màn hình khám bệnh', () => {
     expect(await screen.findByRole('button', { name: /Tải PDF/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Tải Word/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cập nhật bệnh án' })).toBeInTheDocument();
+  });
+});
+
+describe('Xem trước bản điện tử', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('mở bản xem trước ngay trên trang, tải được từ hộp xem trước', async () => {
+    const record = { id: 'r1', symptoms: 'Đau đầu', diagnosis: 'Migraine', icdCode: 'G43.9', followUpDate: null };
+    const detail = { ...visit('IN_PROGRESS'), medicalRecord: record, prescriptions: [], prescription: null };
+    const get = vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
+      if (url === '/queue/doctor') return { data: [visit('IN_PROGRESS')] };
+      if (url === '/visits/v1') return { data: detail };
+      if (url === '/visits/v1/record.html') return { data: '<!doctype html><h1>BỆNH ÁN NGOẠI TRÚ</h1>' };
+      return { data: [] };
+    });
+    renderPage([page('/', <ExamPage />)], { user: fakeUser('DOCTOR') });
+    await userEvent.click(await screen.findByRole('button', { name: /Xem trước/ }));
+    const frame = await screen.findByTitle('Bản xem trước bệnh án');
+    expect(frame).toHaveAttribute('srcdoc', '<!doctype html><h1>BỆNH ÁN NGOẠI TRÚ</h1>');
+    expect(frame).toHaveAttribute('sandbox', '');
+    expect(get).toHaveBeenCalledWith('/visits/v1/record.html', { responseType: 'text' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: /Tải PDF/ })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: /Tải Word/ })).toBeEnabled();
   });
 });
 
