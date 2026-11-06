@@ -52,6 +52,18 @@ enum VisitStatus {
   LEFT
 }
 
+/// Bác sĩ gọi lượt này theo quy tắc nào (xem src/queue/queue-order.ts)
+enum CallRule {
+  /// Người vãng lai chờ sau nhiều lượt ưu tiên người đặt lịch liên tiếp
+  FAIRNESS
+  /// Người đặt lịch đã đến giờ hẹn
+  APPOINTMENT
+  /// Theo thứ tự đến quầy
+  ARRIVAL
+  /// Bác sĩ chọn đích danh
+  MANUAL
+}
+
 enum PrescriptionStatus {
   DRAFT
   FINALIZED
@@ -151,8 +163,9 @@ model Patient {
   visits       Visit[]
 }
 
-/// Phiếu khám = một vị trí trong hàng đợi chung.
-/// Cấp số trong transaction; unique (doctorId, date, queueNumber) chặn trùng số.
+/// Phiếu khám = một vị trí trong hàng đợi của bác sĩ.
+/// Hai dãy số: A (đặt lịch, ONLINE) và B (vãng lai, WALK_IN), mỗi dãy đánh số từ 1 mỗi ngày.
+/// Cấp số trong transaction; unique (doctorId, date, source, queueNumber) chặn trùng số.
 model Visit {
   id            String        @id @default(uuid())
   patientId     String
@@ -164,6 +177,12 @@ model Visit {
   status        VisitStatus   @default(WAITING)
   reason        String?
   appointmentId String?       @unique
+  /// Giờ hẹn của lượt đặt online; người đặt lịch được ưu tiên gọi từ giờ hẹn trừ vài phút
+  appointmentAt DateTime?
+  /// Lễ tân check-in ngoài khung giờ cho phép (đến quá sớm hoặc quá trễ)
+  checkinOverride Boolean     @default(false)
+  calledAt      DateTime?
+  callRule      CallRule?
   createdAt     DateTime      @default(now())
 
   patient       Patient        @relation(fields: [patientId], references: [id])
@@ -172,7 +191,7 @@ model Visit {
   medicalRecord MedicalRecord?
   prescriptions Prescription[]
 
-  @@unique([doctorId, date, queueNumber])
+  @@unique([doctorId, date, source, queueNumber])
   @@index([patientId, date])
 }
 

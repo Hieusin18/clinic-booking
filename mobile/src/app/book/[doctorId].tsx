@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
-import { Button, Card, Chip, Empty, ErrorBox, Field, Loading, Muted, Screen, styles } from '@/components/ui';
+import { Button, Card, Chip, Empty, ErrorBox, Field, Loading, Muted, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { dayLabel, doctorName, formatDate, formatTime, ymd } from '@/lib/format';
-import type { Appointment, Doctor, Slot } from '@/lib/types';
+import { standingNotice } from '@/lib/queue';
+import type { Appointment, BookingStanding, Doctor, Slot } from '@/lib/types';
 
 const DAYS = 7;
 
@@ -24,6 +25,12 @@ export default function BookDoctor() {
     queryKey: ['slots', doctorId, date],
     queryFn: async () => (await api.get<Slot[]>(`/doctors/${doctorId}/schedules`, { params: { date } })).data,
   });
+
+  const standing = useQuery({
+    queryKey: ['appointments', 'standing'],
+    queryFn: async () => (await api.get<BookingStanding>('/appointments/standing')).data,
+  });
+  const notice = standingNotice(standing.data);
 
   const book = useMutation({
     mutationFn: async () => (await api.post<Appointment>('/appointments', { scheduleId: slot!.id, reason: reason.trim() || undefined })).data,
@@ -46,6 +53,12 @@ export default function BookDoctor() {
         <Card>
           <Text style={styles.title}>{doctorName(doctor.data)}</Text>
           <Muted>{doctor.data.specialty.name}</Muted>
+        </Card>
+      ) : null}
+
+      {notice ? (
+        <Card style={{ borderColor: colors.warning, borderWidth: 1 }}>
+          <Text style={{ color: colors.text }}>{notice.text}</Text>
         </Card>
       ) : null}
 
@@ -82,7 +95,7 @@ export default function BookDoctor() {
       <Button
         title={slot ? `Đặt lịch lúc ${formatTime(slot.startTime)}` : 'Chọn giờ để đặt lịch'}
         onPress={() => book.mutate()}
-        disabled={!slot}
+        disabled={!slot || notice?.blocked}
         loading={book.isPending}
       />
     </Screen>

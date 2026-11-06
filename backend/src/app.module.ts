@@ -10,6 +10,7 @@ import { PatientsModule } from './patients/patients.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { QrController } from './qr/qr.controller.js';
 import { QueueController } from './queue/queue.controller.js';
+import { QueueJanitor } from './queue/queue-janitor.js';
 import { QueueService } from './queue/queue.service.js';
 import { SchedulesModule } from './schedules/schedules.js';
 import { SpecialtiesModule } from './specialties/specialties.js';
@@ -34,6 +35,6 @@ import { Icd10Module } from './icd10/icd10.js';
     MetricsModule,
   ],
   controllers: [HealthController, QrController, QueueController],
-  providers: [QueueService],
+  providers: [QueueService, QueueJanitor],
 })
 export class AppModule {}

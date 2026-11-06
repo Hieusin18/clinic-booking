@@ -28,3 +28,7 @@ export const GENDER_LABEL = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' } as c
 
 export const doctorName = (d: { title: string | null; user: { fullName: string } }) =>
   [d.title, d.user.fullName].filter(Boolean).join(' ');
+
+/** Nhãn số thứ tự: A01 (đặt lịch), B03 (vãng lai). */
+export const ticketLabel = (v: { source: 'ONLINE' | 'WALK_IN'; queueNumber: number }) =>
+  `${v.source === 'ONLINE' ? 'A' : 'B'}${String(v.queueNumber).padStart(2, '0')}`;

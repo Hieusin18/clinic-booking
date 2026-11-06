@@ -21,6 +21,8 @@ export default function Scan() {
   const [token, setToken] = useState<string | null>(null);
   const [manual, setManual] = useState('');
   const [needDoctor, setNeedDoctor] = useState(false);
+  /** Lý do phải chọn bác sĩ (chưa đặt lịch, hoặc lịch hẹn đã hết hiệu lực vì đến trễ) */
+  const [needDoctorReason, setNeedDoctorReason] = useState('');
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const locked = useRef(false);
 
@@ -38,8 +40,11 @@ export default function Scan() {
       router.replace('/(tabs)/ticket');
     },
     onError: (err) => {
-      const msg = err instanceof AxiosError ? (err.response?.data as { message?: string })?.message : undefined;
-      if (msg === NEEDS_DOCTOR) setNeedDoctor(true);
+      const data = err instanceof AxiosError ? (err.response?.data as { message?: string; code?: string } | undefined) : undefined;
+      if (data?.code === 'NEEDS_DOCTOR' || data?.message === NEEDS_DOCTOR) {
+        setNeedDoctorReason(data.message && data.message !== NEEDS_DOCTOR ? data.message : '');
+        setNeedDoctor(true);
+      }
       else {
         setToken(null);
         locked.current = false;
@@ -60,14 +65,16 @@ export default function Scan() {
     return (
       <Screen>
         <Stack.Screen options={{ title: 'Chọn bác sĩ' }} />
-        <Muted>Bạn chưa đặt lịch hôm nay. Chọn bác sĩ muốn khám để lấy số.</Muted>
+        <Muted>{needDoctorReason || 'Bạn chưa đặt lịch hôm nay. Chọn bác sĩ muốn khám để lấy số.'}</Muted>
         {doctors.isLoading ? <Loading /> : null}
         <View style={{ gap: 8 }}>
           {doctors.data?.map((d) => (
             <Chip key={d.id} label={`${doctorName(d)} · ${d.specialty.name}`} selected={doctorId === d.id} onPress={() => setDoctorId(d.id)} />
           ))}
         </View>
-        <ErrorBox message={scan.isError && scan.error && errorMessage(scan.error) !== NEEDS_DOCTOR ? errorMessage(scan.error) : null} />
+        <ErrorBox
+          message={scan.isError && scan.error && ![NEEDS_DOCTOR, needDoctorReason].includes(errorMessage(scan.error)) ? errorMessage(scan.error) : null}
+        />
         <Button title="Lấy số" disabled={!doctorId} loading={scan.isPending} onPress={() => scan.mutate({ token, doctorId: doctorId! })} />
         <Button
           title="Quét lại mã"

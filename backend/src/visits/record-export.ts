@@ -194,7 +194,7 @@ export function buildPrintDoc(v: ExportVisit, now = new Date()) {
   const isYoungChild = age.months < 72;
   const ageText = isYoungChild ? `${age.months} tháng` : `${age.years}`;
   const doctorName = [v.doctor.title, v.doctor.user.fullName].filter(Boolean).join(' ');
-  const recordNo = `BA-${day(v.date).split('/').reverse().join('')}-${String(v.queueNumber).padStart(3, '0')}`;
+  const recordNo = `BA-${day(v.date).split('/').reverse().join('')}-${v.source === 'ONLINE' ? 'A' : 'B'}${String(v.queueNumber).padStart(3, '0')}`;
   const headerLeft = [clinic.name.toUpperCase(), clinic.address, clinic.phone && `Điện thoại: ${clinic.phone}`].filter(Boolean) as string[];
   const exported = `Bản điện tử xuất từ hệ thống đặt lịch khám lúc ${dateTime(now)}. Mã tra cứu: ${v.id}`;
 

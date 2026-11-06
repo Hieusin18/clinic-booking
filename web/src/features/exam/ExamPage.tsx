@@ -21,10 +21,10 @@ import {
 } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { age, formatDay, formatTime, GENDER_LABEL } from '../../lib/format';
+import { age, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import type { Prescription, Visit, VisitDetail } from '../../lib/types';
-import { VISIT_STATUS } from '../reception/visitStatus';
+import { arrivalTag, byCallOrder, VISIT_STATUS } from '../reception/visitStatus';
 import { MedicineSelect, medicineLabel } from './MedicineSelect';
 import { ExportButtons, RecordCard } from './RecordCard';
 
@@ -42,12 +42,13 @@ export function ExamPage() {
     queryFn: async () => (await api.get<Visit[]>('/queue/doctor')).data,
     refetchInterval: 15_000,
   });
-  const list = queue.data ?? [];
+  const list = [...(queue.data ?? [])].sort(byCallOrder);
   const current = list.find((v) => v.status === 'IN_PROGRESS');
   const activeId = selectedId ?? current?.id ?? null;
   const waiting = list.filter((v) => v.status === 'WAITING').length;
 
   const callNext = useAction(async () => (await api.post<Visit>('/queue/call-next')).data, { invalidate: ['queue'] });
+  const callOne = useAction(async (id: string) => (await api.post<Visit>(`/queue/${id}/call`)).data, { invalidate: ['queue'] });
 
   return (
     <Row gutter={[16, 16]}>
@@ -63,36 +64,66 @@ export function ExamPage() {
             disabled={!!current || waiting === 0}
             loading={callNext.isPending}
             onClick={() => callNext.mutate(undefined, { onSuccess: (v) => setSelectedId(v.id) })}
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 8 }}
           >
-            {current ? `Đang khám số ${current.queueNumber}` : waiting === 0 ? 'Không còn ai đang chờ' : 'Gọi số tiếp theo'}
+            {current ? `Đang khám số ${ticketLabel(current)}` : waiting === 0 ? 'Không còn ai đang chờ' : 'Gọi số tiếp theo'}
           </Button>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>
+            Thứ tự gọi: người đặt lịch (số A) đã đến giờ hẹn được ưu tiên; còn lại theo thứ tự đến quầy. Sau vài lượt ưu tiên liên tiếp
+            sẽ gọi một người vãng lai (số B) đang chờ.
+          </Typography.Paragraph>
           <List
             loading={queue.isLoading}
             dataSource={list}
             locale={{ emptyText: 'Hôm nay chưa có bệnh nhân' }}
-            renderItem={(v) => (
-              <List.Item
-                onClick={() => (v.status === 'IN_PROGRESS' || v.status === 'DONE' ? setSelectedId(v.id) : undefined)}
-                style={{
-                  cursor: v.status === 'IN_PROGRESS' || v.status === 'DONE' ? 'pointer' : 'default',
-                  background: v.id === activeId ? '#f0fdfa' : undefined,
-                  paddingInline: 8,
-                  borderRadius: 8,
-                }}
-              >
-                <Space>
-                  <Typography.Text strong style={{ fontSize: 18, width: 32, display: 'inline-block' }}>{v.queueNumber}</Typography.Text>
-                  <div>
-                    <div>{v.patient.fullName}</div>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {v.source === 'ONLINE' ? 'Đặt online' : 'Trực tiếp'} · {formatTime(v.createdAt)}
-                    </Typography.Text>
-                  </div>
-                </Space>
-                <Tag color={VISIT_STATUS[v.status].color}>{VISIT_STATUS[v.status].label}</Tag>
-              </List.Item>
-            )}
+            renderItem={(v) => {
+              const src = arrivalTag(v);
+              return (
+                <List.Item
+                  onClick={() => (v.status === 'IN_PROGRESS' || v.status === 'DONE' ? setSelectedId(v.id) : undefined)}
+                  style={{
+                    cursor: v.status === 'IN_PROGRESS' || v.status === 'DONE' ? 'pointer' : 'default',
+                    background: v.id === activeId ? '#f0fdfa' : undefined,
+                    paddingInline: 8,
+                    borderRadius: 8,
+                  }}
+                  actions={
+                    v.status === 'WAITING' && !current
+                      ? [
+                          <Popconfirm
+                            key="call"
+                            title={`Gọi số ${ticketLabel(v)} ngay?`}
+                            description="Bỏ qua thứ tự ưu tiên, dùng cho người già yếu, trẻ sốt cao hoặc người cần xem lại kết quả."
+                            okText="Gọi"
+                            cancelText="Hủy"
+                            onConfirm={() => callOne.mutate(v.id, { onSuccess: (c) => setSelectedId(c.id) })}
+                          >
+                            <Button size="small" aria-label={`Gọi số ${ticketLabel(v)}`}>Gọi</Button>
+                          </Popconfirm>,
+                        ]
+                      : undefined
+                  }
+                >
+                  <Space align="start">
+                    <Typography.Text strong style={{ fontSize: 18, width: 44, display: 'inline-block' }}>{ticketLabel(v)}</Typography.Text>
+                    <div>
+                      <div>{v.patient.fullName}</div>
+                      <Space size={4} wrap style={{ marginTop: 2 }}>
+                        {v.status === 'WAITING' && v.predictedOrder === 0 ? <Tag color="purple">Tiếp theo</Tag> : null}
+                        <Tag color={src.color}>{src.label}</Tag>
+                        {v.status !== 'WAITING' ? <Tag color={VISIT_STATUS[v.status].color}>{VISIT_STATUS[v.status].label}</Tag> : null}
+                      </Space>
+                      <div>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          Đến {formatTime(v.createdAt)}
+                          {v.status === 'WAITING' && v.estimatedCallAt ? ` · dự kiến gọi ${formatTime(v.estimatedCallAt)}` : ''}
+                        </Typography.Text>
+                      </div>
+                    </div>
+                  </Space>
+                </List.Item>
+              );
+            }}
           />
         </Card>
       </Col>
@@ -134,7 +165,7 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
       <Card
         title={
           <Space>
-            <Typography.Text strong style={{ fontSize: 20 }}>Số {v.queueNumber}</Typography.Text>
+            <Typography.Text strong style={{ fontSize: 20 }}>Số {ticketLabel(v)}</Typography.Text>
             <span>{v.patient.fullName}</span>
             <Tag color={VISIT_STATUS[v.status].color}>{VISIT_STATUS[v.status].label}</Tag>
           </Space>

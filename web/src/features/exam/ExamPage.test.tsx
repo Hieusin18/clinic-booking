@@ -37,11 +37,27 @@ describe('Màn hình khám bệnh', () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith('/queue/call-next'));
   });
 
+  it('hàng chờ xếp theo thứ tự gọi dự kiến; bác sĩ gọi đích danh được một người', async () => {
+    mockApi([
+      visit('WAITING', { id: 'v2', queueNumber: 2, predictedOrder: 1, patient: { ...patient, fullName: 'Người Thứ Hai' } }),
+      visit('WAITING', { id: 'v3', queueNumber: 1, source: 'ONLINE', appointmentAt: '2026-11-02T01:30:00.000Z', due: true, predictedOrder: 0 }),
+    ]);
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: visit('IN_PROGRESS', { id: 'v2' }) });
+    renderPage([page('/', <ExamPage />)], { user: fakeUser('DOCTOR') });
+    const labels = (await screen.findAllByText(/^[AB]\d\d$/)).map((el) => el.textContent);
+    expect(labels).toEqual(['A01', 'B02']);
+    expect(screen.getByText('Hẹn 08:30 · đến giờ')).toBeInTheDocument();
+    expect(screen.getByText('Tiếp theo')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Gọi số B02' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Gọi' }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/queue/v2/call'));
+  });
+
   it('đang khám: hiện cảnh báo dị ứng; chưa có bệnh án thì chưa hoàn tất được', async () => {
     mockApi([visit('IN_PROGRESS')], { ...visit('IN_PROGRESS'), medicalRecord: null, prescriptions: [], prescription: null });
     renderPage([page('/', <ExamPage />)], { user: fakeUser('DOCTOR') });
     expect(await screen.findByText('Dị ứng: Penicillin')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Đang khám số 4' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Đang khám số B04' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Hoàn tất lượt khám' })).toBeDisabled();
     expect(screen.getByText('Cần lưu bệnh án trước khi hoàn tất.')).toBeInTheDocument();
   });

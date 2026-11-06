@@ -92,9 +92,32 @@ export interface Visit {
   status: VisitStatus;
   reason: string | null;
   appointmentId: string | null;
+  /** Giờ hẹn (lượt đặt online) */
+  appointmentAt?: string | null;
   createdAt: string;
   patient: { id: string; fullName: string; phone: string; dateOfBirth: string; gender: Gender; allergies: string | null };
   doctor: DoctorRef;
+}
+
+/** Vị trí trong hàng đợi, tính theo đúng quy tắc gọi số của phòng khám */
+export interface QueuePosition {
+  visit: Visit;
+  /** A01 (đặt lịch) hoặc B03 (vãng lai) */
+  label: string;
+  peopleAhead: number;
+  estimatedCallAt: string | null;
+  /** Người đặt lịch đã đến giờ hẹn, đang được ưu tiên */
+  due: boolean;
+  currentLabel: string | null;
+}
+
+/** Số lần không đến gần đây và hạn khóa đặt lịch online */
+export interface BookingStanding {
+  recentNoShows: number;
+  limit: number;
+  windowDays: number;
+  /** Ngày cuối bị khóa (YYYY-MM-DD) */
+  lockedUntil: string | null;
 }
 
 export interface Appointment {
@@ -104,7 +127,10 @@ export interface Appointment {
   createdAt: string;
   schedule: { id: string; startTime: string; endTime: string; doctor: DoctorRef };
   patient: { id: string; fullName: string; phone: string };
-  visit?: { id: string; queueNumber: number; status: VisitStatus } | null;
+  visit?: { id: string; queueNumber: number; source: 'ONLINE' | 'WALK_IN'; status: VisitStatus } | null;
+  /** Có ở /appointments/mine: khung giờ được check-in */
+  checkinOpensAt?: string;
+  checkinClosesAt?: string;
 }
 
 /** Bệnh án ngoại trú theo bố cục mẫu Bộ Y tế */

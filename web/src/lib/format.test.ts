@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { age, doctorName, formatDay, formatTime, todayYmd } from './format';
+import { age, doctorName, formatDay, formatTime, ticketLabel, todayYmd } from './format';
 
 describe('định dạng ngày giờ', () => {
+  it('số thứ tự: A cho đặt lịch, B cho vãng lai', () => {
+    expect(ticketLabel({ source: 'ONLINE', queueNumber: 3 })).toBe('A03');
+    expect(ticketLabel({ source: 'WALK_IN', queueNumber: 12 })).toBe('B12');
+  });
   it('hiển thị giờ theo giờ Việt Nam dù dữ liệu là UTC', () => {
     expect(formatTime('2026-11-02T01:30:00.000Z')).toBe('08:30');
   });

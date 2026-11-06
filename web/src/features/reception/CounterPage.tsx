@@ -3,7 +3,7 @@ import { Button, Flex, Typography } from 'antd';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router';
 import { api } from '../../lib/api';
-import { doctorName } from '../../lib/format';
+import { doctorName, ticketLabel } from '../../lib/format';
 import type { Visit } from '../../lib/types';
 
 /**
@@ -46,7 +46,7 @@ export function CounterPage() {
           calling.map((v) => (
             <Flex key={v.id} justify="space-between" align="center" style={{ background: '#0f766e', borderRadius: 16, padding: '16px 24px' }}>
               <Typography.Text style={{ color: '#fff', fontSize: 22 }}>{doctorName(v.doctor)}</Typography.Text>
-              <Typography.Text style={{ color: '#fff', fontSize: 48, fontWeight: 800 }}>{v.queueNumber}</Typography.Text>
+              <Typography.Text style={{ color: '#fff', fontSize: 48, fontWeight: 800 }}>{ticketLabel(v)}</Typography.Text>
             </Flex>
           ))
         )}

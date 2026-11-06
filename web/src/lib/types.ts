@@ -92,10 +92,24 @@ export interface Visit {
   status: VisitStatus;
   reason: string | null;
   appointmentId: string | null;
+  /** Giờ hẹn (lượt đặt online) */
+  appointmentAt?: string | null;
+  /** Lễ tân check-in ngoài khung giờ */
+  checkinOverride?: boolean;
+  calledAt?: string | null;
+  callRule?: CallRule | null;
   createdAt: string;
   patient: { id: string; fullName: string; phone: string; dateOfBirth: string; gender: Gender; allergies: string | null };
   doctor: DoctorRef;
+  /** Có ở /queue/today và /queue/doctor: thứ tự gọi dự kiến (0 = người tiếp theo) của người đang chờ */
+  predictedOrder?: number | null;
+  estimatedCallAt?: string | null;
+  /** Người đặt lịch đã đến giờ hẹn, được ưu tiên */
+  due?: boolean;
 }
+
+/** Bác sĩ gọi lượt này theo quy tắc nào */
+export type CallRule = 'FAIRNESS' | 'APPOINTMENT' | 'ARRIVAL' | 'MANUAL';
 
 export interface Appointment {
   id: string;
@@ -104,7 +118,7 @@ export interface Appointment {
   createdAt: string;
   schedule: { id: string; startTime: string; endTime: string; doctor: DoctorRef };
   patient: { id: string; fullName: string; phone: string };
-  visit?: { id: string; queueNumber: number; status: VisitStatus } | null;
+  visit?: { id: string; queueNumber: number; source: 'ONLINE' | 'WALK_IN'; status: VisitStatus } | null;
 }
 
 /** Bệnh án ngoại trú theo bố cục mẫu Bộ Y tế */

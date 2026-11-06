@@ -5,23 +5,18 @@ import { Badge, Button, Card, Empty, Loading, Muted, Screen, colors } from '@/co
 import { api } from '@/lib/api';
 import { doctorName, formatTime } from '@/lib/format';
 import { VISIT_STATUS, waitHint } from '@/lib/queue';
-import type { Visit } from '@/lib/types';
-
-interface Position {
-  visit: Visit;
-  peopleAhead: number;
-  currentNumber: number | null;
-}
+import type { QueuePosition, Visit } from '@/lib/types';
 
 /** Phiếu số đang chờ: tự cập nhật mỗi 15 giây. */
 function TicketCard({ visitId }: { visitId: string }) {
   const pos = useQuery({
     queryKey: ['position', visitId],
-    queryFn: async () => (await api.get<Position>(`/queue/${visitId}/position`)).data,
+    queryFn: async () => (await api.get<QueuePosition>(`/queue/${visitId}/position`)).data,
     refetchInterval: 15_000,
   });
   if (!pos.data) return <Loading />;
-  const { visit, peopleAhead, currentNumber } = pos.data;
+  const { visit, label, currentLabel } = pos.data;
+  const hint = waitHint(pos.data);
   const st = VISIT_STATUS[visit.status];
   const active = visit.status === 'WAITING' || visit.status === 'IN_PROGRESS';
 
@@ -33,16 +28,18 @@ function TicketCard({ visitId }: { visitId: string }) {
       </View>
       <View style={{ alignItems: 'center', paddingVertical: 8 }}>
         <Muted>Số thứ tự của bạn</Muted>
-        <Text style={{ fontSize: 88, fontWeight: '800', color: active ? colors.primary : colors.muted, lineHeight: 96 }}>{visit.queueNumber}</Text>
+        <Text style={{ fontSize: 88, fontWeight: '800', color: active ? colors.primary : colors.muted, lineHeight: 96 }}>{label}</Text>
         {active ? (
           <Text style={{ fontSize: 16, color: colors.text }}>
-            Đang khám: <Text style={{ fontWeight: '800' }}>{currentNumber ?? '—'}</Text>
+            Đang khám: <Text style={{ fontWeight: '800' }}>{currentLabel ?? '—'}</Text>
           </Text>
         ) : null}
       </View>
-      <Text style={{ fontSize: 16, fontWeight: '600', textAlign: 'center', color: colors.text }}>{waitHint(visit.status, peopleAhead)}</Text>
+      <Text style={{ fontSize: 16, fontWeight: '600', textAlign: 'center', color: colors.text }}>{hint.text}</Text>
+      {active && hint.note ? <Muted>{hint.note}</Muted> : null}
       <Muted>
-        {visit.doctor.specialty?.name ? `${visit.doctor.specialty.name} · ` : ''}Lấy số lúc {formatTime(visit.createdAt)}
+        {visit.doctor.specialty?.name ? `${visit.doctor.specialty.name} · ` : ''}
+        {visit.appointmentAt ? `Lịch hẹn ${formatTime(visit.appointmentAt)} · ` : ''}Lấy số lúc {formatTime(visit.createdAt)}
       </Muted>
     </Card>
   );
@@ -67,7 +64,10 @@ export default function Ticket() {
         visits.map((v) => <TicketCard key={v.id} visitId={v.id} />)
       )}
       {!hasActive ? <Button title="Quét mã QR tại quầy" onPress={() => router.push('/scan')} /> : null}
-      <Muted>Đã đặt lịch trước? Quét mã là bạn được check-in luôn, không cần xếp hàng ở quầy.</Muted>
+      <Muted>
+        Đã đặt lịch trước? Quét mã trong khung giờ check-in ghi ở tab Lịch hẹn là bạn được check-in luôn và nhận số A, được ưu tiên
+        khi đến giờ hẹn. Đến trễ hơn thì lịch hẹn hết hiệu lực và bạn lấy số thường (số B).
+      </Muted>
     </Screen>
   );
 }

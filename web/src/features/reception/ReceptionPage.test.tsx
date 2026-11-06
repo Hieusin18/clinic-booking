@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
+import { AxiosError, AxiosHeaders } from 'axios';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api';
@@ -17,6 +18,8 @@ const appt = {
 const visit = {
   id: 'v1',
   queueNumber: 7,
+  source: 'ONLINE',
+  appointmentAt: '2026-11-02T01:30:00.000Z',
   createdAt: '2026-11-02T01:00:00.000Z',
   patient: { fullName: 'Lê Thị Hẹn' },
   doctor: { id: 'd1', title: 'BS', user: { fullName: 'An' }, specialty: { id: 's', name: 'Nhi khoa' } },
@@ -50,6 +53,25 @@ describe('Trang tiếp đón', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Check-in' }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/queue/checkin', { appointmentId: 'a1' }));
     expect(await screen.findByText('Đã cấp số')).toBeInTheDocument();
-    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.getByText('A07')).toBeInTheDocument();
+    expect(screen.getByText(/Lịch hẹn 08:30/)).toBeInTheDocument();
+  });
+
+  it('ngoài khung giờ check-in: hỏi lễ tân rồi check-in ngoài giờ', async () => {
+    mockGet();
+    const tooEarly = new AxiosError('409', '409', undefined, undefined, {
+      status: 409,
+      statusText: 'Conflict',
+      headers: {},
+      config: { headers: new AxiosHeaders() },
+      data: { code: 'CHECKIN_TOO_EARLY', message: '…', appointmentAt: '2026-11-02T01:30:00.000Z', opensAt: '2026-11-02T01:00:00.000Z' },
+    });
+    const post = vi.spyOn(api, 'post').mockRejectedValueOnce(tooEarly).mockResolvedValueOnce({ data: visit });
+    renderPage([page('/', <ReceptionPage />)], { user: fakeUser('RECEPTIONIST') });
+    await userEvent.click(await screen.findByRole('button', { name: 'Check-in' }));
+    expect(await screen.findByText('Lịch hẹn lúc 08:30, khung check-in mở từ 08:00.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Check-in ngoài giờ' }));
+    await waitFor(() => expect(post).toHaveBeenLastCalledWith('/queue/checkin', { appointmentId: 'a1', override: true }));
+    expect(await screen.findByText('A07')).toBeInTheDocument();
   });
 });
