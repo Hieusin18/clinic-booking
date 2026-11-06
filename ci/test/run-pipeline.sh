@@ -62,7 +62,11 @@ echo "::endgroup::"
 echo "Kết quả pipeline: $RESULT"
 
 if [ "$RESULT" != "SUCCESS" ]; then
-  fail "pipeline $RESULT" "$(grep -vE '^\[Pipeline\]' console.txt | grep -v '^\s*$' | tail -n 60)"
+  sed -i 's/\x1b\[[0-9;]*m//g' console.txt
+  STAGES=$(grep -E '^\[Pipeline\] \{ \(' console.txt | sed 's/\[Pipeline\] { (//; s/)$//' | tr '\n' '>' )
+  ERRS=$(grep -nE 'ERROR|FAIL|Error:|error |Exception|script returned exit code|not found|denied|refused|Quality Gate' console.txt | grep -v '✓' | head -n 40)
+  fail "pipeline $RESULT" "Các stage đã vào: $STAGES
+$ERRS"
 fi
 QG=$(curl -s -u "admin:Ci-Test-Admin-123!" "http://localhost:9000/api/qualitygates/project_status?projectKey=clinic-booking")
 echo "Quality Gate: $QG"
