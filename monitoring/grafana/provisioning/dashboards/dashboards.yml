@@ -1,0 +1,9 @@
+# Grafana tự nạp các dashboard JSON trong /var/lib/grafana/dashboards
+apiVersion: 1
+providers:
+  - name: clinic
+    folder: Phòng khám
+    type: file
+    disableDeletion: true
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,94 @@
+# Giám sát hệ thống bằng Prometheus + Grafana.
+#   Chạy SAU khi hệ thống chính đã chạy (project clinic-booking), ở thư mục gốc repo:
+#     docker compose -f monitoring/docker-compose.yml --env-file .env up -d
+#   Prometheus: http://localhost:9090   ·   Grafana: http://localhost:3001 (admin / GRAFANA_ADMIN_PASSWORD)
+#
+#   backend ──/api/metrics──┐
+#   node-exporter (máy) ────┤
+#   cAdvisor (container) ───┼──► Prometheus (thu 15 giây/lần, giữ 7 ngày, luật cảnh báo) ──► Grafana (dashboard)
+#   postgres-exporter (CSDL)┘
+name: clinic-monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    networks: [monitoring, app]
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    restart: unless-stopped
+    depends_on: [prometheus]
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/clinic-overview.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks: [monitoring]
+
+  # Số liệu của máy chủ: CPU, RAM, ổ đĩa, mạng
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks: [monitoring]
+
+  # Số liệu từng container: CPU, RAM, mạng
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=15s
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [monitoring]
+
+  # Số liệu PostgreSQL của hệ thống: kết nối, giao dịch, kích thước CSDL
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+    networks: [monitoring, app]
+
+networks:
+  monitoring:
+  # Mạng của hệ thống chính (docker-compose.yml / docker-compose.prod.yml, project clinic-booking)
+  app:
+    external: true
+    name: clinic-booking_default
+
+volumes:
+  prometheus_data:
+  grafana_data:

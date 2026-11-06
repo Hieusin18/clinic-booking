@@ -1,0 +1,47 @@
+# Luật cảnh báo: xem ở Prometheus → Alerts (http://localhost:9090/alerts)
+groups:
+  - name: clinic
+    rules:
+      - alert: BackendNgungHoatDong
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Backend không trả lời /api/metrics hơn 1 phút"
+
+      - alert: CSDLNgungHoatDong
+        expr: pg_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "postgres-exporter không kết nối được PostgreSQL"
+
+      - alert: TiLeLoiCao
+        expr: |
+          (sum(rate(http_requests_total{status=~"5.."}[5m])) or vector(0))
+            / clamp_min(sum(rate(http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Hơn 5% request trả lỗi 5xx trong 5 phút"
+
+      - alert: PhanHoiCham
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "95% request chậm hơn 1 giây"
+
+      - alert: MayChuThieuRAM
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Máy chủ dùng hơn 90% RAM"
+
+      - alert: OCungSapDay
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Ổ đĩa {{ $labels.mountpoint }} còn dưới 10%"
