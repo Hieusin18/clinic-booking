@@ -7,6 +7,14 @@ cd "$(dirname "$0")/.."            # thư mục ci/
 note() { echo "::group::$*"; }
 fail() { echo "::error title=$1::$(printf '%s' "$2" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"; exit 1; }
 wait_for() { for i in $(seq 1 "$2"); do eval "$1" && return 0; sleep 5; done; return 1; }
+on_err() {
+  local line=$1
+  local logs
+  logs=$(docker compose -f docker-compose.yml logs --no-color --tail 15 jenkins sonarqube 2>&1 | grep -vE 'loaded module' | tail -30)
+  fail "dừng ở dòng $line" "$(sed -n "${line}p" "$0")
+$logs"
+}
+trap 'on_err $LINENO' ERR
 
 note "SonarQube: dựng và lấy token"
 docker compose -f docker-compose.yml up -d sonar-db sonarqube
