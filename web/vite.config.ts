@@ -12,6 +12,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
     css: false,
+    // Ant Design trong jsdom khá nặng; khi Jenkins chạy song song 3 bộ test thì 5 giây mặc định không đủ
+    testTimeout: 15000,
     // Độ phủ test cho SonarQube (chạy: npx vitest run --coverage)
     coverage: {
       provider: 'v8',
