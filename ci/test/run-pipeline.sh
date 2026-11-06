@@ -24,6 +24,9 @@ curl -sf -u admin:admin -X POST "http://localhost:9000/api/users/change_password
 SONAR_TOKEN=$(curl -sf -u "admin:Ci-Test-Admin-123!" -X POST "http://localhost:9000/api/user_tokens/generate" \
   --data-urlencode "name=jenkins" --data-urlencode "type=GLOBAL_ANALYSIS_TOKEN" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
 [ -n "$SONAR_TOKEN" ] || fail sonarqube "Không tạo được token"
+# Jenkins nằm trong mạng Docker nội bộ: phải tắt kiểm tra "local webhooks" thì SonarQube mới gửi kết quả về
+curl -sf -u "admin:Ci-Test-Admin-123!" -X POST "http://localhost:9000/api/settings/set" \
+  --data-urlencode "key=sonar.validateWebhooks" --data-urlencode "value=false" >/dev/null
 curl -sf -u "admin:Ci-Test-Admin-123!" -X POST "http://localhost:9000/api/webhooks/create" \
   --data-urlencode "name=jenkins" --data-urlencode "url=http://jenkins:8080/sonarqube-webhook/" >/dev/null
 export SONAR_TOKEN
