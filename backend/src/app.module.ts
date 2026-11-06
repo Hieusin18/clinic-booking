@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { DoctorsModule } from './doctors/doctors.js';
 import { HealthController } from './health/health.controller.js';
 import { MedicinesModule } from './medicines/medicines.js';
+import { MetricsModule } from './metrics/metrics.js';
 import { PatientsModule } from './patients/patients.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { QrController } from './qr/qr.controller.js';
@@ -28,6 +29,7 @@ import { VisitsModule } from './visits/visits.js';
     AppointmentsModule,
     PatientsModule,
     VisitsModule,
+    MetricsModule,
   ],
   controllers: [HealthController, QrController, QueueController],
   providers: [QueueService],

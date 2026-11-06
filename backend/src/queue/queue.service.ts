@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { todayVN } from '../common/time.js';
 import { Prisma } from '../generated/prisma/client.js';
 import type { CheckinMethod, VisitSource } from '../generated/prisma/enums.js';
+import { queueTickets } from '../metrics/metrics.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export interface IssueTicketInput {
@@ -43,7 +44,7 @@ export class QueueService {
     if (!doctor || !doctor.user.isActive) throw new NotFoundException('Không tìm thấy bác sĩ');
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const visit = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`queue:${input.doctorId}:${date.toISOString()}`}))`;
 
         // Mỗi bệnh nhân chỉ giữ một số đang chờ cho mỗi chuyên khoa trong ngày
@@ -67,6 +68,8 @@ export class QueueService {
           select: visitView,
         });
       });
+      queueTickets.inc({ source: input.source });
+      return visit;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         throw new ConflictException('Lịch hẹn này đã được check-in');

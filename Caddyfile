@@ -3,6 +3,11 @@
 {$DOMAIN} {
 	encode gzip
 
+	# Số liệu cho Prometheus chỉ đọc trong mạng Docker (backend:3000), không mở ra ngoài
+	handle /api/metrics* {
+		respond 404
+	}
+
 	# API và Swagger
 	handle /api/* {
 		reverse_proxy backend:3000

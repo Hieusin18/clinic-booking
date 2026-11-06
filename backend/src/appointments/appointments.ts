@@ -4,6 +4,7 @@ import { IsDateString, IsIn, IsOptional, IsString, MaxLength } from 'class-valid
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
 import { dateOnly, vnDateString } from '../common/time.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { appointmentsBooked } from '../metrics/metrics.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export class BookDto {
@@ -70,7 +71,7 @@ export class AppointmentsService {
     });
     if (sameDay) throw new ConflictException('Bạn đã có lịch với bác sĩ này trong ngày');
 
-    return this.prisma.$transaction(async (tx) => {
+    const appointment = await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.schedule.updateMany({
         where: { id: slot.id, isBooked: false, startTime: { gt: new Date() } },
         data: { isBooked: true },
@@ -81,6 +82,8 @@ export class AppointmentsService {
         select: appointmentView,
       });
     });
+    appointmentsBooked.inc();
+    return appointment;
   }
 
   async mine(user: AuthUser, q: MineQuery) {
