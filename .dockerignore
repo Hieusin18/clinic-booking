@@ -1,0 +1,10 @@
+# Ngữ cảnh build ở thư mục gốc (web/Dockerfile)
+**/node_modules
+**/dist
+**/coverage
+.git
+.env
+**/.env
+backend
+mobile
+ci

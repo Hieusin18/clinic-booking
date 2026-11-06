@@ -1,0 +1,10 @@
+# Ghép thêm vào ci/docker-compose.yml khi CI kiểm tra Jenkinsfile: bỏ màn hình cài đặt, nạp cấu hình JCasC
+services:
+  jenkins:
+    environment:
+      JAVA_OPTS: -Xmx1g -Djenkins.install.runSetupWizard=false
+      CASC_JENKINS_CONFIG: /ci-test/casc.yaml
+      SONAR_TOKEN: ${SONAR_TOKEN}
+      SCANNER_VERSION: ${SCANNER_VERSION}
+    volumes:
+      - ./test:/ci-test:ro

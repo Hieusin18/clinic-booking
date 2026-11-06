@@ -11,5 +11,12 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 20000,
     hookTimeout: 30000,
+    // Độ phủ test cho SonarQube (chạy: npx vitest run --coverage)
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'lcov'],
+      include: ['src/**/*.ts'],
+      exclude: ['src/generated/**', 'src/main.ts'],
+    },
   },
 });

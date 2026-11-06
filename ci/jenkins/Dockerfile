@@ -26,4 +26,5 @@ RUN jenkins-plugin-cli --plugins \
     credentials-binding \
     pipeline-stage-view \
     timestamper \
-    ws-cleanup
+    ws-cleanup \
+    configuration-as-code

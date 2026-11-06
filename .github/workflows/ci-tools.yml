@@ -3,10 +3,16 @@ name: ci-tools
 
 on:
   pull_request:
-    paths: ["ci/**", ".github/workflows/ci-tools.yml"]
+    paths: &paths
+      - "ci/**"
+      - "Jenkinsfile"
+      - "sonar-project.properties"
+      - "docker-compose.prod.yml"
+      - "web/Dockerfile"
+      - ".github/workflows/ci-tools.yml"
   push:
     branches: [main]
-    paths: ["ci/**", ".github/workflows/ci-tools.yml"]
+    paths: *paths
 
 jobs:
   jenkins-sonarqube:
@@ -40,3 +46,15 @@ jobs:
           for s in sonarqube; do
             echo "::error title=log $s::$(docker compose -f ci/docker-compose.yml logs --no-color --tail 25 $s 2>&1 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"
           done
+
+  jenkinsfile:
+    # Chạy trọn Jenkinsfile trên Jenkins thật: test, SonarQube, Quality Gate, build image, deploy, health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chạy pipeline Jenkins
+        env:
+          REPO_URL: https://github.com/${{ github.repository }}.git
+          BRANCH: "*/${{ github.head_ref || github.ref_name }}"
+        run: bash ci/test/run-pipeline.sh
