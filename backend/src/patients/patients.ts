@@ -19,8 +19,24 @@ export class CreatePatientDto {
   @IsOptional() @IsString() @MaxLength(255) address?: string;
   /** Mã thẻ BHYT */
   @IsOptional() @IsString() @MaxLength(20) insuranceNo?: string;
+  /** Hạn dùng thẻ BHYT, YYYY-MM-DD */
+  @IsOptional() @IsDateString() insuranceExpiry?: string;
   /** Tiền sử dị ứng (thuốc, thức ăn…) */
   @IsOptional() @IsString() @MaxLength(500) allergies?: string;
+  @IsOptional() @IsString() @MaxLength(100) occupation?: string;
+  @IsOptional() @IsString() @MaxLength(50) ethnicity?: string;
+  /** Người nhà cần báo tin; với trẻ em là người đưa trẻ đến khám */
+  @IsOptional() @IsString() @MaxLength(100) relativeName?: string;
+  @IsOptional() @Matches(PHONE_REGEX, { message: PHONE_MESSAGE }) relativePhone?: string;
+}
+
+/** Chuyển ngày dạng chuỗi sang giá trị cột @db.Date. */
+function toData<T extends { dateOfBirth?: string; insuranceExpiry?: string }>(dto: T) {
+  return {
+    ...dto,
+    dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+    insuranceExpiry: dto.insuranceExpiry ? new Date(dto.insuranceExpiry) : undefined,
+  };
 }
 
 export class UpdatePatientDto extends PartialType(CreatePatientDto) {}
@@ -38,7 +54,12 @@ const patientView = {
   nationalId: true,
   address: true,
   insuranceNo: true,
+  insuranceExpiry: true,
   allergies: true,
+  occupation: true,
+  ethnicity: true,
+  relativeName: true,
+  relativePhone: true,
   createdAt: true,
   userId: true,
 } satisfies Prisma.PatientSelect;
@@ -75,7 +96,7 @@ export class PatientsService {
   async create(dto: CreatePatientDto) {
     await this.ensureUnique(dto.phone, dto.nationalId);
     return this.prisma.patient.create({
-      data: { ...dto, dateOfBirth: new Date(dto.dateOfBirth) },
+      data: { ...toData(dto), dateOfBirth: new Date(dto.dateOfBirth) },
       select: patientView,
     });
   }
@@ -88,7 +109,7 @@ export class PatientsService {
     await this.ensureUnique(dto.phone, dto.nationalId, id);
     return this.prisma.patient.update({
       where: { id },
-      data: { ...dto, dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined },
+      data: toData(dto),
       select: patientView,
     });
   }

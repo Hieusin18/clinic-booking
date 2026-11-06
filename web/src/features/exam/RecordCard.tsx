@@ -1,0 +1,250 @@
+import { FilePdfOutlined, FileWordOutlined } from '@ant-design/icons';
+import { useQuery } from '@tanstack/react-query';
+import { App, AutoComplete, Button, Card, Col, DatePicker, Divider, Form, Input, InputNumber, Row, Space, Typography } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
+import { useEffect, useState } from 'react';
+import { api, errorMessage } from '../../lib/api';
+import { useAction } from '../../lib/hooks';
+import type { MedicalRecord } from '../../lib/types';
+
+/** Giá trị form: ngày tái khám dùng Dayjs, còn lại giống bệnh án. */
+export type RecordForm = Omit<MedicalRecord, 'id' | 'followUpDate'> & { followUpDate?: Dayjs | null };
+
+/** Chuyển form sang dữ liệu gửi API: ngày → "YYYY-MM-DD", ô trống → null để xóa giá trị cũ. */
+export function toRecordPayload(f: RecordForm) {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(f)) {
+    if (k === 'followUpDate') out[k] = v ? (v as Dayjs).format('YYYY-MM-DD') : null;
+    else if ((k === 'icdCode' || k === 'secondaryIcdCodes') && typeof v === 'string') out[k] = v.trim().toUpperCase() || null;
+    else out[k] = v === undefined || v === '' ? null : v;
+  }
+  return out;
+}
+
+/** BMI = cân nặng (kg) / chiều cao (m)², làm tròn 1 chữ số. */
+export const bmi = (weight?: number | null, height?: number | null) =>
+  weight && height ? Math.round((weight / (height / 100) ** 2) * 10) / 10 : null;
+
+/** Tải file từ API (có token) rồi lưu về máy. */
+async function download(url: string, fallbackName: string) {
+  const res = await api.get<Blob>(url, { responseType: 'blob' });
+  const name = /filename="([^"]+)"/.exec(String(res.headers['content-disposition'] ?? ''))?.[1] ?? fallbackName;
+  const href = URL.createObjectURL(res.data);
+  const a = Object.assign(document.createElement('a'), { href, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+
+/** Nút tải bệnh án + đơn thuốc dạng PDF và Word. */
+export function ExportButtons({ visitId, size }: { visitId: string; size?: 'small' | 'middle' }) {
+  const { message } = App.useApp();
+  const [busy, setBusy] = useState<'pdf' | 'docx' | null>(null);
+  const get = async (format: 'pdf' | 'docx') => {
+    setBusy(format);
+    try {
+      await download(`/visits/${visitId}/record.${format}`, `benh-an.${format}`);
+    } catch (e) {
+      message.error(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Space size="small">
+      <Button size={size} icon={<FilePdfOutlined />} loading={busy === 'pdf'} onClick={() => get('pdf')}>
+        Tải PDF
+      </Button>
+      <Button size={size} icon={<FileWordOutlined />} loading={busy === 'docx'} onClick={() => get('docx')}>
+        Tải Word
+      </Button>
+    </Space>
+  );
+}
+
+/** Ô nhập mã ICD-10: gõ mã hoặc tên bệnh (không cần dấu) để chọn trong danh mục, hoặc tự nhập mã. */
+function IcdInput({ id, value, onChange, onPick }: { id?: string; value?: string; onChange?: (v: string) => void; onPick?: (name: string) => void }) {
+  const [q, setQ] = useState('');
+  const options = useQuery({
+    queryKey: ['icd10', q],
+    queryFn: async () => (await api.get<{ code: string; name: string }[]>('/icd10', { params: { q } })).data,
+    staleTime: Infinity,
+  });
+  return (
+    <AutoComplete
+      id={id}
+      value={value}
+      onChange={(v) => onChange?.(v)}
+      onSearch={setQ}
+      onSelect={(code: string) => onPick?.(options.data?.find((o) => o.code === code)?.name ?? '')}
+      options={options.data?.map((o) => ({ value: o.code, label: `${o.code} – ${o.name}` }))}
+      placeholder="Gõ mã hoặc tên bệnh, vd. viem hong"
+      popupMatchSelectWidth={420}
+      allowClear
+    />
+  );
+}
+
+const Section = ({ children }: { children: string }) => (
+  <Divider titlePlacement="start" style={{ margin: '8px 0 12px' }}>
+    <Typography.Text strong>{children}</Typography.Text>
+  </Divider>
+);
+
+const num = (min: number, max: number, unit: string, step = 1) => (
+  <InputNumber min={min} max={max} step={step} addonAfter={unit} style={{ width: '100%' }} />
+);
+
+/** Bệnh án ngoại trú: hỏi bệnh, khám (sinh hiệu), chẩn đoán ICD-10, điều trị; tải bản PDF/Word. */
+export function RecordCard({ visitId, visitDate, reason, record }: { visitId: string; visitDate: string; reason: string | null; record: MedicalRecord | null }) {
+  const [form] = Form.useForm<RecordForm>();
+  useEffect(() => {
+    if (record) {
+      const { id: _id, followUpDate, ...rest } = record;
+      form.setFieldsValue({ ...rest, followUpDate: followUpDate ? dayjs(followUpDate.slice(0, 10)) : null });
+    } else {
+      form.setFieldsValue({ reason: reason ?? '' });
+    }
+  }, [record, reason, form]);
+
+  const save = useAction((f: RecordForm) => api.put(`/visits/${visitId}/record`, toRecordPayload(f)), { success: 'Đã lưu bệnh án', invalidate: ['visit'] });
+  const weight = Form.useWatch('weight', form);
+  const height = Form.useWatch('height', form);
+  const index = bmi(weight, height);
+
+  return (
+    <Card title="Bệnh án ngoại trú" extra={record && <ExportButtons visitId={visitId} size="small" />}>
+      <Form<RecordForm> form={form} layout="vertical" requiredMark={false} onFinish={(f) => save.mutate(f)}>
+        <Section>Hỏi bệnh</Section>
+        <Form.Item label="Lý do đến khám" name="reason">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Quá trình bệnh lý" name="symptoms" rules={[{ required: true, min: 2, message: 'Nhập quá trình bệnh lý / triệu chứng' }]}>
+          <Input.TextArea rows={3} placeholder="Khởi phát, diễn biến, triệu chứng, đã điều trị gì…" />
+        </Form.Item>
+        <Row gutter={12}>
+          <Col xs={24} md={12}>
+            <Form.Item label="Tiền sử bản thân" name="personalHistory">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Tiền sử gia đình" name="familyHistory">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Section>Khám bệnh</Section>
+        <Row gutter={12}>
+          <Col xs={12} md={6}>
+            <Form.Item label="Mạch" name="pulse">{num(20, 250, 'l/ph')}</Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item label="Nhiệt độ" name="temperature">{num(30, 45, '°C', 0.1)}</Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item
+              label="Huyết áp tâm thu"
+              name="bpSystolic"
+              dependencies={['bpDiastolic']}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator: (_, v) => ((v == null) === (getFieldValue('bpDiastolic') == null) ? Promise.resolve() : Promise.reject(new Error('Nhập đủ cả 2 số huyết áp'))),
+                }),
+              ]}
+            >
+              {num(40, 300, 'mmHg')}
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item label="Huyết áp tâm trương" name="bpDiastolic">{num(20, 200, 'mmHg')}</Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item label="Nhịp thở" name="respiratoryRate">{num(5, 80, 'l/ph')}</Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item label="SpO₂" name="spo2">{num(50, 100, '%')}</Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item label="Cân nặng" name="weight">{num(0.5, 400, 'kg', 0.1)}</Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item label="Chiều cao" name="height" extra={index ? `BMI: ${index}` : undefined}>
+              {num(30, 250, 'cm')}
+            </Form.Item>
+          </Col>
+        </Row>
+        <Form.Item label="Toàn thân" name="generalExam">
+          <Input.TextArea rows={2} placeholder="Tri giác, da niêm mạc, hạch, phù…" />
+        </Form.Item>
+        <Form.Item label="Các bộ phận" name="organExam">
+          <Input.TextArea rows={2} placeholder="Tim, phổi, bụng, tai mũi họng…" />
+        </Form.Item>
+        <Row gutter={12}>
+          <Col xs={24} md={12}>
+            <Form.Item label="Chỉ định cận lâm sàng" name="orders">
+              <Input.TextArea rows={2} placeholder="Xét nghiệm, chẩn đoán hình ảnh…" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Tóm tắt kết quả cận lâm sàng" name="labSummary">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Section>Chẩn đoán</Section>
+        <Row gutter={12}>
+          <Col xs={24} md={16}>
+            <Form.Item label="Bệnh chính" name="diagnosis" rules={[{ required: true, min: 2, message: 'Nhập chẩn đoán' }]}>
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item label="Mã ICD-10" name="icdCode" rules={[{ pattern: /^\s*[A-Z]\d{2}(\.\d{1,2})?\s*$/i, message: 'Chọn trong danh sách hoặc nhập mã dạng J02.9' }]}>
+              <IcdInput onPick={(name) => !form.getFieldValue('diagnosis') && form.setFieldValue('diagnosis', name)} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={16}>
+            <Form.Item label="Bệnh kèm theo" name="secondaryDiagnosis">
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item
+              label="Mã ICD-10 bệnh kèm theo"
+              name="secondaryIcdCodes"
+              rules={[{ pattern: /^\s*[A-Z]\d{2}(\.\d{1,2})?(\s*,\s*[A-Z]\d{2}(\.\d{1,2})?)*\s*$/i, message: 'Các mã cách nhau dấu phẩy' }]}
+            >
+              <Input placeholder="J30.4, J31.0" />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Section>Điều trị</Section>
+        <Row gutter={12}>
+          <Col xs={24} md={16}>
+            <Form.Item label="Hướng xử trí, điều trị" name="treatment">
+              <Input.TextArea rows={2} placeholder="Điều trị ngoại trú, theo dõi…" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item label="Hẹn tái khám" name="followUpDate">
+              <DatePicker
+                placeholder="Chọn ngày"
+                format="DD/MM/YYYY"
+                style={{ width: '100%' }}
+                disabledDate={(d) => !d.isAfter(dayjs(visitDate.slice(0, 10)), 'day')}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+        <Button htmlType="submit" type="primary" ghost loading={save.isPending}>
+          {record ? 'Cập nhật bệnh án' : 'Lưu bệnh án'}
+        </Button>
+      </Form>
+    </Card>
+  );
+}

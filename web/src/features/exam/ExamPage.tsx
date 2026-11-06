@@ -26,8 +26,8 @@ import { useAction } from '../../lib/hooks';
 import type { Prescription, Visit, VisitDetail } from '../../lib/types';
 import { VISIT_STATUS } from '../reception/visitStatus';
 import { MedicineSelect, medicineLabel } from './MedicineSelect';
+import { ExportButtons, RecordCard } from './RecordCard';
 
-type RecordForm = { symptoms: string; diagnosis: string; orders?: string };
 type ItemForm = { medicineId: string; quantity: number; dosePerTime: string; timesPerDay: number; days: number; note?: string };
 type PrescriptionForm = { advice?: string; items: ItemForm[] };
 
@@ -121,12 +121,6 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
     queryFn: async () => (await api.get<VisitDetail[]>('/visits/history', { params: { patientId: v!.patient.id } })).data,
   });
 
-  const [recordForm] = Form.useForm<RecordForm>();
-  useEffect(() => {
-    if (v?.medicalRecord) recordForm.setFieldsValue({ ...v.medicalRecord, orders: v.medicalRecord.orders ?? '' });
-  }, [v?.medicalRecord, recordForm]);
-
-  const saveRecord = useAction((r: RecordForm) => api.put(`/visits/${visitId}/record`, r), { success: 'Đã lưu bệnh án', invalidate: ['visit'] });
   const complete = useAction(() => api.post(`/visits/${visitId}/complete`), { success: 'Đã hoàn tất lượt khám', invalidate: ['queue', 'visit'] });
   const markLeft = useAction(() => api.patch(`/queue/${visitId}/left`), { success: 'Đã đánh dấu bỏ về', invalidate: ['queue'] });
 
@@ -173,9 +167,10 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
                     size="small"
                     dataSource={pastVisits}
                     renderItem={(h) => (
-                      <List.Item>
+                      <List.Item extra={h.medicalRecord && <ExportButtons visitId={h.id} size="small" />}>
                         <div>
                           <Typography.Text strong>{formatDay(h.date)}</Typography.Text> · {h.medicalRecord?.diagnosis ?? 'Không có bệnh án'}
+                          {h.medicalRecord?.icdCode && <Typography.Text type="secondary"> ({h.medicalRecord.icdCode})</Typography.Text>}
                           {h.prescription && (
                             <div>
                               <Typography.Text type="secondary">
@@ -194,22 +189,7 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
         )}
       </Card>
 
-      <Card title="Bệnh án">
-        <Form form={recordForm} layout="vertical" requiredMark={false} onFinish={(r) => saveRecord.mutate(r)}>
-          <Form.Item label="Triệu chứng" name="symptoms" rules={[{ required: true, min: 2, message: 'Nhập triệu chứng' }]}>
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Form.Item label="Chẩn đoán" name="diagnosis" rules={[{ required: true, min: 2, message: 'Nhập chẩn đoán' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="Chỉ định (xét nghiệm, tái khám…)" name="orders">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Button htmlType="submit" loading={saveRecord.isPending}>
-            {v.medicalRecord ? 'Cập nhật bệnh án' : 'Lưu bệnh án'}
-          </Button>
-        </Form>
-      </Card>
+      <RecordCard visitId={visitId} visitDate={v.date} reason={v.reason} record={v.medicalRecord} />
 
       <PrescriptionCard visitId={visitId} draft={draft} current={v.prescription} />
 
@@ -370,6 +350,7 @@ function PrescriptionCard({ visitId, draft, current }: { visitId: string; draft:
 export function PrescriptionView({ p }: { p: Prescription }) {
   return (
     <>
+      {p.code && <Typography.Text type="secondary">Mã đơn thuốc: {p.code}</Typography.Text>}
       <List
         size="small"
         dataSource={p.items}
