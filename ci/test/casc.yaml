@@ -1,0 +1,39 @@
+# Cấu hình Jenkins tự động CHỈ dùng khi CI kiểm tra Jenkinsfile (máy nhóm cấu hình bằng giao diện).
+jenkins:
+  systemMessage: "Jenkins kiểm thử pipeline trong GitHub Actions"
+  authorizationStrategy: unsecured
+  numExecutors: 4
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: DEPLOY_LOCAL
+            value: "true"
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - string:
+              scope: GLOBAL
+              id: sonar-token
+              secret: "${SONAR_TOKEN}"
+          - file:
+              scope: GLOBAL
+              id: clinic-env
+              fileName: .env
+              secretBytes: "${readFileBase64:/ci-test/app.env}"
+unclassified:
+  sonarGlobalConfiguration:
+    buildWrapperEnabled: true
+    installations:
+      - name: sonarqube
+        serverUrl: http://sonarqube:9000
+        credentialsId: sonar-token
+tool:
+  sonarRunnerInstallation:
+    installations:
+      - name: sonar-scanner
+        properties:
+          - installSource:
+              installers:
+                - sonarRunnerInstaller:
+                    id: "${SCANNER_VERSION}"

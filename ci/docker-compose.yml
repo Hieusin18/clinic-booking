@@ -14,6 +14,9 @@ services:
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+    # Để Jenkins gọi được hệ thống vừa deploy trên chính máy này (health check)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       JAVA_OPTS: -Xmx1g
     restart: unless-stopped
