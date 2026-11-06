@@ -1,3 +1,4 @@
+video họp tuần 1: https://drive.google.com/file/d/1-mBF2ICs8vLiGIk_gCy9YN9aDRFsE-QM/view?usp=drive_link
 # Clinic Booking: hệ thống đặt lịch khám
 
 Đồ án nhóm 5 người, dùng chung cho 3 môn: Phát triển ứng dụng di động, Lập trình web, Triển khai phần mềm.
