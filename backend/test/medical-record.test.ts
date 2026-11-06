@@ -140,6 +140,20 @@ describe('Bệnh án theo mẫu Bộ Y tế và bản điện tử PDF/Word', ()
       }
     });
 
+    it('xem trước HTML cùng nội dung, chặn script và tài nguyên ngoài', async () => {
+      const visitId = await finishedVisit();
+      // Dữ liệu người dùng chứa thẻ HTML phải hiện thành chữ, không thành thẻ
+      await prisma.patient.update({ where: { id: patient.patient.id }, data: { address: '<script>alert(1)</script> Hà Nội' } });
+      const res = await api(app).get(`/api/visits/${visitId}/record.html`).set(patient.auth).expect(200);
+      expect(res.headers['content-type']).toContain('text/html');
+      expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+      for (const s of ['BỆNH ÁN NGOẠI TRÚ', 'ĐƠN THUỐC', 'Viêm họng cấp', 'SL: 06 gói', '&lt;script&gt;alert(1)&lt;/script&gt; Hà Nội']) expect(res.text).toContain(s);
+      expect(res.text).not.toContain('<script>');
+      await api(app).get(`/api/visits/${visitId}/record.html`).set(doctor.auth).expect(200);
+      await api(app).get(`/api/visits/${visitId}/record.html`).set((await createPatient(app, prisma)).auth).expect(404);
+      await api(app).get(`/api/visits/${visitId}/record.html`).set(reception).expect(403);
+    });
+
     it('chưa có bệnh án thì báo lỗi; người khác không tải được', async () => {
       const visitId = await startVisit();
       expect((await api(app).get(`/api/visits/${visitId}/record.pdf`).set(doctor.auth).expect(409)).body.message).toBe('Lượt khám chưa có bệnh án');

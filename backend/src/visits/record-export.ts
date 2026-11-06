@@ -528,3 +528,75 @@ export async function renderDocx(doc: ReturnType<typeof buildPrintDoc>): Promise
   });
   return Packer.toBuffer(document);
 }
+
+// ---------- HTML (xem trước trên web và app) ----------
+
+/** Thoát ký tự HTML: dữ liệu người dùng nhập (địa chỉ, lời dặn…) không bao giờ thành thẻ HTML. */
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const fieldHtml = (f: Field) => `<span>${esc(f.label)}: </span><span class="${f.bold ? 'b' : ''}">${esc(f.value?.toString().trim() || BLANK)}</span>`;
+
+function htmlBlock(b: Block): string {
+  switch (b.kind) {
+    case 'heading':
+      return `<h3>${esc(b.text)}</h3>`;
+    case 'text':
+      return `<p class="${[b.italic && 'i', b.bold && 'b', b.indent && 'ind'].filter(Boolean).join(' ')}">${esc(b.text)}</p>`;
+    case 'fields':
+      return `<div class="row">${b.fields.map((f) => `<div>${fieldHtml(f)}</div>`).join('')}</div>`;
+    case 'grid': {
+      const rows: string[] = [];
+      for (let i = 0; i < b.cells.length; i += b.columns) {
+        rows.push(`<tr>${b.cells.slice(i, i + b.columns).map((f) => `<td>${fieldHtml(f)}</td>`).join('')}</tr>`);
+      }
+      return `<table class="grid">${rows.join('')}</table>`;
+    }
+    case 'medicine':
+      return `<div class="med"><div class="row b"><div>${b.index}. ${esc(b.name)}</div><div class="r">${esc(b.quantity)}</div></div><p class="i ind">${esc(b.usage)}</p></div>`;
+  }
+}
+
+/**
+ * Trang HTML giống bản in (khổ A4), để xem trước trước khi tải PDF/Word.
+ * Không có JavaScript; CSP chặn mọi tài nguyên ngoài.
+ */
+export function renderHtml(doc: ReturnType<typeof buildPrintDoc>): string {
+  const pages = doc.pages
+    .map(
+      (p) => `<section class="page">
+  <div class="head"><div>${p.headerLeft.map((t, i) => `<div class="${i === 0 ? 'b' : ''}">${esc(t)}</div>`).join('')}</div>
+  <div class="r">${p.headerRight.map((t) => `<div>${esc(t)}</div>`).join('')}</div></div>
+  <h1>${esc(p.title)}</h1>${p.subtitle ? `<p class="sub">${esc(p.subtitle)}</p>` : ''}
+  ${p.blocks.map(htmlBlock).join('\n  ')}
+  <div class="sign"><div class="i">${esc(p.sign.date)}</div><div class="b">${esc(p.sign.role)}</div><div class="i small">(Ký, ghi rõ họ tên)</div><div class="b name">${esc(p.sign.name)}</div></div>
+  ${p.note ? `<p class="i small">${esc(p.note)}</p>` : ''}
+</section>`,
+    )
+    .join('\n');
+  return `<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(doc.pages.map((p) => p.title).join(' – '))}</title>
+<style>
+  /* Kích thước tính theo em; cỡ chữ gốc co theo bề rộng màn hình nên cả trang A4 luôn vừa khung (như xem PDF), tối đa 15px */
+  :root { color-scheme: light; }
+  body { margin: 0; padding: 1em 0; background: #e5e7eb; color: #111; line-height: 1.35;
+    font-family: 'Times New Roman', Tinos, 'Noto Serif', serif; font-size: min(15px, calc((100vw - 16px) / 52.933)); }
+  .page { box-sizing: border-box; width: 52.933em; min-height: 74.867em; margin: 0 auto 1em; padding: 3.2em 3.733em 2.667em 5em; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .head { display: flex; justify-content: space-between; gap: 1em; font-size: .933em; }
+  h1 { text-align: center; font-size: 1.467em; margin: .8em 0 .1em; }
+  h3 { font-size: 1em; margin: .667em 0 .2em; }
+  p { margin: .133em 0; }
+  .sub { text-align: center; font-style: italic; margin-bottom: .533em; }
+  .row { display: flex; gap: 1.867em; margin: .133em 0; } .row > div:last-child { flex: 1; }
+  .grid { width: 100%; border-collapse: collapse; margin: .267em 0 .4em; font-size: .933em; }
+  .grid td { border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: .2em .267em; }
+  .med { margin: .267em 0; } .med .row > div:last-child { flex: 0 0 auto; }
+  .sign { width: 20em; margin: .933em 0 0 auto; text-align: center; } .sign .name { margin-top: 3.733em; }
+  .b { font-weight: bold; } .i { font-style: italic; } .r { text-align: right; } .ind { padding-left: 1.067em; } .small { font-size: .867em; }
+  .foot { width: 52.933em; margin: 0 auto; font-size: .8em; font-style: italic; color: #555; }
+</style></head>
+<body>
+${pages}
+<p class="foot">${esc(doc.footer)}</p>
+</body></html>`;
+}

@@ -1,6 +1,6 @@
-import { FilePdfOutlined, FileWordOutlined } from '@ant-design/icons';
+import { EyeOutlined, FilePdfOutlined, FileWordOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { App, AutoComplete, Button, Card, Col, DatePicker, Divider, Form, Input, InputNumber, Row, Space, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Row, Space, Spin, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import { api, errorMessage } from '../../lib/api';
@@ -25,11 +25,9 @@ export function toRecordPayload(f: RecordForm) {
 export const bmi = (weight?: number | null, height?: number | null) =>
   weight && height ? Math.round((weight / (height / 100) ** 2) * 10) / 10 : null;
 
-/** Tải file từ API (có token) rồi lưu về máy. */
-async function download(url: string, fallbackName: string) {
-  const res = await api.get<Blob>(url, { responseType: 'blob' });
-  const name = /filename="([^"]+)"/.exec(String(res.headers['content-disposition'] ?? ''))?.[1] ?? fallbackName;
-  const href = URL.createObjectURL(res.data);
+/** Lưu một Blob thành file trên máy. */
+function saveBlob(blob: Blob, name: string) {
+  const href = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), { href, download: name });
   document.body.appendChild(a);
   a.click();
@@ -37,14 +35,62 @@ async function download(url: string, fallbackName: string) {
   setTimeout(() => URL.revokeObjectURL(href), 1000);
 }
 
-/** Nút tải bệnh án + đơn thuốc dạng PDF và Word. */
-export function ExportButtons({ visitId, size }: { visitId: string; size?: 'small' | 'middle' }) {
+/** Tải file từ API (có token): trả về nội dung và tên file server đặt. */
+async function fetchFile(url: string, fallbackName: string) {
+  const res = await api.get<Blob>(url, { responseType: 'blob' });
+  const name = /filename="([^"]+)"/.exec(String(res.headers['content-disposition'] ?? ''))?.[1] ?? fallbackName;
+  return { blob: res.data, name };
+}
+
+/** Xem trước bệnh án + đơn thuốc đúng bố cục bản in (trang HTML do máy chủ tạo), kèm nút tải PDF/Word. */
+function PreviewModal({ visitId, open, onClose }: { visitId: string; open: boolean; onClose: () => void }) {
+  const html = useQuery({
+    queryKey: ['record-html', visitId],
+    enabled: open,
+    gcTime: 0,
+    staleTime: 0,
+    queryFn: async () => (await api.get<string>(`/visits/${visitId}/record.html`, { responseType: 'text' })).data,
+  });
+  return (
+    <Modal
+      title="Xem trước bản điện tử"
+      open={open}
+      onCancel={onClose}
+      width={900}
+      destroyOnHidden
+      styles={{ body: { height: '72vh' } }}
+      footer={
+        <Flex justify="space-between" align="center" wrap gap={8}>
+          <Typography.Text type="secondary">Nội dung theo bệnh án và đơn thuốc đã lưu</Typography.Text>
+          <Space>
+            <Button onClick={onClose}>Đóng</Button>
+            <DownloadButtons visitId={visitId} primary />
+          </Space>
+        </Flex>
+      }
+    >
+      {html.isError ? (
+        <Alert type="error" showIcon title={errorMessage(html.error)} />
+      ) : html.data ? (
+        // sandbox rỗng: trang xem trước không chạy script, không điều hướng; máy chủ đã thoát ký tự HTML
+        <iframe title="Bản xem trước bệnh án" srcDoc={html.data} sandbox="" style={{ width: '100%', height: '100%', border: '1px solid #e5e7eb', borderRadius: 8 }} />
+      ) : (
+        <Flex align="center" justify="center" style={{ height: '100%' }}>
+          <Spin />
+        </Flex>
+      )}
+    </Modal>
+  );
+}
+
+function DownloadButtons({ visitId, size, primary }: { visitId: string; size?: 'small' | 'middle'; primary?: boolean }) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState<'pdf' | 'docx' | null>(null);
   const get = async (format: 'pdf' | 'docx') => {
     setBusy(format);
     try {
-      await download(`/visits/${visitId}/record.${format}`, `benh-an.${format}`);
+      const f = await fetchFile(`/visits/${visitId}/record.${format}`, `benh-an.${format}`);
+      saveBlob(f.blob, f.name);
     } catch (e) {
       message.error(errorMessage(e));
     } finally {
@@ -52,13 +98,27 @@ export function ExportButtons({ visitId, size }: { visitId: string; size?: 'smal
     }
   };
   return (
-    <Space size="small">
-      <Button size={size} icon={<FilePdfOutlined />} loading={busy === 'pdf'} onClick={() => get('pdf')}>
-        Tải PDF
-      </Button>
+    <>
       <Button size={size} icon={<FileWordOutlined />} loading={busy === 'docx'} onClick={() => get('docx')}>
         Tải Word
       </Button>
+      <Button size={size} type={primary ? 'primary' : 'default'} icon={<FilePdfOutlined />} loading={busy === 'pdf'} onClick={() => get('pdf')}>
+        Tải PDF
+      </Button>
+    </>
+  );
+}
+
+/** Nút xem trước, tải bệnh án + đơn thuốc dạng PDF và Word. */
+export function ExportButtons({ visitId, size }: { visitId: string; size?: 'small' | 'middle' }) {
+  const [previewing, setPreviewing] = useState(false);
+  return (
+    <Space size="small">
+      <Button size={size} type="primary" ghost icon={<EyeOutlined />} onClick={() => setPreviewing(true)}>
+        Xem trước
+      </Button>
+      <DownloadButtons visitId={visitId} size={size} />
+      <PreviewModal visitId={visitId} open={previewing} onClose={() => setPreviewing(false)} />
     </Space>
   );
 }
