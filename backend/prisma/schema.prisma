@@ -91,18 +91,61 @@ model Specialty {
   doctors     Doctor[]
 }
 
+/// Bác sĩ. Hồ sơ (giới thiệu, kinh nghiệm, thế mạnh, quá trình đào tạo và công tác, ảnh)
+/// hiện cho bệnh nhân xem trước khi đặt lịch.
 model Doctor {
   id          String  @id @default(uuid())
   userId      String  @unique
   specialtyId String
   title       String?
   bio         String?
+  /// Năm bắt đầu hành nghề; số năm kinh nghiệm tính từ năm này nên luôn đúng theo thời gian
+  practiceSince Int?
+  /// Thế mạnh chuyên môn, mỗi dòng một mục (bệnh hoặc kỹ thuật)
+  expertise   String?
 
   user          User           @relation(fields: [userId], references: [id])
   specialty     Specialty      @relation(fields: [specialtyId], references: [id])
   schedules     Schedule[]
   visits        Visit[]
   prescriptions Prescription[]
+  history       DoctorHistory[]
+  avatar        DoctorAvatar?
+}
+
+enum DoctorHistoryKind {
+  /// Quá trình đào tạo: văn bằng, chứng chỉ
+  EDUCATION
+  /// Quá trình công tác: chức vụ, nơi làm việc
+  WORK
+}
+
+/// Một mốc trong quá trình đào tạo hoặc công tác của bác sĩ
+model DoctorHistory {
+  id       String            @id @default(uuid())
+  doctorId String
+  kind     DoctorHistoryKind
+  fromYear Int
+  /// null = đến nay
+  toYear   Int?
+  /// Chức vụ, vị trí (công tác) hoặc văn bằng (đào tạo)
+  title    String
+  /// Nơi công tác hoặc cơ sở đào tạo
+  place    String
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+}
+
+/// Ảnh đại diện bác sĩ, tách bảng để danh sách bác sĩ không phải đọc dữ liệu ảnh
+model DoctorAvatar {
+  doctorId  String   @id
+  data      Bytes
+  mimeType  String
+  updatedAt DateTime @updatedAt
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 }
 
 /// Khung giờ bác sĩ mở cho đặt lịch.

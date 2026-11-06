@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from 'react-router';
 import { DoctorsPage } from './features/admin/DoctorsPage';
+import { MyProfilePage } from './features/doctor-profile/MyProfilePage';
 import { MedicinesPage } from './features/admin/MedicinesPage';
 import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
@@ -25,6 +26,7 @@ function Home() {
  * - Lịch khám: /doctor/schedule
  * - Tiếp đón và hàng đợi: /reception, /reception/queue, /counter
  * - Khám bệnh: /doctor/queue
+ * - Hồ sơ của tôi: /doctor/profile
  */
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
@@ -50,6 +52,7 @@ export const routes: RouteObject[] = [
       { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><MedicinesPage /></RequireRole> },
       { path: '/doctor/queue', element: <RequireRole roles={['DOCTOR']}><ExamPage /></RequireRole> },
       { path: '/doctor/schedule', element: <RequireRole roles={['DOCTOR']}><SchedulePage /></RequireRole> },
+      { path: '/doctor/profile', element: <RequireRole roles={['DOCTOR']}><MyProfilePage /></RequireRole> },
       { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ReceptionPage /></RequireRole> },
       { path: '/reception/queue', element: <RequireRole roles={['RECEPTIONIST']}><QueueBoardPage /></RequireRole> },
     ],

@@ -13,9 +13,10 @@ const DAYS = 7;
 
 /** Chọn ngày, chọn giờ trống rồi đặt lịch với một bác sĩ. */
 export default function BookDoctor() {
-  const { doctorId } = useLocalSearchParams<{ doctorId: string }>();
+  const { doctorId, day } = useLocalSearchParams<{ doctorId: string; day?: string }>();
   const queryClient = useQueryClient();
-  const [offset, setOffset] = useState(0);
+  // Mở từ hồ sơ bác sĩ với một ngày đã chọn (số ngày tính từ hôm nay)
+  const [offset, setOffset] = useState(() => Math.min(Math.max(Number(day) || 0, 0), DAYS - 1));
   const [slot, setSlot] = useState<Slot | null>(null);
   const [reason, setReason] = useState('');
   const date = ymd(offset);

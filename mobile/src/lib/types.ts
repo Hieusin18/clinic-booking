@@ -28,12 +28,37 @@ export interface Specialty {
   _count?: { doctors: number };
 }
 
+/** Một mốc trong quá trình đào tạo hoặc công tác; toYear null = đến nay */
+export interface HistoryItem {
+  id: string;
+  fromYear: number;
+  toYear: number | null;
+  title: string;
+  place: string;
+}
+
+/** Bác sĩ theo API công khai (không có SĐT, email) */
 export interface Doctor {
   id: string;
   title: string | null;
   bio: string | null;
+  practiceSince: number | null;
+  experienceYears: number | null;
+  /** Thế mạnh chuyên môn */
+  expertise: string[];
+  /** Phiên bản ảnh đại diện; null = chưa có ảnh */
+  avatarVersion: number | null;
   specialty: { id: string; name: string };
-  user: { id: string; fullName: string; phone: string; email: string | null; isActive: boolean };
+  user: { fullName: string };
+  /** Có khi xem hồ sơ (GET /doctors/:id) */
+  education?: HistoryItem[];
+  career?: HistoryItem[];
+}
+
+/** Số giờ còn trống của bác sĩ trong một ngày */
+export interface DayAvailability {
+  date: string;
+  free: number;
 }
 
 export interface Medicine {
