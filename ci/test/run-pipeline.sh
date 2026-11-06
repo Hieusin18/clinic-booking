@@ -30,8 +30,8 @@ export SONAR_TOKEN
 echo "::endgroup::"
 
 note "Jenkins: dựng với cấu hình JCasC"
-SCANNER_VERSION=$(curl -s https://updates.jenkins.io/updates/hudson.plugins.sonar.SonarRunnerInstaller.json \
-  | sed 's/^[^{]*//; s/);*$//' | python3 -c 'import json,sys; print(json.load(sys.stdin)["list"][0]["id"])')
+SCANNER_VERSION=$(curl -sL https://updates.jenkins.io/updates/hudson.plugins.sonar.SonarRunnerInstaller.json \
+  | python3 -c 'import json,sys,re; t=sys.stdin.read(); print(json.loads(t[t.index("{"):t.rindex("}")+1])["list"][0]["id"])')
 export SCANNER_VERSION
 echo "sonar-scanner $SCANNER_VERSION"
 cp ../.env.example test/app.env
