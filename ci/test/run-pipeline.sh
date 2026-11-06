@@ -65,8 +65,15 @@ if [ "$RESULT" != "SUCCESS" ]; then
   sed -i 's/\x1b\[[0-9;]*m//g' console.txt
   STAGES=$(grep -E '^\[Pipeline\] \{ \(' console.txt | sed 's/\[Pipeline\] { (//; s/)$//' | tr '\n' '>' )
   ERRS=$(grep -nE 'ERROR|FAIL|Error:|error |Exception|script returned exit code|not found|denied|refused|Quality Gate' console.txt | grep -v '✓' | head -n 40)
+  QGLOG=$(grep -n -A12 '{ (Quality Gate)' console.txt | grep -v '^\s*$' | head -n 14)
+  QGS=$(curl -s -u "admin:Ci-Test-Admin-123!" "http://localhost:9000/api/qualitygates/project_status?projectKey=clinic-booking" | head -c 1500)
+  HOOK=$(curl -s -u "admin:Ci-Test-Admin-123!" "http://localhost:9000/api/webhook_deliveries/search?componentKey=clinic-booking" | head -c 600)
   fail "pipeline $RESULT" "Các stage đã vào: $STAGES
-$ERRS"
+$ERRS
+--- Quality Gate trong Jenkins:
+$QGLOG
+--- SonarQube project_status: $QGS
+--- Webhook deliveries: $HOOK"
 fi
 QG=$(curl -s -u "admin:Ci-Test-Admin-123!" "http://localhost:9000/api/qualitygates/project_status?projectKey=clinic-booking")
 echo "Quality Gate: $QG"
