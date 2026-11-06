@@ -66,7 +66,7 @@ describe('Khám bệnh, bệnh án và đơn thuốc', () => {
     });
 
     it('hoàn tất lượt khám cần có bệnh án; lịch hẹn chuyển sang đã khám', async () => {
-      const start = new Date(Date.now() + 3_600_000);
+      const start = new Date(Date.now() + 10 * 60_000);
       const slot = await prisma.schedule.create({ data: { doctorId: doctor.doctor.id, date: todayVN(), startTime: start, endTime: new Date(start.getTime() + 900_000), isBooked: true } });
       const appt = await prisma.appointment.create({ data: { patientId: patient.patient.id, scheduleId: slot.id, status: 'CONFIRMED' } });
       const v = await api(app).post('/api/queue/checkin').set(reception).send({ appointmentId: appt.id }).expect(201);

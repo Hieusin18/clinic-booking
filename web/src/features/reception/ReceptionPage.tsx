@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, Col, DatePicker, Descriptions, Empty, Form, Input, List, Modal, Row, Select, Space, Tag, Typography } from 'antd';
+import { Alert, App, Button, Card, Col, DatePicker, Descriptions, Empty, Form, Input, List, Modal, Row, Select, Space, Tag, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useState } from 'react';
-import { api } from '../../lib/api';
-import { age, doctorName, formatDay, formatTime, GENDER_LABEL } from '../../lib/format';
+import { api, errorData } from '../../lib/api';
+import { age, doctorName, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import type { Appointment, Gender, Page, Patient, Visit } from '../../lib/types';
 import { TicketModal } from './TicketPrint';
@@ -71,9 +71,43 @@ export function ReceptionPage() {
     async (v: { patientId: string; doctorId: string; reason?: string }) => (await api.post<Visit>('/queue/tickets', v)).data,
     { invalidate: ['queue'] },
   );
-  const checkIn = useAction(async (appointmentId: string) => (await api.post<Visit>('/queue/checkin', { appointmentId })).data, {
-    invalidate: ['appointments', 'queue'],
-  });
+  const { modal } = App.useApp();
+  const checkIn = useAction(
+    async ({ id, override }: { id: string; override?: boolean }) =>
+      (await api.post<Visit>('/queue/checkin', { appointmentId: id, ...(override ? { override: true } : {}) })).data,
+    {
+      invalidate: ['appointments', 'queue'],
+      // Ngoài khung giờ check-in: hỏi lễ tân có muốn check-in ngoài giờ không
+      handleError: (err, vars) => {
+        const data = errorData<{ appointmentAt?: string; opensAt?: string; closesAt?: string }>(err);
+        const early = data?.code === 'CHECKIN_TOO_EARLY';
+        if (!early && data?.code !== 'CHECKIN_TOO_LATE') return false;
+        const at = data.appointmentAt ? formatTime(data.appointmentAt) : '';
+        modal.confirm({
+          title: early ? 'Bệnh nhân đến sớm hơn khung check-in' : 'Bệnh nhân đến trễ quá khung check-in',
+          content: (
+            <>
+              <p>
+                {early
+                  ? `Lịch hẹn lúc ${at}, khung check-in mở từ ${data.opensAt ? formatTime(data.opensAt) : ''}.`
+                  : `Lịch hẹn lúc ${at}, khung check-in đã đóng lúc ${data.closesAt ? formatTime(data.closesAt) : ''} nên lịch hẹn được tính là không đến.`}
+              </p>
+              <p>
+                {early
+                  ? 'Vẫn check-in ngay? Bệnh nhân giữ số A và được ưu tiên khi đến giờ hẹn.'
+                  : 'Vẫn check-in theo lịch hẹn (giữ số A, có ưu tiên)? Nếu không, hãy cấp số thường ở khung bên trái.'}
+              </p>
+            </>
+          ),
+          okText: 'Check-in ngoài giờ',
+          cancelText: 'Không',
+          onOk: () => checkIn.mutate({ id: vars.id, override: true }, { onSuccess: setTicket }),
+        });
+        appointments.refetch();
+        return true;
+      },
+    },
+  );
 
   return (
     <Row gutter={[16, 16]}>
@@ -184,14 +218,14 @@ export function ReceptionPage() {
               <List.Item
                 actions={[
                   a.visit ? (
-                    <Tag key="no" color="green">Số {a.visit.queueNumber}</Tag>
+                    <Tag key="no" color="green">Số {ticketLabel(a.visit)}</Tag>
                   ) : (
                     <Button
                       key="checkin"
                       type="primary"
                       ghost
-                      loading={checkIn.isPending && checkIn.variables === a.id}
-                      onClick={() => checkIn.mutate(a.id, { onSuccess: setTicket })}
+                      loading={checkIn.isPending && checkIn.variables?.id === a.id}
+                      onClick={() => checkIn.mutate({ id: a.id }, { onSuccess: setTicket })}
                     >
                       Check-in
                     </Button>
@@ -205,7 +239,16 @@ export function ReceptionPage() {
                       {a.patient.fullName}
                     </Space>
                   }
-                  description={`${doctorName(a.schedule.doctor)} · ${a.patient.phone}`}
+                  description={
+                    <>
+                      {doctorName(a.schedule.doctor)} · {a.patient.phone}
+                      {a.status === 'NO_SHOW' && !a.visit ? (
+                        <Tag color="orange" style={{ marginLeft: 8 }}>
+                          Quá giờ, chưa đến
+                        </Tag>
+                      ) : null}
+                    </>
+                  }
                 />
               </List.Item>
             )}

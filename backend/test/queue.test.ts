@@ -22,9 +22,9 @@ describe('Tiếp đón, hàng đợi và QR', () => {
 
   const qr = (ageMs = 0) => createQrToken(process.env.CLINIC_ID!, process.env.QR_SECRET!, Date.now() - ageMs);
 
-  /** Lịch hẹn của bệnh nhân với bác sĩ, khung giờ sau hiện tại 2 tiếng; date mặc định hôm nay. */
-  async function bookToday(patientId: string, date = todayVN()) {
-    const start = new Date(Date.now() + 2 * 3_600_000);
+  /** Lịch hẹn của bệnh nhân với bác sĩ, mặc định 10 phút nữa (đang trong khung check-in); date mặc định hôm nay. */
+  async function bookToday(patientId: string, date = todayVN(), minutesFromNow = 10) {
+    const start = new Date(Date.now() + minutesFromNow * 60_000);
     const slot = await prisma.schedule.create({
       data: { doctorId: doctor.doctor.id, date, startTime: start, endTime: new Date(start.getTime() + 900_000), isBooked: true },
     });
@@ -92,7 +92,7 @@ describe('Tiếp đón, hàng đợi và QR', () => {
       const otherSpecialty = await createDoctor(app, prisma, (await createSpecialty(prisma)).id);
       await api(app).post('/api/queue/tickets').set(reception).send({ patientId: p.id, doctorId: doctor.doctor.id }).expect(201);
       const res = await api(app).post('/api/queue/tickets').set(reception).send({ patientId: p.id, doctorId: sameSpecialty.doctor.id }).expect(409);
-      expect(res.body.message).toBe('Bệnh nhân đang giữ số 1 cho chuyên khoa này');
+      expect(res.body.message).toBe('Bệnh nhân đang giữ số B01 cho chuyên khoa này');
       await api(app).post('/api/queue/tickets').set(reception).send({ patientId: p.id, doctorId: otherSpecialty.doctor.id }).expect(201);
     });
 
@@ -161,7 +161,7 @@ describe('Tiếp đón, hàng đợi và QR', () => {
       const first = await api(app).post('/api/queue/call-next').set(doctor.auth).expect(200);
       expect(first.body).toMatchObject({ queueNumber: 1, status: 'IN_PROGRESS' });
       const blocked = await api(app).post('/api/queue/call-next').set(doctor.auth).expect(409);
-      expect(blocked.body.message).toBe('Bạn đang khám số 1, hãy hoàn tất trước khi gọi tiếp');
+      expect(blocked.body.message).toBe('Bạn đang khám số B01, hãy hoàn tất trước khi gọi tiếp');
 
       await api(app).patch(`/api/queue/${first.body.id}/left`).set(doctor.auth).expect(200);
       const second = await api(app).post('/api/queue/call-next').set(doctor.auth).expect(200);
@@ -194,11 +194,11 @@ describe('Tiếp đón, hàng đợi và QR', () => {
       const mine = await api(app).post('/api/queue/scan').set(me.auth).send({ token: qr(), doctorId: doctor.doctor.id }).expect(201);
 
       let pos = await api(app).get(`/api/queue/${mine.body.id}/position`).set(me.auth).expect(200);
-      expect(pos.body).toMatchObject({ peopleAhead: 2, currentNumber: null, visit: { queueNumber: 3 } });
+      expect(pos.body).toMatchObject({ peopleAhead: 2, current: null, label: 'B03', visit: { queueNumber: 3 } });
 
       await api(app).post('/api/queue/call-next').set(doctor.auth).expect(200);
       pos = await api(app).get(`/api/queue/${mine.body.id}/position`).set(me.auth).expect(200);
-      expect(pos.body).toMatchObject({ peopleAhead: 1, currentNumber: 1 });
+      expect(pos.body).toMatchObject({ peopleAhead: 1, current: { queueNumber: 1, source: 'WALK_IN' }, currentLabel: 'B01' });
 
       expect((await api(app).get('/api/queue/mine').set(me.auth).expect(200)).body[0].id).toBe(mine.body.id);
       const stranger = await createPatient(app, prisma);

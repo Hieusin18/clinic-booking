@@ -125,7 +125,7 @@ describe('Bệnh án theo mẫu Bộ Y tế và bản điện tử PDF/Word', ()
       for (const who of [doctor.auth, patient.auth]) {
         const res = await api(app).get(`/api/visits/${visitId}/record.pdf`).set(who).buffer(true).parse(binary).expect(200);
         expect(res.headers['content-type']).toBe('application/pdf');
-        expect(res.headers['content-disposition']).toMatch(/^attachment; filename="benh-an-BA-\d{8}-\d{3}\.pdf"$/);
+        expect(res.headers['content-disposition']).toMatch(/^attachment; filename="benh-an-BA-\d{8}-[AB]\d{3}\.pdf"$/);
         expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
       }
     });

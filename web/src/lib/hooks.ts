@@ -37,7 +37,16 @@ export function usePagedList<T>(key: string, url: string, extra: Record<string, 
 /** Mutation có sẵn thông báo thành công/thất bại và làm mới các danh sách liên quan. */
 export function useAction<TVars, TResult = unknown>(
   fn: (vars: TVars) => Promise<TResult>,
-  { success, invalidate = [] }: { success?: string; invalidate?: string[] } = {},
+  {
+    success,
+    invalidate = [],
+    handleError,
+  }: {
+    success?: string;
+    invalidate?: string[];
+    /** Tự xử lý lỗi (vd. mở hộp thoại); trả về true thì không hiện thông báo lỗi mặc định */
+    handleError?: (err: unknown, vars: TVars) => boolean;
+  } = {},
 ) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -47,6 +56,8 @@ export function useAction<TVars, TResult = unknown>(
       if (success) message.success(success);
       invalidate.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
     },
-    onError: (err) => message.error(errorMessage(err)),
+    onError: (err, vars) => {
+      if (!handleError?.(err, vars)) message.error(errorMessage(err));
+    },
   });
 }

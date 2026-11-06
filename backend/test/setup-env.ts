@@ -4,3 +4,4 @@ process.env.JWT_SECRET ??= 'test-jwt-secret';
 process.env.QR_SECRET ??= 'test-qr-secret';
 process.env.QR_TTL_SECONDS ??= '60';
 process.env.CLINIC_ID ??= 'phong-kham-test';
+process.env.QUEUE_SWEEP_SECONDS ??= '0';

@@ -12,7 +12,7 @@ const STATUS: Record<AppointmentStatus, { label: string; tone: 'primary' | 'succ
   CONFIRMED: { label: 'Đã xác nhận', tone: 'primary' },
   COMPLETED: { label: 'Đã khám', tone: 'success' },
   CANCELLED: { label: 'Đã hủy', tone: 'neutral' },
-  NO_SHOW: { label: 'Vắng mặt', tone: 'danger' },
+  NO_SHOW: { label: 'Không đến', tone: 'warning' },
 };
 
 /** Xác nhận trước khi hủy; bản web dùng window.confirm vì Alert nhiều nút không có trên web. */
@@ -66,7 +66,11 @@ export default function Appointments() {
             {a.reason ? <Muted>Lý do: {a.reason}</Muted> : null}
             {when === 'upcoming' ? (
               <>
-                <Muted>Đến phòng khám, vào tab Lấy số và quét mã QR ở quầy để check-in.</Muted>
+                <Muted>
+                  {a.checkinOpensAt && a.checkinClosesAt
+                    ? `Quét mã QR ở quầy để check-in trong khoảng ${formatTime(a.checkinOpensAt)}–${formatTime(a.checkinClosesAt)}. Đến trễ hơn thì lịch hẹn hết hiệu lực.`
+                    : 'Đến phòng khám, vào tab Lấy số và quét mã QR ở quầy để check-in.'}
+                </Muted>
                 <Button title="Hủy lịch" variant="danger" loading={cancel.isPending && cancel.variables === a.id} onPress={() => confirmCancel(() => cancel.mutate(a.id))} />
               </>
             ) : null}

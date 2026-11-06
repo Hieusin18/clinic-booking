@@ -17,13 +17,28 @@ clinic-booking/
 │       ├── prisma/          PrismaService dùng chung
 │       ├── health/          GET /api/health
 │       ├── qr/              Ký và kiểm tra token QR động (HMAC, hết hạn sau 60 giây)
-│       └── queue/           Cấp số thứ tự an toàn khi nhiều người lấy cùng lúc, quét QR
+│       └── queue/           Cấp số (dãy A đặt lịch, B vãng lai), thứ tự gọi số, khung check-in, tự đóng lịch không đến
 ├── web/                     React + Vite + Ant Design (admin, bác sĩ, lễ tân)
 ├── mobile/                  Expo + Expo Router (bệnh nhân)
 ├── docker-compose.yml       db + backend + caddy
 ├── Caddyfile                HTTPS tự động, /api → backend, còn lại → web
 └── .github/workflows/       CI kiểm tra mỗi pull request, tự deploy khi vào main
 ```
+
+## Hàng đợi ngày khám
+
+- **Hai dãy số:** check-in lịch hẹn nhận số **A** (A01, A02…), người đến trực tiếp nhận số **B**.
+- **Khung check-in:** từ giờ hẹn − 30 phút đến giờ hẹn + 15 phút. Đến sớm hơn thì app báo giờ mở check-in; đến trễ hơn thì lịch hẹn thành *không đến* và bệnh nhân lấy số B. Lễ tân check-in ngoài khung giờ được khi cần.
+- **Thứ tự gọi số** (`backend/src/queue/queue-order.ts`), xét lần lượt:
+  1. đã có 3 lượt liên tiếp gọi người đặt lịch mà còn người vãng lai chờ → gọi người vãng lai đến sớm nhất;
+  2. người đặt lịch đã đến giờ hẹn (từ giờ hẹn − 10 phút) → gọi người có giờ hẹn sớm nhất;
+  3. còn lại → theo thứ tự đến quầy.
+
+  Bác sĩ có thể gọi đích danh một người (nút **Gọi** cạnh từng người chờ). Số "trước bạn còn mấy người" trên app tính bằng chính quy tắc này.
+- **Tự dọn mỗi 5 phút:** lịch quá giờ hẹn + 15 phút chưa check-in → *không đến*; sau 21:00 số còn chờ → *bỏ về*.
+- **Khóa đặt lịch:** không đến 3 lần trong 30 ngày thì 14 ngày không đặt lịch online được (vẫn lấy số trực tiếp được).
+
+Các mốc trên đổi được trong `.env` (xem `.env.example`).
 
 ## Chạy backend trên máy
 

@@ -1,13 +1,17 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { patientIdOf } from '../appointments/appointments.js';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
 import { todayVN } from '../common/time.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { verifyQrToken } from '../qr/qr-token.js';
 import { QueueService, visitView } from './queue.service.js';
+import { ticketLabel } from './queue-order.js';
+
+/** Thông báo khi quét QR mà hôm nay chưa có lịch hẹn còn hiệu lực */
+export const NEEDS_DOCTOR = 'Bạn chưa đặt lịch hôm nay, vui lòng chọn bác sĩ';
 
 class ScanQrDto {
   /** Chuỗi đọc được từ mã QR ở quầy */
@@ -25,6 +29,8 @@ class WalkInDto {
 
 class CheckInDto {
   @IsString() appointmentId: string;
+  /** Lễ tân check-in ngoài khung giờ (đến quá sớm hoặc quá trễ) */
+  @IsOptional() @IsBoolean() override?: boolean;
 }
 
 class TodayQuery {
@@ -42,8 +48,9 @@ export class QueueController {
   ) {}
 
   /**
-   * Bệnh nhân quét QR tại quầy: nếu đã đặt lịch hôm nay thì tự check-in,
-   * nếu chưa thì lấy số mới cho bác sĩ đã chọn.
+   * Bệnh nhân quét QR tại quầy: có lịch hẹn hôm nay trong khung check-in thì tự check-in;
+   * đến quá sớm thì báo giờ mở check-in; đến quá trễ hoặc chưa đặt lịch thì lấy số thường
+   * với bác sĩ đã chọn.
    */
   @Roles('PATIENT')
   @Post('scan')
@@ -59,14 +66,36 @@ export class QueueController {
       );
     }
 
+    const now = new Date();
     const patientId = await patientIdOf(this.prisma, user);
-    const booked = await this.prisma.appointment.findFirst({
-      where: { patientId, status: { in: ['PENDING', 'CONFIRMED'] }, schedule: { date: todayVN() }, visit: null },
+    const booked = await this.prisma.appointment.findMany({
+      where: { patientId, status: { in: ['PENDING', 'CONFIRMED'] }, schedule: { date: todayVN(now) }, visit: { is: null } },
+      include: { schedule: true },
       orderBy: { schedule: { startTime: 'asc' } },
     });
-    if (booked) return this.queue.checkIn(booked.id, 'QR', patientId);
+    const win = (a: (typeof booked)[number]) => this.queue.checkinWindow(a.schedule.startTime);
+    const open = booked.find((a) => now >= win(a).opens && now <= win(a).closes);
+    if (open) return this.queue.checkIn(open.id, 'QR', { expectedPatientId: patientId, now });
+    // Còn lịch hẹn chưa đến giờ: checkIn báo giờ mở check-in
+    const early = booked.find((a) => now < win(a).opens);
+    if (early) return this.queue.checkIn(early.id, 'QR', { expectedPatientId: patientId, now });
 
-    if (!dto.doctorId) throw new BadRequestException('Bạn chưa đặt lịch hôm nay, vui lòng chọn bác sĩ');
+    // Còn lại là lịch đã quá giờ: tính là không đến, bệnh nhân lấy số thường
+    const late = booked[booked.length - 1];
+    if (late) {
+      await this.prisma.appointment.updateMany({
+        where: { id: { in: booked.map((a) => a.id) }, status: { in: ['PENDING', 'CONFIRMED'] } },
+        data: { status: 'NO_SHOW' },
+      });
+    }
+    if (!dto.doctorId) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: 'NEEDS_DOCTOR',
+        message: late ? `${this.queue.lateMessage(late.schedule.startTime)} Chọn bác sĩ để lấy số.` : NEEDS_DOCTOR,
+      });
+    }
     return this.queue.issueTicket({ patientId, doctorId: dto.doctorId, source: 'WALK_IN', checkinMethod: 'QR', reason: dto.reason });
   }
 
@@ -86,7 +115,8 @@ export class QueueController {
   @Get(':visitId/position')
   async position(@CurrentUser() user: AuthUser, @Param('visitId') visitId: string) {
     const patientId = user.role === 'PATIENT' ? await patientIdOf(this.prisma, user) : undefined;
-    return this.queue.position(visitId, patientId);
+    const pos = await this.queue.position(visitId, patientId);
+    return { ...pos, label: ticketLabel(pos.visit), currentLabel: pos.current ? ticketLabel(pos.current) : null };
   }
 
   /** Lễ tân cấp số cho bệnh nhân đến trực tiếp (không dùng app) */
@@ -96,11 +126,11 @@ export class QueueController {
     return this.queue.issueTicket({ ...dto, source: 'WALK_IN', checkinMethod: 'RECEPTION' });
   }
 
-  /** Lễ tân check-in cho bệnh nhân đã đặt lịch */
+  /** Lễ tân check-in cho bệnh nhân đã đặt lịch; `override` = cho phép ngoài khung giờ */
   @Roles('RECEPTIONIST')
   @Post('checkin')
   checkIn(@Body() dto: CheckInDto) {
-    return this.queue.checkIn(dto.appointmentId, 'RECEPTION');
+    return this.queue.checkIn(dto.appointmentId, 'RECEPTION', { override: dto.override });
   }
 
   /** Hàng đợi hôm nay của cả phòng khám (lọc theo bác sĩ) */
@@ -117,11 +147,20 @@ export class QueueController {
     return this.queue.today(await this.queue.doctorIdOf(user.sub));
   }
 
+  /** Gọi số tiếp theo theo thứ tự ưu tiên */
   @Roles('DOCTOR')
   @Post('call-next')
   @HttpCode(200)
   async callNext(@CurrentUser() user: AuthUser) {
     return this.queue.callNext(await this.queue.doctorIdOf(user.sub));
+  }
+
+  /** Bác sĩ gọi đích danh một người đang chờ, bỏ qua thứ tự ưu tiên */
+  @Roles('DOCTOR')
+  @Post(':visitId/call')
+  @HttpCode(200)
+  async call(@CurrentUser() user: AuthUser, @Param('visitId') visitId: string) {
+    return this.queue.callVisit(await this.queue.doctorIdOf(user.sub), visitId);
   }
 
   /** Đánh dấu bỏ về; bác sĩ chỉ đánh dấu được bệnh nhân của mình */

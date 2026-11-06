@@ -55,3 +55,9 @@ export function errorMessage(err: unknown): string {
   }
   return 'Đã có lỗi xảy ra, vui lòng thử lại';
 }
+
+/** Nội dung lỗi backend (mã lỗi như CHECKIN_TOO_EARLY và dữ liệu kèm theo) để màn hình xử lý riêng. */
+export function errorData<T extends object = Record<string, unknown>>(err: unknown): (T & { code?: string }) | undefined {
+  if (err instanceof AxiosError) return err.response?.data as (T & { code?: string }) | undefined;
+  return undefined;
+}
