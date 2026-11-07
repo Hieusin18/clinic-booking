@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { todayVN, vnTime } from '../common/time.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RealtimeService } from '../realtime/realtime.js';
 import { QueueService } from './queue.service.js';
 
 const MINUTE = 60_000;
@@ -21,6 +22,7 @@ export class QueueJanitor implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
     private readonly config: ConfigService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   onApplicationBootstrap() {
@@ -68,6 +70,7 @@ export class QueueJanitor implements OnApplicationBootstrap, OnModuleDestroy {
         }),
       ]);
     }
+    if (noShow.count || stale.length) this.realtime.staffChanged();
     return { noShow: noShow.count, left: stale.length };
   }
 }

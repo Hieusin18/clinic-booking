@@ -6,6 +6,7 @@ import { api, errorData } from '../../lib/api';
 import { age, doctorName, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import type { Appointment, Gender, Page, Patient, Visit } from '../../lib/types';
+import { useRealtime } from '../../lib/realtime';
 import { C } from '../../lib/theme';
 import { TicketModal } from './TicketPrint';
 import { useDoctorOptions } from './useDoctorOptions';
@@ -29,6 +30,7 @@ type NewPatient = {
 /** Lễ tân: tìm hoặc tạo hồ sơ, cấp số cho người đến trực tiếp, check-in người đã đặt lịch. */
 export function ReceptionPage() {
   const [term, setTerm] = useState('');
+  const { connected } = useRealtime();
   const [selected, setSelected] = useState<Patient | null>(null);
   const [creating, setCreating] = useState(false);
   /** Giá trị điền sẵn khi mở form tạo hồ sơ (form được tạo lại mỗi lần mở) */
@@ -46,7 +48,7 @@ export function ReceptionPage() {
   const appointments = useQuery({
     queryKey: ['appointments', 'today'],
     queryFn: async () => (await api.get<Appointment[]>('/appointments')).data,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 120_000 : 30_000,
   });
 
   const create = useAction(

@@ -5,8 +5,8 @@ export default defineConfig({
   plugins: [react()],
   build: { chunkSizeWarningLimit: 1500 },
   server: {
-    // Khi dev, chuyển /api sang backend NestJS chạy ở cổng 3000
-    proxy: { '/api': 'http://localhost:3000' },
+    // Khi dev, chuyển /api (cả WebSocket /api/socket.io) sang backend NestJS ở cổng 3000
+    proxy: { '/api': { target: 'http://localhost:3000', ws: true } },
   },
   test: {
     environment: 'jsdom',

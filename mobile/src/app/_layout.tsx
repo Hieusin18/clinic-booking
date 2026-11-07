@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { fontFor } from '@/components/Text';
 import { colors } from '@/components/ui';
 import { AuthProvider } from '@/lib/auth';
+import { RealtimeProvider } from '@/lib/realtime';
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -37,6 +38,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <RealtimeProvider>
           <StatusBar style="dark" />
           <Stack
             screenOptions={{
@@ -58,6 +60,7 @@ export default function RootLayout() {
             <Stack.Screen name="visit/[id]" options={{ title: 'Chi tiết lần khám' }} />
             <Stack.Screen name="preview/[id]" options={{ title: 'Xem trước bản điện tử' }} />
           </Stack>
+          </RealtimeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

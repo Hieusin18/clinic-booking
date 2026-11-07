@@ -38,6 +38,14 @@ describe('Màn hình khám bệnh', () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith('/queue/call-next'));
   });
 
+  it('đang khám: bấm "Gọi lại" để loa ở quầy đọc lại số', async () => {
+    mockApi([visit('IN_PROGRESS')], { ...visit('IN_PROGRESS'), medicalRecord: null, prescriptions: [], prescription: null });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ok: true } });
+    renderPage([page('/', <ExamPage />)], { user: fakeUser('DOCTOR') });
+    await userEvent.click(await screen.findByRole('button', { name: /Gọi lại/ }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/queue/v1/recall'));
+  });
+
   it('hàng chờ xếp theo thứ tự gọi dự kiến; bác sĩ gọi đích danh được một người', async () => {
     mockApi([
       visit('WAITING', { id: 'v2', queueNumber: 2, predictedOrder: 1, patient: { ...patient, fullName: 'Người Thứ Hai' } }),

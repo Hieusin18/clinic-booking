@@ -16,6 +16,7 @@ type FormValues = ProfileFormValues & {
   password?: string;
   specialtyId: string;
   title?: string;
+  room?: string;
 };
 
 export function DoctorsPage() {
@@ -31,10 +32,10 @@ export function DoctorsPage() {
 
   const save = useAction(
     async (v: FormValues): Promise<unknown> => {
-      const { fullName, phone, email, password, specialtyId: sid, title, ...profile } = v;
+      const { fullName, phone, email, password, specialtyId: sid, title, room, ...profile } = v;
       const body = toProfilePayload(profile);
-      if (editing && editing !== 'new') return api.patch(`/doctors/${editing.id}`, { fullName, specialtyId: sid, title, ...body });
-      const created = (await api.post<Doctor>('/doctors', { fullName, phone, password, specialtyId: sid, title, email: email || undefined })).data;
+      if (editing && editing !== 'new') return api.patch(`/doctors/${editing.id}`, { fullName, specialtyId: sid, title, room: room ?? '', ...body });
+      const created = (await api.post<Doctor>('/doctors', { fullName, phone, password, specialtyId: sid, title, room: room || undefined, email: email || undefined })).data;
       return api.patch(`/doctors/${created.id}`, body);
     },
     { success: 'Đã lưu thông tin bác sĩ', invalidate: ['doctors', 'specialties'] },
@@ -49,7 +50,7 @@ export function DoctorsPage() {
     setFull(null);
     form.resetFields();
     if (d === 'new') return;
-    form.setFieldsValue({ fullName: d.user.fullName, specialtyId: d.specialty.id, title: d.title ?? '' });
+    form.setFieldsValue({ fullName: d.user.fullName, specialtyId: d.specialty.id, title: d.title ?? '', room: d.room ?? '' });
     const loaded = (await api.get<Doctor>(`/doctors/${d.id}/full`)).data;
     setFull(loaded);
     form.setFieldsValue(toProfileForm(loaded));
@@ -85,6 +86,7 @@ export function DoctorsPage() {
             ),
           },
           { title: 'Chuyên khoa', render: (_, d) => <Tag>{d.specialty.name}</Tag> },
+          { title: 'Phòng', width: 100, render: (_, d) => d.room ?? <Typography.Text type="secondary">—</Typography.Text> },
           {
             title: 'Kinh nghiệm',
             width: 130,
@@ -138,9 +140,14 @@ export function DoctorsPage() {
               <Input />
             </Form.Item>
           </Space.Compact>
-          <Form.Item label="Chuyên khoa" name="specialtyId" rules={[{ required: true, message: 'Chọn chuyên khoa' }]}>
-            <Select options={specialties.options} loading={specialties.isLoading} />
-          </Form.Item>
+          <Space.Compact block>
+            <Form.Item label="Chuyên khoa" name="specialtyId" rules={[{ required: true, message: 'Chọn chuyên khoa' }]} style={{ flex: 1 }}>
+              <Select options={specialties.options} loading={specialties.isLoading} />
+            </Form.Item>
+            <Form.Item label="Phòng khám" name="room" extra="Loa gọi số đọc tên phòng này" style={{ width: 200 }}>
+              <Input placeholder="Phòng 2" maxLength={40} />
+            </Form.Item>
+          </Space.Compact>
           {isNew && (
             <>
               <Form.Item

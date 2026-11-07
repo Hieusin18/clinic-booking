@@ -99,6 +99,7 @@ describe('Hồ sơ bác sĩ trên web', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sửa' }));
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByDisplayValue('Phụ trách khoa Nội')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Phòng khám'), 'Phòng 5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu' }));
     await waitFor(() =>
       expect(patch).toHaveBeenCalledWith(
@@ -106,6 +107,7 @@ describe('Hồ sơ bác sĩ trên web', () => {
         expect.objectContaining({
           fullName: 'Trần Thị Bình',
           title: 'BSCKI',
+          room: 'Phòng 5',
           career: [{ fromYear: 2021, toYear: null, title: 'Phụ trách khoa Nội', place: 'Phòng khám' }],
         }),
       ),

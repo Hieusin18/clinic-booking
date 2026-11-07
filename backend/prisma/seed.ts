@@ -175,6 +175,8 @@ async function main() {
       update: {},
       create: { userId: user.id, specialtyId: specialty.id, title: d.title },
     });
+    // Phòng khám mẫu: bác sĩ thứ n ở "Phòng n" (không ghi đè phòng admin đã đặt)
+    if (!doctor.room) await prisma.doctor.update({ where: { id: doctor.id }, data: { room: `Phòng ${doctors.indexOf(d) + 1}` } });
     // Chỉ điền hồ sơ mẫu khi bác sĩ chưa có quá trình công tác (không ghi đè dữ liệu đã sửa)
     if ((await prisma.doctorHistory.count({ where: { doctorId: doctor.id } })) === 0) {
       await prisma.doctor.update({

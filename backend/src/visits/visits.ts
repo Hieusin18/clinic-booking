@@ -12,6 +12,7 @@ import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { dateOnly } from '../common/time.js';
 import { ICD_REGEX } from '../icd10/icd10.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { fireAndForget, RealtimeService } from '../realtime/realtime.js';
 import { visitView } from '../queue/queue.service.js';
 import { labOrderView, presentLabOrders } from './lab-files.js';
 import { buildPrintDoc, renderDocx, renderHtml, renderPdf } from './record-export.js';
@@ -167,6 +168,7 @@ export class VisitsService {
   constructor(
     private readonly prisma: PrismaService,
     config: ConfigService,
+    private readonly realtime: RealtimeService,
   ) {
     this.secret = config.getOrThrow<string>('JWT_SECRET');
   }
@@ -222,12 +224,14 @@ export class VisitsService {
     const draft = await this.prisma.prescription.findFirst({ where: { visitId, status: 'DRAFT' } });
     if (draft) throw new ConflictException('Đơn thuốc còn ở dạng nháp, hãy hoàn tất hoặc xóa đơn');
 
-    return this.prisma.$transaction(async (tx) => {
+    const done = await this.prisma.$transaction(async (tx) => {
       if (visit.appointmentId) {
         await tx.appointment.update({ where: { id: visit.appointmentId }, data: { status: 'COMPLETED' } });
       }
       return tx.visit.update({ where: { id: visitId }, data: { status: 'DONE' }, select: visitView });
     });
+    fireAndForget(this.realtime.visitChanged(visitId));
+    return done;
   }
 
   /**

@@ -43,6 +43,8 @@ export interface Doctor {
   id: string;
   title: string | null;
   bio: string | null;
+  /** Phòng khám, ví dụ "Phòng 2" */
+  room?: string | null;
   /** Năm bắt đầu hành nghề */
   practiceSince: number | null;
   experienceYears: number | null;
@@ -104,6 +106,8 @@ export interface Slot {
 export interface DoctorRef {
   id: string;
   title: string | null;
+  /** Phòng khám, ví dụ "Phòng 2" */
+  room?: string | null;
   user: { fullName: string };
   specialty?: { id: string; name: string };
 }

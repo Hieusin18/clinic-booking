@@ -38,6 +38,7 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { AuthUser, CurrentUser, Public, Roles } from '../auth/decorators.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { fireAndForget, RealtimeService } from '../realtime/realtime.js';
 import { visitView } from '../queue/queue.service.js';
 import { cleanFileName, detectLabFile, LAB_FILE_MAX_BYTES, LAB_FILES_PER_ORDER, labOrderView, presentLabOrders, verifyFileLink } from './lab-files.js';
 import { VisitsModule, VisitsService } from './visits.js';
@@ -73,6 +74,7 @@ export class LabService {
     private readonly prisma: PrismaService,
     private readonly visits: VisitsService,
     config: ConfigService,
+    private readonly realtime: RealtimeService,
   ) {
     this.secret = config.getOrThrow<string>('JWT_SECRET');
   }
@@ -158,6 +160,7 @@ export class LabService {
       data: { status: 'AWAITING_RESULTS', resultMode: dto.mode, sentForTestsAt: now, resultsReadyAt: null },
     });
     if (count === 0) throw new ConflictException('Lượt khám vừa thay đổi, vui lòng tải lại');
+    fireAndForget(this.realtime.visitChanged(visitId));
     return this.prisma.visit.findUniqueOrThrow({ where: { id: visitId }, select: visitView });
   }
 
@@ -172,6 +175,7 @@ export class LabService {
     }
     await this.requireAllDone(visitId);
     await this.prisma.visit.update({ where: { id: visitId }, data: { status: 'WAITING', resultsReadyAt: now } });
+    fireAndForget(this.realtime.visitChanged(visitId));
     return this.prisma.visit.findUniqueOrThrow({ where: { id: visitId }, select: visitView });
   }
 

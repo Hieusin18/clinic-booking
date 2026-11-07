@@ -7,6 +7,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from './lib/auth';
+import { RealtimeProvider } from './lib/realtime';
 import { routes } from './routes';
 import '@fontsource/be-vietnam-pro/400.css';
 import '@fontsource/be-vietnam-pro/500.css';
@@ -35,7 +36,9 @@ createRoot(document.getElementById('root')!).render(
       <AntApp>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <RouterProvider router={router} />
+            <RealtimeProvider>
+              <RouterProvider router={router} />
+            </RealtimeProvider>
           </AuthProvider>
         </QueryClientProvider>
       </AntApp>

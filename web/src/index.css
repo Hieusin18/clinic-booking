@@ -18,3 +18,8 @@ body { margin: 0; background: #F4F6F7; color: #1E2638; -webkit-font-smoothing: a
   .login-split { grid-template-columns: 1fr !important; }
   .login-art { display: none !important; }
 }
+
+/* Màn hình quầy: số vừa gọi nhấp nháy vài lần cho người đang chờ để ý */
+@keyframes counter-flash { 0%, 100% { box-shadow: 0 0 0 0 rgba(142, 146, 232, 0); } 50% { box-shadow: 0 0 0 12px rgba(142, 146, 232, .55); } }
+.counter-flash { animation: counter-flash 1s ease-in-out 4; }
+@media (prefers-reduced-motion: reduce) { .counter-flash { animation: none; } }
