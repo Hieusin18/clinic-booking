@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api } from '../lib/api';
 import { AuthContext } from '../lib/auth';
 import type { User } from '../lib/types';
 import { fakeUser, page, renderPage } from '../test/render';
@@ -28,6 +29,7 @@ function WithAuth({ initial }: { initial: User }) {
 }
 
 describe('AppLayout', () => {
+  afterEach(() => vi.restoreAllMocks());
   it('bấm Đăng xuất thì về trang đăng nhập, không bị trang trắng', async () => {
     render(<WithAuth initial={fakeUser('ADMIN')} />);
     expect(await screen.findByText('Danh sách bác sĩ')).toBeInTheDocument();
@@ -41,5 +43,18 @@ describe('AppLayout', () => {
   it('tài khoản bệnh nhân được hướng dẫn dùng app', async () => {
     renderPage(routes, { path: '/admin/doctors', user: fakeUser('PATIENT') });
     expect(await screen.findByText(/dùng ứng dụng trên điện thoại/)).toBeInTheDocument();
+  });
+  it('bác sĩ có ảnh đại diện thì góc phải hiện ảnh thay cho chữ cái đầu', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { id: 'd9', avatarVersion: 3 } });
+    const doctorRoutes = [{ element: <AppLayout />, children: [page('/doctor/queue', <p>Khám bệnh</p>)] }];
+    renderPage(doctorRoutes, { path: '/doctor/queue', user: fakeUser('DOCTOR', { fullName: 'Trần Thị Bình' }) });
+    const img = await screen.findByAltText('Ảnh Trần Thị Bình');
+    expect(img.getAttribute('src')).toMatch(/\/doctors\/d9\/avatar\?v=3$/);
+  });
+  it('tài khoản không phải bác sĩ thì không gọi API hồ sơ bác sĩ', async () => {
+    const get = vi.spyOn(api, 'get');
+    render(<WithAuth initial={fakeUser('ADMIN')} />);
+    expect(await screen.findByText('Danh sách bác sĩ')).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalledWith('/doctors/me');
   });
 });
