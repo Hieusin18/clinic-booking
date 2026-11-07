@@ -6,7 +6,7 @@
  * máy khách nhận xong thì gọi lại API như cũ (API vẫn kiểm tra quyền).
  *
  *  - queue:changed  {doctorId?}            → staff: hàng đợi hoặc lịch hẹn trong ngày vừa đổi
- *  - queue:called   {visitId, label, room, doctorName, recall} → staff: loa ở màn hình quầy đọc số
+ *  - queue:called   {visitId, label, room, doctorName, doctorFullName, recall} → staff: loa ở màn hình quầy đọc số
  *  - visit:changed  {visitId, status}      → bệnh nhân: phiếu số của mình vừa đổi
  *  - visit:called   {visitId, label, room} → bệnh nhân: đến lượt mình
  */
@@ -77,7 +77,7 @@ export class RealtimeService {
     if (!v) return;
     const label = ticketLabel(v);
     const doctorName = `${v.doctor.title ? `${v.doctor.title} ` : ''}${v.doctor.user.fullName}`;
-    this.gateway.emit(STAFF_ROOM, 'queue:called', { visitId, label, room: v.doctor.room, doctorName, recall });
+    this.gateway.emit(STAFF_ROOM, 'queue:called', { visitId, label, room: v.doctor.room, doctorName, doctorFullName: v.doctor.user.fullName, recall });
     this.gateway.emit(STAFF_ROOM, 'queue:changed', { doctorId: v.doctorId, visitId });
     if (v.patient.userId) {
       this.gateway.emit(userRoom(v.patient.userId), 'visit:called', { visitId, label, room: v.doctor.room, recall });
