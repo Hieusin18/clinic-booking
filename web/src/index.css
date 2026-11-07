@@ -1,6 +1,20 @@
+body { margin: 0; background: #F4F6F7; color: #1E2638; -webkit-font-smoothing: antialiased; }
+
+/* Chữ số hẹp cho số thứ tự, giờ, chỉ số */
+.num { font-family: 'Barlow Condensed', 'Be Vietnam Pro', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+
+/* Đường xé của phiếu */
+.perf { border-top: 2px dashed #D5DBE1; margin: 0 -24px; position: relative; }
+
 /* Khi in phiếu số: chỉ in phần .ticket */
 @media print {
   body * { visibility: hidden; }
   .ticket, .ticket * { visibility: visible; }
   .ticket { position: fixed; inset: 0 auto auto 0; width: 80mm; border: none !important; }
+}
+
+/* Màn đăng nhập: màn hẹp thì ẩn nửa minh họa */
+@media (max-width: 860px) {
+  .login-split { grid-template-columns: 1fr !important; }
+  .login-art { display: none !important; }
 }

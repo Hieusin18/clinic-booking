@@ -8,6 +8,14 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { AuthProvider } from './lib/auth';
 import { routes } from './routes';
+import '@fontsource/be-vietnam-pro/400.css';
+import '@fontsource/be-vietnam-pro/500.css';
+import '@fontsource/be-vietnam-pro/600.css';
+import '@fontsource/be-vietnam-pro/700.css';
+import '@fontsource/barlow-condensed/500.css';
+import '@fontsource/barlow-condensed/600.css';
+import '@fontsource/barlow-condensed/700.css';
+import { theme } from './lib/theme';
 import './index.css';
 
 dayjs.locale('vi');
@@ -22,16 +30,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConfigProvider
       locale={viVN}
-      theme={{
-        token: {
-          colorPrimary: '#0f766e',
-          borderRadius: 8,
-          fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
-        },
-        components: {
-          Menu: { itemSelectedBg: '#ccfbf1', itemSelectedColor: '#115e59', itemBorderRadius: 8 },
-        },
-      }}
+      theme={theme}
     >
       <AntApp>
         <QueryClientProvider client={queryClient}>

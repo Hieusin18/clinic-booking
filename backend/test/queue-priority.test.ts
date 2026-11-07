@@ -95,6 +95,8 @@ describe('Ưu tiên gọi số, khung giờ check-in và lịch không đến', 
       await book((await createPatient(app, prisma)).patient.id, -40, { status: 'NO_SHOW' });
       const res = await api(app).get('/api/appointments').set(reception).expect(200);
       expect(res.body.map((a: { status: string }) => a.status)).toEqual(['NO_SHOW']);
+      const start = new Date(res.body[0].schedule.startTime).getTime();
+      expect(start - new Date(res.body[0].checkinOpensAt).getTime()).toBe(30 * MIN);
     });
   });
 

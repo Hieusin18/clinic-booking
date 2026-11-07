@@ -21,6 +21,7 @@ import {
 } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { C } from '../../lib/theme';
 import { age, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import type { Prescription, Visit, VisitDetail } from '../../lib/types';
@@ -83,7 +84,7 @@ export function ExamPage() {
                   onClick={() => (v.status === 'IN_PROGRESS' || v.status === 'DONE' ? setSelectedId(v.id) : undefined)}
                   style={{
                     cursor: v.status === 'IN_PROGRESS' || v.status === 'DONE' ? 'pointer' : 'default',
-                    background: v.id === activeId ? '#f0fdfa' : undefined,
+                    background: v.id === activeId ? C.stampSoft : undefined,
                     paddingInline: 8,
                     borderRadius: 8,
                   }}
@@ -105,11 +106,13 @@ export function ExamPage() {
                   }
                 >
                   <Space align="start">
-                    <Typography.Text strong style={{ fontSize: 18, width: 44, display: 'inline-block' }}>{ticketLabel(v)}</Typography.Text>
+                    <span className="num" style={{ fontSize: 28, fontWeight: 700, lineHeight: '30px', width: 52, display: 'inline-block', color: v.source === 'ONLINE' ? C.stamp : C.ink }}>
+                      {ticketLabel(v)}
+                    </span>
                     <div>
                       <div>{v.patient.fullName}</div>
                       <Space size={4} wrap style={{ marginTop: 2 }}>
-                        {v.status === 'WAITING' && v.predictedOrder === 0 ? <Tag color="purple">Tiếp theo</Tag> : null}
+                        {v.status === 'WAITING' && v.predictedOrder === 0 ? <Tag style={{ background: C.ink, color: '#fff', borderColor: C.ink }}>Tiếp theo</Tag> : null}
                         <Tag color={src.color}>{src.label}</Tag>
                         {v.status !== 'WAITING' ? <Tag color={VISIT_STATUS[v.status].color}>{VISIT_STATUS[v.status].label}</Tag> : null}
                       </Space>
@@ -165,7 +168,7 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
       <Card
         title={
           <Space>
-            <Typography.Text strong style={{ fontSize: 20 }}>Số {ticketLabel(v)}</Typography.Text>
+            <span className="num" style={{ fontSize: 30, fontWeight: 700, color: C.stamp }}>{ticketLabel(v)}</span>
             <span>{v.patient.fullName}</span>
             <Tag color={VISIT_STATUS[v.status].color}>{VISIT_STATUS[v.status].label}</Tag>
           </Space>
@@ -266,7 +269,7 @@ function PrescriptionCard({ visitId, draft, current }: { visitId: string; draft:
   return (
     <Card
       title="Đơn thuốc"
-      extra={draft ? <Tag color="gold">Bản nháp</Tag> : current ? <Tag color="green">Đã hoàn tất</Tag> : null}
+      extra={draft ? <Tag color="warning">Bản nháp</Tag> : current ? <Tag color="success">Đã hoàn tất</Tag> : null}
     >
       {current && !draft && (
         <>

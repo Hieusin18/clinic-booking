@@ -2,7 +2,7 @@ import { formatTime } from '../../lib/format';
 import type { Visit, VisitStatus } from '../../lib/types';
 
 export const VISIT_STATUS: Record<VisitStatus, { label: string; color: string }> = {
-  WAITING: { label: 'Đang chờ', color: 'gold' },
+  WAITING: { label: 'Đang chờ', color: 'warning' },
   IN_PROGRESS: { label: 'Đang khám', color: 'processing' },
   DONE: { label: 'Đã khám', color: 'success' },
   LEFT: { label: 'Bỏ về', color: 'default' },
@@ -12,8 +12,8 @@ export const VISIT_STATUS: Record<VisitStatus, { label: string; color: string }>
 export function arrivalTag(v: Pick<Visit, 'source' | 'appointmentAt' | 'status' | 'due'>): { label: string; color: string } {
   if (v.source === 'WALK_IN' || !v.appointmentAt) return { label: 'Vãng lai', color: 'default' };
   const at = `Hẹn ${formatTime(v.appointmentAt)}`;
-  if (v.status !== 'WAITING') return { label: at, color: 'blue' };
-  return v.due ? { label: `${at} · đến giờ`, color: 'green' } : { label: `${at} · đến sớm`, color: 'blue' };
+  if (v.status !== 'WAITING') return { label: at, color: 'processing' };
+  return v.due ? { label: `${at} · đến giờ`, color: 'success' } : { label: `${at} · đến sớm`, color: 'processing' };
 }
 
 /** Sắp xếp hàng đợi: đang khám, rồi người chờ theo thứ tự gọi dự kiến, rồi người đã xong (gọi gần nhất trước). */

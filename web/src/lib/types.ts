@@ -54,6 +54,9 @@ export interface Doctor {
   /** Có khi xem hồ sơ đầy đủ */
   education?: HistoryItem[];
   career?: HistoryItem[];
+  /** Có ở danh sách: số giờ còn trống hôm nay, công việc hiện tại */
+  freeToday?: number;
+  currentPosition?: string | null;
 }
 
 export interface Medicine {
@@ -139,6 +142,9 @@ export interface Appointment {
   schedule: { id: string; startTime: string; endTime: string; doctor: DoctorRef };
   patient: { id: string; fullName: string; phone: string };
   visit?: { id: string; queueNumber: number; source: 'ONLINE' | 'WALK_IN'; status: VisitStatus } | null;
+  /** Khung giờ được check-in theo lịch hẹn */
+  checkinOpensAt?: string;
+  checkinClosesAt?: string;
 }
 
 /** Bệnh án ngoại trú theo bố cục mẫu Bộ Y tế */

@@ -1,6 +1,7 @@
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/Text';
 import { Button, Card, Chip, ErrorBox, Field, Muted, Screen, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';

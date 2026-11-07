@@ -21,10 +21,10 @@ export function RecordActions({ visitId, visitDate }: { visitId: string; visitDa
   return (
     <View style={[styles.row, { gap: 10 }]}>
       <View style={{ flex: 1 }}>
-        <Button title="Tải PDF" variant="secondary" loading={busy === 'pdf'} disabled={!!busy} onPress={() => download('pdf')} />
+        <Button title="Tải PDF" variant="secondary" icon="download" loading={busy === 'pdf'} disabled={!!busy} onPress={() => download('pdf')} />
       </View>
       <View style={{ flex: 1 }}>
-        <Button title="Tải Word" variant="secondary" loading={busy === 'docx'} disabled={!!busy} onPress={() => download('docx')} />
+        <Button title="Tải Word" variant="secondary" icon="download" loading={busy === 'docx'} disabled={!!busy} onPress={() => download('docx')} />
       </View>
     </View>
   );

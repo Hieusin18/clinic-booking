@@ -1,7 +1,9 @@
 import { Link, Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
-import { Button, Card, ErrorBox, Field, Muted, Screen, colors } from '@/components/ui';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/components/Text';
+import { Button, ErrorBox, Field, colors, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { PHONE_REGEX } from '@/lib/format';
@@ -31,26 +33,38 @@ export default function Login() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen>
-        <View style={{ alignItems: 'center', marginTop: 48, marginBottom: 16, gap: 6 }}>
-          <View style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 34, fontWeight: '800' }}>+</Text>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 20, gap: 24 }} keyboardShouldPersistTaps="handled">
+          <View style={{ gap: 14, marginTop: 32 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 34, fontWeight: '700', lineHeight: 40 }}>+</Text>
+            </View>
+            <Text style={{ fontSize: 34, fontWeight: '700', color: colors.text, letterSpacing: -0.4 }}>Phòng khám</Text>
+            <Text style={{ fontSize: 16, lineHeight: 24, color: colors.muted }}>Đặt lịch khám, lấy số ở quầy bằng mã QR và xem lại đơn thuốc của bạn.</Text>
           </View>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.text }}>Phòng khám</Text>
-          <Muted>Đặt lịch khám và lấy số ngay trên điện thoại</Muted>
-        </View>
-        <Card>
-          <Field label="Số điện thoại" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09xxxxxxxx" autoComplete="tel" />
-          <Field label="Mật khẩu" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" onSubmitEditing={submit} />
-          <ErrorBox message={error} />
-          <Button title="Đăng nhập" onPress={submit} loading={submitting} />
-        </Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
-          <Muted>Chưa có tài khoản?</Muted>
-          <Link href="/register" style={{ color: colors.primary, fontWeight: '600' }}>Đăng ký</Link>
-        </View>
-      </Screen>
-    </KeyboardAvoidingView>
+          <View style={{ backgroundColor: colors.card, borderRadius: 20, padding: 20, gap: 16 }}>
+            <Field label="Số điện thoại" icon="phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="09xxxxxxxx" autoComplete="tel" />
+            <Field label="Mật khẩu" icon="lock" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" onSubmitEditing={submit} />
+            <ErrorBox message={error} />
+            <Button title="Đăng nhập" onPress={submit} loading={submitting} />
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+              <Text style={{ color: colors.muted, fontSize: 15 }}>Chưa có tài khoản?</Text>
+              <Link href="/register">
+                <Text style={{ color: colors.stamp, fontWeight: '700', fontSize: 15 }}>Đăng ký</Text>
+              </Link>
+            </View>
+          </View>
+          <View style={{ flex: 1 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.card, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 18 }}>
+            <Text style={{ fontFamily: 'num', fontWeight: '700', fontSize: 40, color: colors.stamp, lineHeight: 44 }}>A07</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>Đặt lịch trước, được gọi trước</Text>
+              <Text style={{ fontSize: 13, color: colors.muted }}>khi bạn đến đúng giờ hẹn</Text>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
