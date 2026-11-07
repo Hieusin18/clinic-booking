@@ -1,4 +1,5 @@
-import { Image, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
+import { Text } from '@/components/Text';
 import { colors } from '@/components/ui';
 import { API_URL } from '@/lib/api';
 import { avatarUri, initial } from '@/lib/doctor';

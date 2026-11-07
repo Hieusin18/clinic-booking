@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
-import { Button, Card, Empty, ErrorBox, Loading, Muted, Screen, colors, styles } from '@/components/ui';
-import { api } from '@/lib/api';
+import { View } from 'react-native';
 import { RecordActions } from '@/components/RecordActions';
+import { Text } from '@/components/Text';
+import { Badge, Button, Card, Empty, ErrorBox, Loading, Muted, Perforation, Screen, SectionLabel, colors, styles } from '@/components/ui';
+import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { doctorName, formatDate, formatDay } from '@/lib/format';
 import { medicineName, usage } from '@/lib/prescription';
@@ -15,13 +16,15 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   return (
     <View style={{ gap: 2 }}>
       <Muted>{label}</Muted>
-      <Text style={{ fontSize: 16, color: colors.text }}>{value}</Text>
+      <Text style={{ fontSize: 15.5, lineHeight: 22, color: colors.text }}>{value}</Text>
     </View>
   );
 }
 
-function Section({ title }: { title: string }) {
-  return <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryDark, marginTop: 6, textTransform: 'uppercase' }}>{title}</Text>;
+/** "120/80 mmHg" → số "120/80" (chữ số hẹp) và đơn vị "mmHg". */
+function splitUnit(value: string) {
+  const i = value.indexOf(' ');
+  return i < 0 ? { n: value, unit: '' } : { n: value.slice(0, i), unit: value.slice(i + 1) };
 }
 
 /** Chi tiết một lần khám: bệnh án ngoại trú và đơn thuốc; tải bản điện tử PDF/Word để lưu, in hoặc gửi. */
@@ -33,8 +36,6 @@ export default function VisitScreen() {
   if (visit.isLoading) return <Screen><Loading /></Screen>;
   if (!v) return <Screen><ErrorBox message={visit.error ? errorMessage(visit.error) : 'Không tìm thấy lần khám'} /></Screen>;
 
-
-
   const r = v.medicalRecord;
   const p = v.prescription;
   const signs = r ? vitals(r) : [];
@@ -42,32 +43,40 @@ export default function VisitScreen() {
     <Screen refreshing={visit.isRefetching} onRefresh={visit.refetch}>
       <Stack.Screen options={{ title: `Khám ngày ${formatDay(v.date)}` }} />
       <Card>
-        <Text style={styles.title}>Bệnh án ngoại trú</Text>
         <Muted>
           {doctorName(v.doctor)}
           {v.doctor.specialty ? ` · ${v.doctor.specialty.name}` : ''}
         </Muted>
         {r ? (
           <>
-            <Section title="Chẩn đoán" />
-            <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{withIcd(r.diagnosis, r.icdCode)}</Text>
+            <SectionLabel>CHẨN ĐOÁN</SectionLabel>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text, flexShrink: 1 }}>{r.diagnosis}</Text>
+              {r.icdCode ? <Badge label={r.icdCode} tone="primary" /> : null}
+            </View>
             <Row label="Bệnh kèm theo" value={r.secondaryDiagnosis && withIcd(r.secondaryDiagnosis, r.secondaryIcdCodes)} />
 
-            <Section title="Hỏi bệnh" />
+            <SectionLabel>HỎI BỆNH</SectionLabel>
             <Row label="Lý do đến khám" value={r.reason ?? v.reason} />
             <Row label="Quá trình bệnh lý" value={r.symptoms} />
             <Row label="Tiền sử bản thân" value={r.personalHistory} />
             <Row label="Tiền sử gia đình" value={r.familyHistory} />
 
-            {(signs.length > 0 || r.generalExam || r.organExam || r.orders || r.labSummary) && <Section title="Khám bệnh" />}
+            {(signs.length > 0 || r.generalExam || r.organExam || r.orders || r.labSummary) && <SectionLabel>KHÁM BỆNH</SectionLabel>}
             {signs.length > 0 && (
               <View style={styles.wrap}>
-                {signs.map((s) => (
-                  <View key={s.label} style={{ backgroundColor: colors.primarySoft, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10 }}>
-                    <Text style={{ fontSize: 12, color: colors.primaryDark }}>{s.label}</Text>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{s.value}</Text>
-                  </View>
-                ))}
+                {signs.map((s) => {
+                  const { n, unit } = splitUnit(s.value);
+                  return (
+                    <View key={s.label} style={{ backgroundColor: colors.bg, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, minWidth: 92 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>{s.label}</Text>
+                      <Text style={{ color: colors.text }}>
+                        <Text style={{ fontFamily: 'num', fontWeight: '600', fontSize: 22 }}>{n}</Text>
+                        {unit ? <Text style={{ fontSize: 12, color: colors.muted }}> {unit}</Text> : null}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             )}
             <Row label="Toàn thân" value={r.generalExam} />
@@ -75,11 +84,11 @@ export default function VisitScreen() {
             <Row label="Chỉ định cận lâm sàng" value={r.orders} />
             <Row label="Kết quả cận lâm sàng" value={r.labSummary} />
 
-            {(r.treatment || r.followUpDate) && <Section title="Điều trị" />}
+            {(r.treatment || r.followUpDate) && <SectionLabel>ĐIỀU TRỊ</SectionLabel>}
             <Row label="Hướng xử trí, điều trị" value={r.treatment} />
             {r.followUpDate && (
-              <View style={{ backgroundColor: colors.primarySoft, borderRadius: 10, padding: 12 }}>
-                <Text style={{ color: colors.primaryDark, fontWeight: '700' }}>Hẹn tái khám ngày {formatDay(r.followUpDate)}</Text>
+              <View style={{ backgroundColor: colors.stampSoft, borderRadius: 10, padding: 12 }}>
+                <Text style={{ color: colors.stamp, fontWeight: '700' }}>Hẹn tái khám ngày {formatDay(r.followUpDate)}</Text>
               </View>
             )}
           </>
@@ -89,33 +98,43 @@ export default function VisitScreen() {
       </Card>
 
       {p ? (
-        <Card style={{ borderColor: colors.primary, borderWidth: 2 }}>
-          <Text style={styles.title}>Đơn thuốc</Text>
-          <Muted>
-            {v.patient.fullName} · Kê ngày {p.finalizedAt ? formatDate(p.finalizedAt) : formatDay(v.date)}
-          </Muted>
-          {p.code ? <Muted>Mã đơn thuốc: {p.code}</Muted> : null}
-          {p.items.map((i, idx) => (
-            <View key={i.id} style={{ paddingVertical: 10, borderTopWidth: idx ? 1 : 0, borderColor: colors.border, gap: 4 }}>
-              <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, flex: 1 }}>
-                  {idx + 1}. {medicineName(i.medicine)}
-                </Text>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.primaryDark }}>
-                  {i.quantity} {i.medicine.unit}
-                </Text>
+        <View style={{ backgroundColor: colors.card, borderRadius: 16, borderWidth: 2, borderColor: colors.ink }}>
+          <View style={{ padding: 16, gap: 2 }}>
+            <View style={[styles.row, { justifyContent: 'space-between' }]}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>Đơn thuốc</Text>
+              {p.code ? <Text style={{ fontFamily: 'num', fontWeight: '600', fontSize: 20, color: colors.text, letterSpacing: 0.5 }}>{p.code}</Text> : null}
+            </View>
+            <Muted>
+              {v.patient.fullName} · Kê ngày {p.finalizedAt ? formatDate(p.finalizedAt) : formatDay(v.date)}
+            </Muted>
+          </View>
+          <Perforation />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+            {p.items.map((i, idx) => (
+              <View key={i.id} style={{ paddingVertical: 10, borderTopWidth: idx ? 1 : 0, borderColor: colors.border, gap: 3 }}>
+                <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+                  <Text style={{ fontSize: 15.5, fontWeight: '700', color: colors.text, flex: 1 }}>
+                    {idx + 1}. {medicineName(i.medicine)}
+                  </Text>
+                  <Text style={{ color: colors.stamp }}>
+                    <Text style={{ fontFamily: 'num', fontWeight: '700', fontSize: 24 }}>{i.quantity}</Text>
+                    <Text style={{ fontSize: 13 }}> {i.medicine.unit}</Text>
+                  </Text>
+                </View>
+                {i.medicine.activeIngredient ? <Muted>Hoạt chất: {i.medicine.activeIngredient}</Muted> : null}
+                <Text style={{ color: colors.text, fontSize: 14.5, lineHeight: 21 }}>{usage(i)}</Text>
               </View>
-              {i.medicine.activeIngredient ? <Muted>Hoạt chất: {i.medicine.activeIngredient}</Muted> : null}
-              <Text style={{ color: colors.text }}>{usage(i)}</Text>
+            ))}
+            {p.advice ? (
+              <View style={{ backgroundColor: colors.bg, borderRadius: 10, padding: 12, marginTop: 4 }}>
+                <Text style={{ color: colors.text, lineHeight: 20 }}>Lời dặn: {p.advice}</Text>
+              </View>
+            ) : null}
+            <View style={{ marginTop: 10 }}>
+              <Muted>Đưa màn hình này cho nhân viên nhà thuốc để mua đúng thuốc và số lượng.</Muted>
             </View>
-          ))}
-          {p.advice ? (
-            <View style={{ backgroundColor: colors.primarySoft, borderRadius: 10, padding: 12 }}>
-              <Text style={{ color: colors.primaryDark }}>Lời dặn: {p.advice}</Text>
-            </View>
-          ) : null}
-          <Muted>Đưa màn hình này cho nhân viên nhà thuốc để mua đúng thuốc và số lượng.</Muted>
-        </Card>
+          </View>
+        </View>
       ) : (
         <Empty title="Lần khám này không kê đơn" />
       )}
@@ -124,7 +143,7 @@ export default function VisitScreen() {
         <Card>
           <Text style={styles.title}>Bản điện tử</Text>
           <Muted>Bệnh án và đơn thuốc theo mẫu in của phòng khám. Xem trước rồi tải về để lưu, in hoặc gửi cho bác sĩ khác.</Muted>
-          <Button title="Xem trước" onPress={() => router.push({ pathname: '/preview/[id]', params: { id: v.id, date: v.date } })} />
+          <Button title="Xem trước" variant="secondary" icon="eye" onPress={() => router.push({ pathname: '/preview/[id]', params: { id: v.id, date: v.date } })} />
           <RecordActions visitId={v.id} visitDate={v.date} />
         </Card>
       )}

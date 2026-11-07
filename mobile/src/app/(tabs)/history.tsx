@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
-import { Badge, Card, Empty, ErrorBox, Loading, Muted, Screen, colors, styles } from '@/components/ui';
+import { Pressable, View } from 'react-native';
+import { Icon } from '@/components/Icon';
+import { Text } from '@/components/Text';
+import { Badge, Empty, ErrorBox, Loading, Muted, Screen, colors } from '@/components/ui';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
-import { doctorName, formatDay } from '@/lib/format';
+import { dayMonth, doctorName } from '@/lib/format';
 import type { VisitDetail } from '@/lib/types';
 
 /** Lịch sử các lần khám đã hoàn tất, mới nhất trước. */
@@ -12,29 +14,46 @@ export default function History() {
   const list = useQuery({ queryKey: ['visits', 'mine'], queryFn: async () => (await api.get<VisitDetail[]>('/visits/mine')).data });
 
   return (
-    <Screen refreshing={list.isRefetching} onRefresh={list.refetch}>
+    <Screen title="Lịch sử khám" refreshing={list.isRefetching} onRefresh={list.refetch}>
       <ErrorBox message={list.error ? errorMessage(list.error) : null} />
       {list.isLoading ? (
         <Loading />
       ) : list.data?.length === 0 ? (
         <Empty title="Chưa có lần khám nào" hint="Sau khi khám xong, bệnh án và đơn thuốc sẽ hiện ở đây." />
       ) : (
-        list.data?.map((v) => (
-          <Pressable key={v.id} accessibilityRole="button" onPress={() => router.push(`/visit/${v.id}`)}>
-            <Card>
-              <View style={[styles.row, { justifyContent: 'space-between' }]}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{formatDay(v.date)}</Text>
-                {v.prescription ? <Badge label={`Đơn ${v.prescription.items.length} thuốc`} tone="primary" /> : <Badge label="Không kê đơn" />}
+        list.data?.map((v) => {
+          const { dm, year } = dayMonth(v.date);
+          const rec = v.medicalRecord;
+          const items = v.prescription?.items.length ?? 0;
+          return (
+            <Pressable
+              key={v.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Lần khám ngày ${dm}/${year}: ${rec?.diagnosis ?? 'chưa có chẩn đoán'}`}
+              onPress={() => router.push(`/visit/${v.id}`)}
+              style={{ flexDirection: 'row', gap: 14, alignItems: 'center', backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 14 }}
+            >
+              <View style={{ width: 62, alignItems: 'center', paddingRight: 12, borderRightWidth: 1, borderRightColor: colors.border }}>
+                <Text style={{ fontFamily: 'num', fontWeight: '700', fontSize: 26, lineHeight: 30, color: colors.text }}>{dm}</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>{year}</Text>
               </View>
-              <Text style={{ fontSize: 15, color: colors.text }}>{v.medicalRecord?.diagnosis ?? 'Chưa có chẩn đoán'}</Text>
-              <Muted>
-                {doctorName(v.doctor)}
-                {v.doctor.specialty ? ` · ${v.doctor.specialty.name}` : ''}
-              </Muted>
-              <Text style={{ color: colors.primary, fontWeight: '600' }}>Xem bệnh án và đơn thuốc ›</Text>
-            </Card>
-          </Pressable>
-        ))
+              <View style={{ flex: 1, gap: 3 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: 15.5, fontWeight: '700', color: colors.text, flexShrink: 1 }}>{rec?.diagnosis ?? 'Chưa có chẩn đoán'}</Text>
+                  {rec?.icdCode ? <Badge label={rec.icdCode} /> : null}
+                </View>
+                <Muted>
+                  {doctorName(v.doctor)}
+                  {v.doctor.specialty ? ` · ${v.doctor.specialty.name}` : ''}
+                </Muted>
+                <Text style={{ fontSize: 13.5, fontWeight: '600', color: items ? colors.success : colors.faint }}>
+                  {items ? `Đơn ${items} thuốc` : 'Không kê đơn'}
+                </Text>
+              </View>
+              <Icon name="chevron" color={colors.faint} size={20} />
+            </Pressable>
+          );
+        })
       )}
     </Screen>
   );

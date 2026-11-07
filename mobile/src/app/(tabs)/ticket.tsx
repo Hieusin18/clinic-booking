@@ -1,11 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
-import { Badge, Button, Card, Empty, Loading, Muted, Screen, colors } from '@/components/ui';
+import { View } from 'react-native';
+import { Text } from '@/components/Text';
+import { Badge, Button, Empty, Loading, Muted, Perforation, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { doctorName, formatTime } from '@/lib/format';
 import { VISIT_STATUS, waitHint } from '@/lib/queue';
 import type { QueuePosition, Visit } from '@/lib/types';
+
+/** Một cột số nhỏ ở cuống phiếu. */
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+      <Text style={{ fontSize: 12.5, color: colors.muted }}>{label}</Text>
+      <Text style={{ fontFamily: 'num', fontWeight: '700', fontSize: 30, lineHeight: 34, color: accent ? colors.stamp : colors.text }}>{value}</Text>
+    </View>
+  );
+}
 
 /** Phiếu số đang chờ: tự cập nhật mỗi 15 giây. */
 function TicketCard({ visitId }: { visitId: string }) {
@@ -15,33 +26,56 @@ function TicketCard({ visitId }: { visitId: string }) {
     refetchInterval: 15_000,
   });
   if (!pos.data) return <Loading />;
-  const { visit, label, currentLabel } = pos.data;
+  const { visit, label, currentLabel, peopleAhead, estimatedCallAt, due } = pos.data;
   const hint = waitHint(pos.data);
   const st = VISIT_STATUS[visit.status];
   const active = visit.status === 'WAITING' || visit.status === 'IN_PROGRESS';
+  const online = visit.source === 'ONLINE';
 
   return (
-    <Card style={active ? { borderColor: colors.primary, borderWidth: 2 } : undefined}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Muted>{doctorName(visit.doctor)}</Muted>
-        <Badge label={st.label} tone={st.tone} />
+    <View style={{ backgroundColor: colors.card, borderRadius: 20, borderWidth: active ? 2 : 1, borderColor: active ? colors.ink : colors.border }}>
+      <View style={{ padding: 16, gap: 2 }}>
+        <View style={[styles.row, { justifyContent: 'space-between' }]}>
+          <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: colors.text }}>{doctorName(visit.doctor)}</Text>
+          {active ? <Badge label={online ? 'Đặt lịch' : 'Vãng lai'} tone={online ? 'primary' : 'neutral'} /> : <Badge label={st.label} tone={st.tone} />}
+        </View>
+        <Muted>
+          {visit.doctor.specialty?.name ? `${visit.doctor.specialty.name} · ` : ''}
+          {visit.appointmentAt ? `Hẹn ${formatTime(visit.appointmentAt)} · ` : ''}Lấy số {formatTime(visit.createdAt)}
+        </Muted>
       </View>
-      <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-        <Muted>Số thứ tự của bạn</Muted>
-        <Text style={{ fontSize: 88, fontWeight: '800', color: active ? colors.primary : colors.muted, lineHeight: 96 }}>{label}</Text>
-        {active ? (
-          <Text style={{ fontSize: 16, color: colors.text }}>
-            Đang khám: <Text style={{ fontWeight: '800' }}>{currentLabel ?? '—'}</Text>
-          </Text>
+      <Perforation />
+      <View style={{ alignItems: 'center', paddingVertical: 4, gap: 4 }}>
+        <Text style={{ fontSize: 14, color: colors.muted, letterSpacing: 0.4 }}>Số của bạn</Text>
+        <Text
+          accessibilityLabel={`Số của bạn ${label}`}
+          style={{ fontFamily: 'num', fontWeight: '700', fontSize: 132, lineHeight: 136, color: active ? colors.stamp : colors.faint, letterSpacing: 2 }}
+        >
+          {label}
+        </Text>
+        {visit.status === 'IN_PROGRESS' ? (
+          <Badge label="Mời vào phòng khám" tone="success" />
+        ) : active && due ? (
+          <Badge label="Đến giờ hẹn · đang được ưu tiên" tone="primary" />
         ) : null}
       </View>
-      <Text style={{ fontSize: 16, fontWeight: '600', textAlign: 'center', color: colors.text }}>{hint.text}</Text>
-      {active && hint.note ? <Muted>{hint.note}</Muted> : null}
-      <Muted>
-        {visit.doctor.specialty?.name ? `${visit.doctor.specialty.name} · ` : ''}
-        {visit.appointmentAt ? `Lịch hẹn ${formatTime(visit.appointmentAt)} · ` : ''}Lấy số lúc {formatTime(visit.createdAt)}
-      </Muted>
-    </Card>
+      {active ? (
+        <>
+          <Perforation />
+          <View style={{ flexDirection: 'row', paddingHorizontal: 8, paddingBottom: 14 }}>
+            <Stat label="Đang khám" value={currentLabel ?? '—'} />
+            <View style={{ width: 1, backgroundColor: colors.border }} />
+            <Stat label="Trước bạn" value={visit.status === 'IN_PROGRESS' ? '0' : String(peopleAhead)} />
+            <View style={{ width: 1, backgroundColor: colors.border }} />
+            <Stat label="Dự kiến" value={estimatedCallAt && visit.status === 'WAITING' ? formatTime(estimatedCallAt) : '—'} accent />
+          </View>
+        </>
+      ) : null}
+      <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 4 }}>
+        <Text style={{ fontSize: 15, fontWeight: '600', textAlign: 'center', color: colors.text }}>{hint.text}</Text>
+        {active && hint.note ? <Text style={[styles.muted, { textAlign: 'center' }]}>{hint.note}</Text> : null}
+      </View>
+    </View>
   );
 }
 
@@ -55,7 +89,12 @@ export default function Ticket() {
   const hasActive = visits.some((v) => v.status === 'WAITING' || v.status === 'IN_PROGRESS');
 
   return (
-    <Screen refreshing={mine.isRefetching} onRefresh={mine.refetch}>
+    <Screen
+      title="Số thứ tự của bạn"
+      refreshing={mine.isRefetching}
+      onRefresh={mine.refetch}
+      footer={!hasActive ? <Button title="Quét mã QR tại quầy" icon="qr" onPress={() => router.push('/scan')} /> : undefined}
+    >
       {mine.isLoading ? (
         <Loading />
       ) : visits.length === 0 ? (
@@ -63,7 +102,6 @@ export default function Ticket() {
       ) : (
         visits.map((v) => <TicketCard key={v.id} visitId={v.id} />)
       )}
-      {!hasActive ? <Button title="Quét mã QR tại quầy" onPress={() => router.push('/scan')} /> : null}
       <Muted>
         Đã đặt lịch trước? Quét mã trong khung giờ check-in ghi ở tab Lịch hẹn là bạn được check-in luôn và nhận số A, được ưu tiên
         khi đến giờ hẹn. Đến trễ hơn thì lịch hẹn hết hiệu lực và bạn lấy số thường (số B).

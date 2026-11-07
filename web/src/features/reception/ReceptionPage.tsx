@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { Alert, App, Button, Card, Col, DatePicker, Descriptions, Empty, Form, Input, List, Modal, Row, Select, Space, Tag, Typography } from 'antd';
+import { Alert, App, Button, Card, Col, DatePicker, Descriptions, Empty, Form, Input, List, Modal, Row, Select, Tag, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useState } from 'react';
 import { api, errorData } from '../../lib/api';
 import { age, doctorName, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import type { Appointment, Gender, Page, Patient, Visit } from '../../lib/types';
+import { C } from '../../lib/theme';
 import { TicketModal } from './TicketPrint';
 import { useDoctorOptions } from './useDoctorOptions';
 
@@ -200,7 +201,7 @@ export function ReceptionPage() {
                   <Input.TextArea rows={2} maxLength={500} />
                 </Form.Item>
                 <Button type="primary" htmlType="submit" size="large" loading={issue.isPending}>
-                  Cấp số
+                  Cấp số thường (B)
                 </Button>
               </Form>
             </Card>
@@ -214,44 +215,53 @@ export function ReceptionPage() {
             loading={appointments.isLoading}
             dataSource={appointments.data ?? []}
             locale={{ emptyText: 'Hôm nay chưa có lịch hẹn' }}
-            renderItem={(a) => (
-              <List.Item
-                actions={[
-                  a.visit ? (
-                    <Tag key="no" color="green">Số {ticketLabel(a.visit)}</Tag>
-                  ) : (
-                    <Button
-                      key="checkin"
-                      type="primary"
-                      ghost
-                      loading={checkIn.isPending && checkIn.variables?.id === a.id}
-                      onClick={() => checkIn.mutate({ id: a.id }, { onSuccess: setTicket })}
-                    >
-                      Check-in
-                    </Button>
-                  ),
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    <Space>
-                      <Typography.Text strong>{formatTime(a.schedule.startTime)}</Typography.Text>
-                      {a.patient.fullName}
-                    </Space>
-                  }
-                  description={
-                    <>
-                      {doctorName(a.schedule.doctor)} · {a.patient.phone}
-                      {a.status === 'NO_SHOW' && !a.visit ? (
-                        <Tag color="orange" style={{ marginLeft: 8 }}>
-                          Quá giờ, chưa đến
-                        </Tag>
-                      ) : null}
-                    </>
-                  }
-                />
-              </List.Item>
-            )}
+            renderItem={(a) => {
+              // Lịch hẹn chưa tới khung check-in: chỉ báo giờ mở, lễ tân vẫn bấm được (sẽ hỏi check-in ngoài giờ)
+              const early = !a.visit && a.status !== 'NO_SHOW' && a.checkinOpensAt && new Date(a.checkinOpensAt).getTime() > Date.now();
+              return (
+                <List.Item
+                  actions={[
+                    a.visit ? (
+                      <span key="no" className="num" aria-label={`Đã check-in, số ${ticketLabel(a.visit)}`} style={{ fontSize: 22, fontWeight: 700, color: C.good, background: C.goodSoft, borderRadius: 8, padding: '0 10px' }}>
+                        {ticketLabel(a.visit)}
+                      </span>
+                    ) : early ? (
+                      <Button key="checkin" onClick={() => checkIn.mutate({ id: a.id }, { onSuccess: setTicket })} loading={checkIn.isPending && checkIn.variables?.id === a.id}>
+                        Mở check-in {formatTime(a.checkinOpensAt!)}
+                      </Button>
+                    ) : (
+                      <Button
+                        key="checkin"
+                        type="primary"
+                        loading={checkIn.isPending && checkIn.variables?.id === a.id}
+                        onClick={() => checkIn.mutate({ id: a.id }, { onSuccess: setTicket })}
+                      >
+                        Check-in
+                      </Button>
+                    ),
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={
+                      <span className="num" style={{ fontSize: 26, fontWeight: 600, lineHeight: '32px', color: a.visit || early ? C.muted : C.ink, display: 'inline-block', width: 58 }}>
+                        {formatTime(a.schedule.startTime)}
+                      </span>
+                    }
+                    title={a.patient.fullName}
+                    description={
+                      <>
+                        {doctorName(a.schedule.doctor)} · {a.patient.phone}
+                        {a.status === 'NO_SHOW' && !a.visit ? (
+                          <Tag color="warning" style={{ marginLeft: 8 }}>
+                            Quá giờ, chưa đến
+                          </Tag>
+                        ) : null}
+                      </>
+                    }
+                  />
+                </List.Item>
+              );
+            }}
           />
         </Card>
       </Col>

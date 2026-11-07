@@ -26,6 +26,26 @@ export function dayLabel(offset: number, now = new Date()) {
   return `${weekday} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
 }
 
+/** Hai dòng cho ô chọn ngày: thứ ngắn ("Nay", "Mai", "T4") và ngày trong tháng ("04"). */
+export function dayParts(offset: number, now = new Date()) {
+  const [y, m, d] = ymd(offset, now).split('-').map(Number);
+  const top = offset === 0 ? 'Nay' : offset === 1 ? 'Mai' : WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return { top, day: String(d).padStart(2, '0'), month: String(m).padStart(2, '0') };
+}
+
+/** Ngày và năm tách riêng cho khối ngày lớn: { dm: "05/11", year: "2026" } (cột @db.Date). */
+export function dayMonth(iso: string) {
+  const [dd, mm, yyyy] = formatDay(iso).split('/');
+  return { dm: `${dd}/${mm}`, year: yyyy };
+}
+
+/** Tuổi tròn theo ngày sinh (cột @db.Date, "YYYY-MM-DD…"), tính theo ngày Việt Nam. */
+export function ageOf(dob: string, now = new Date()) {
+  const [y, m, d] = dob.slice(0, 10).split('-').map(Number);
+  const [ty, tm, td] = ymd(0, now).split('-').map(Number);
+  return ty - y - (tm < m || (tm === m && td < d) ? 1 : 0);
+}
+
 export const doctorName = (d: { title: string | null; user: { fullName: string } }) =>
   [d.title, d.user.fullName].filter(Boolean).join(' ');
 

@@ -95,7 +95,7 @@ describe('Hồ sơ bác sĩ trên web', () => {
     });
     const patch = vi.spyOn(api, 'patch').mockResolvedValue({ data: me });
     renderPage([page('/', <DoctorsPage />)], { user: fakeUser('ADMIN') });
-    expect(await screen.findByText('14 năm')).toBeInTheDocument();
+    expect(await screen.findByLabelText('14 năm kinh nghiệm')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Sửa' }));
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByDisplayValue('Phụ trách khoa Nội')).toBeInTheDocument();

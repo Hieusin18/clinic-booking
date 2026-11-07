@@ -105,6 +105,25 @@ describe('Hồ sơ bác sĩ: API', () => {
     expect(res.body.education).toHaveLength(1);
   });
 
+  it('danh sách bác sĩ kèm số chỗ trống hôm nay và công việc hiện tại; xem giờ đã đặt khi cần', async () => {
+    await api(app).patch(`/api/doctors/${doctor.doctor.id}`).set(admin).send(profile).expect(200);
+    const at = (min: number) => new Date(Date.now() + min * 60_000);
+    await prisma.schedule.createMany({
+      data: [
+        { doctorId: doctor.doctor.id, date: todayVN(), startTime: at(30), endTime: at(45) },
+        { doctorId: doctor.doctor.id, date: todayVN(), startTime: at(45), endTime: at(60), isBooked: true },
+        { doctorId: doctor.doctor.id, date: todayVN(), startTime: at(-60), endTime: at(-45) },
+      ],
+    });
+    const list = await api(app).get('/api/doctors').expect(200);
+    expect(list.body.items[0]).toMatchObject({ freeToday: 1, currentPosition: 'Trưởng khoa Nội · Phòng khám Đa khoa' });
+    const ymd = todayVN().toISOString().slice(0, 10);
+    expect((await api(app).get(`/api/doctors/${doctor.doctor.id}/schedules?date=${ymd}`).expect(200)).body).toHaveLength(1);
+    const all = await api(app).get(`/api/doctors/${doctor.doctor.id}/schedules?date=${ymd}&all=true`).expect(200);
+    expect(all.body.map((x: { isBooked: boolean }) => x.isBooked)).toEqual([false, true]);
+    expect(new Date(all.body[0].startTime).getTime() - new Date(all.body[0].checkinOpensAt).getTime()).toBe(30 * 60_000);
+  });
+
   it('năm không hợp lệ thì báo lỗi rõ ràng', async () => {
     const send = (body: object) => api(app).patch(`/api/doctors/${doctor.doctor.id}`).set(admin).send(body).expect(400);
     expect((await send({ career: [{ fromYear: 2015, toYear: 2010, title: 'Bác sĩ', place: 'Bệnh viện A' }] })).body.message).toBe(

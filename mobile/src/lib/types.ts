@@ -50,6 +50,9 @@ export interface Doctor {
   avatarVersion: number | null;
   specialty: { id: string; name: string };
   user: { fullName: string };
+  /** Có ở danh sách bác sĩ: số chỗ trống hôm nay, công việc hiện tại */
+  freeToday?: number;
+  currentPosition?: string | null;
   /** Có khi xem hồ sơ (GET /doctors/:id) */
   education?: HistoryItem[];
   career?: HistoryItem[];
@@ -93,6 +96,9 @@ export interface Slot {
   startTime: string;
   endTime: string;
   isBooked?: boolean;
+  /** Khung giờ được check-in nếu đặt khung giờ này */
+  checkinOpensAt?: string;
+  checkinClosesAt?: string;
   appointments?: {
     id: string;
     status: AppointmentStatus;

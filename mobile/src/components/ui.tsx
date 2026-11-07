@@ -1,34 +1,33 @@
 import type { ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-  type ViewStyle,
-} from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Icon, type IconName } from './Icon';
+import { Text, fontFor } from './Text';
 
-/** Bảng màu chung của app. */
+/**
+ * Bảng màu "Phiếu số": giấy phiếu, mực chữ và mực dấu (chỉ dùng cho số thứ tự, giờ đã chọn, con dấu).
+ * Cảnh báo chỉ dùng hổ phách, không dùng đỏ để không gây hoảng trong phòng khám.
+ */
 export const colors = {
-  primary: '#0f766e',
-  primaryDark: '#115e59',
-  primarySoft: '#ccfbf1',
-  bg: '#f4f7f6',
-  card: '#ffffff',
-  text: '#0f172a',
-  muted: '#64748b',
-  border: '#e2e8f0',
-  danger: '#dc2626',
-  dangerSoft: '#fee2e2',
-  warning: '#b45309',
-  warningSoft: '#fef3c7',
-  success: '#15803d',
-  successSoft: '#dcfce7',
+  ink: '#1E2638',
+  stamp: '#3A3FB0',
+  stampSoft: '#E6E7F7',
+  primary: '#3A3FB0',
+  primaryDark: '#2E3290',
+  primarySoft: '#E6E7F7',
+  bg: '#F4F6F7',
+  card: '#FFFFFF',
+  text: '#1E2638',
+  muted: '#5E6878',
+  faint: '#A7AFBA',
+  border: '#D5DBE1',
+  seg: '#E4E8EC',
+  danger: '#B4690E',
+  dangerSoft: '#FBEFDD',
+  warning: '#B4690E',
+  warningSoft: '#FBEFDD',
+  success: '#2E7A57',
+  successSoft: '#E3F1EA',
 };
 
 /** Khung màn hình: vùng an toàn + cuộn + kéo để tải lại (nếu truyền onRefresh). */
@@ -37,14 +36,28 @@ export function Screen({
   refreshing = false,
   onRefresh,
   scroll = true,
+  footer,
+  title,
+  subtitle,
 }: {
   children: ReactNode;
+  /** Tiêu đề lớn đầu màn (màn tab không có thanh tiêu đề) */
+  title?: string;
+  subtitle?: string;
   refreshing?: boolean;
   onRefresh?: () => void;
   scroll?: boolean;
+  /** Phần ghim ở đáy màn hình (vd. nút đặt lịch), luôn hiện khi cuộn */
+  footer?: ReactNode;
 }) {
   return (
-    <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={styles.safe} edges={title ? ['top', 'left', 'right'] : ['left', 'right', 'bottom']}>
+      {title ? (
+        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, gap: 2 }}>
+          <Text style={styles.heading}>{title}</Text>
+          {subtitle ? <Text style={styles.muted}>{subtitle}</Text> : null}
+        </View>
+      ) : null}
       {scroll ? (
         <ScrollView
           contentContainerStyle={styles.screen}
@@ -56,6 +69,7 @@ export function Screen({
       ) : (
         <View style={[styles.screen, { flex: 1 }]}>{children}</View>
       )}
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </SafeAreaView>
   );
 }
@@ -72,18 +86,25 @@ export function Muted({ children }: { children: ReactNode }) {
   return <Text style={styles.muted}>{children}</Text>;
 }
 
+/** Nhãn mục nhỏ màu mực dấu, vd. "CHẨN ĐOÁN". */
+export function SectionLabel({ children }: { children: ReactNode }) {
+  return <Text style={{ fontSize: 13, fontWeight: '700', color: colors.stamp, letterSpacing: 0.3, marginTop: 4 }}>{children}</Text>;
+}
+
 export function Button({
   title,
   onPress,
   loading = false,
   disabled = false,
   variant = 'primary',
+  icon,
 }: {
   title: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'accent';
+  icon?: IconName;
 }) {
   const v = buttonVariants[variant];
   return (
@@ -91,28 +112,35 @@ export function Button({
       accessibilityRole="button"
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [styles.button, v.box, (disabled || loading) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [styles.button, v.box, (disabled || loading) && { opacity: 0.45 }, pressed && { opacity: 0.8 }]}
     >
-      {loading ? <ActivityIndicator color={v.text.color} /> : <Text style={[styles.buttonText, v.text]}>{title}</Text>}
+      {loading ? (
+        <ActivityIndicator color={v.text.color} />
+      ) : (
+        <View style={styles.row}>
+          {icon ? <Icon name={icon} color={v.text.color} size={20} strokeWidth={2} /> : null}
+          <Text style={[styles.buttonText, v.text]}>{title}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
 
 const buttonVariants = {
-  primary: { box: { backgroundColor: colors.primary }, text: { color: '#fff' } },
+  primary: { box: { backgroundColor: colors.ink }, text: { color: '#fff' } },
+  accent: { box: { backgroundColor: colors.stamp }, text: { color: '#fff' } },
   secondary: { box: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }, text: { color: colors.text } },
   danger: { box: { backgroundColor: colors.dangerSoft }, text: { color: colors.danger } },
 };
 
-export function Field({ label, error, ...input }: TextInputProps & { label: string; error?: string }) {
+export function Field({ label, error, icon, ...input }: TextInputProps & { label: string; error?: string; icon?: IconName }) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        placeholderTextColor={colors.muted}
-        style={[styles.input, error ? { borderColor: colors.danger } : null]}
-        {...input}
-      />
+      <View style={[styles.inputBox, error ? { borderColor: colors.danger } : null]}>
+        {icon ? <Icon name={icon} color={colors.muted} size={20} /> : null}
+        <TextInput placeholderTextColor={colors.faint} style={styles.input} {...input} />
+      </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
@@ -128,18 +156,18 @@ export function Chip({ label, selected, onPress, disabled }: { label: string; se
       disabled={disabled}
       style={[styles.chip, selected && styles.chipSelected, disabled && { opacity: 0.4 }]}
     >
-      <Text style={[styles.chipText, selected && { color: '#fff' }]}>{label}</Text>
+      <Text style={[styles.chipText, selected && { color: '#fff', fontWeight: '600' }]}>{label}</Text>
     </Pressable>
   );
 }
 
 export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'primary' }) {
   const t = {
-    neutral: [colors.border, colors.muted],
+    neutral: [colors.seg, colors.muted],
     success: [colors.successSoft, colors.success],
     warning: [colors.warningSoft, colors.warning],
     danger: [colors.dangerSoft, colors.danger],
-    primary: [colors.primarySoft, colors.primaryDark],
+    primary: [colors.stampSoft, colors.stamp],
   }[tone];
   return (
     <View style={[styles.badge, { backgroundColor: t[0] }]}>
@@ -148,11 +176,32 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neut
   );
 }
 
+/** Con dấu nghiêng kiểu mộc phòng khám, vd. "ĐÃ XÁC NHẬN". */
+export function Stamp({ label }: { label: string }) {
+  return (
+    <View style={{ borderWidth: 2, borderColor: colors.stamp, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, transform: [{ rotate: '-8deg' }] }}>
+      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.stamp, letterSpacing: 0.6 }}>{label}</Text>
+    </View>
+  );
+}
+
+/** Đường xé của phiếu: nét đứt ngang và hai khía tròn ở mép (màu nền). */
+export function Perforation({ inset = 18 }: { inset?: number }) {
+  return (
+    <View style={{ height: 22, justifyContent: 'center', marginHorizontal: -1 }}>
+      <View style={{ position: 'absolute', left: -11, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.bg }} />
+      <View style={{ marginHorizontal: inset, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.border }} />
+      <View style={{ position: 'absolute', right: -11, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.bg }} />
+    </View>
+  );
+}
+
 export function ErrorBox({ message }: { message: string | null | undefined }) {
   if (!message) return null;
   return (
     <View style={styles.errorBox}>
-      <Text style={{ color: colors.danger }}>{message}</Text>
+      <Icon name="alert" color={colors.danger} size={18} strokeWidth={2} />
+      <Text style={{ color: colors.danger, flex: 1, fontSize: 14, lineHeight: 20 }}>{message}</Text>
     </View>
   );
 }
@@ -169,51 +218,48 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
 export function Loading() {
   return (
     <View style={{ padding: 32 }}>
-      <ActivityIndicator color={colors.primary} />
+      <ActivityIndicator color={colors.stamp} />
     </View>
   );
 }
 
 export const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  screen: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    padding: 16,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  title: { fontSize: 18, fontWeight: '700', color: colors.text },
-  muted: { color: colors.muted, fontSize: 14 },
+  screen: { padding: 20, gap: 12 },
+  footer: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, backgroundColor: colors.bg },
+  card: { backgroundColor: colors.card, borderRadius: 16, padding: 16, gap: 8 },
+  title: { fontSize: 17, fontWeight: '700', color: colors.text },
+  heading: { fontSize: 26, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  muted: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   label: { fontSize: 14, fontWeight: '600', color: colors.text },
-  input: {
+  inputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
     backgroundColor: '#fff',
-    color: colors.text,
   },
+  input: { flex: 1, paddingVertical: 13, fontSize: 16, color: colors.text, fontFamily: fontFor('400') },
   error: { color: colors.danger, fontSize: 13 },
-  button: { borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', minHeight: 50 },
-  buttonText: { fontSize: 16, fontWeight: '600' },
+  button: { borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
+  buttonText: { fontSize: 16, fontWeight: '700' },
   chip: {
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: '#fff',
   },
-  chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.text, fontWeight: '500' },
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
-  errorBox: { backgroundColor: colors.dangerSoft, borderRadius: 10, padding: 12 },
+  chipSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipText: { color: colors.text, fontSize: 15 },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  badgeText: { fontSize: 13, fontWeight: '600' },
+  errorBox: { flexDirection: 'row', gap: 8, backgroundColor: colors.dangerSoft, borderRadius: 12, padding: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  num: { fontFamily: 'num' },
 });

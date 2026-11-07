@@ -150,11 +150,7 @@ export class AppointmentsService {
       select: appointmentView,
     });
     // Khung giờ check-in để app nhắc bệnh nhân đến đúng lúc
-    return list.map((a) => ({
-      ...a,
-      checkinOpensAt: new Date(a.schedule.startTime.getTime() - this.rules.checkinEarlyMinutes * MINUTE),
-      checkinClosesAt: new Date(a.schedule.startTime.getTime() + this.rules.checkinLateMinutes * MINUTE),
-    }));
+    return list.map((a) => ({ ...a, ...this.checkinWindow(a.schedule.startTime) }));
   }
 
   /** Bệnh nhân hủy lịch của mình trước giờ khám; khung giờ được mở lại cho người khác. */
@@ -173,13 +169,22 @@ export class AppointmentsService {
   }
 
   /** Lịch hẹn trong ngày của cả phòng khám (lễ tân dùng để check-in, kể cả lịch đã bị tính không đến). */
-  byDay(q: DayQuery) {
+  async byDay(q: DayQuery) {
     const date = dateOnly(q.date?.slice(0, 10) ?? vnDateString());
-    return this.prisma.appointment.findMany({
+    const list = await this.prisma.appointment.findMany({
       where: { status: { in: [...ACTIVE, 'COMPLETED', 'NO_SHOW'] }, schedule: { date } },
       orderBy: { schedule: { startTime: 'asc' } },
       select: { ...appointmentView, visit: { select: { id: true, queueNumber: true, source: true, status: true } } },
     });
+    return list.map((a) => ({ ...a, ...this.checkinWindow(a.schedule.startTime) }));
+  }
+
+  /** Khung giờ được check-in của lịch hẹn (để app và lễ tân nhắc giờ). */
+  private checkinWindow(start: Date) {
+    return {
+      checkinOpensAt: new Date(start.getTime() - this.rules.checkinEarlyMinutes * MINUTE),
+      checkinClosesAt: new Date(start.getTime() + this.rules.checkinLateMinutes * MINUTE),
+    };
   }
 }
 

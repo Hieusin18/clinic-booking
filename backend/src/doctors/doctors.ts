@@ -41,6 +41,7 @@ import { PHONE_MESSAGE, PHONE_REGEX } from '../auth/auth.dto.js';
 import { AuthUser, CurrentUser, Public, Roles } from '../auth/decorators.js';
 import { hashPassword } from '../auth/password.js';
 import { PageQuery, skipTake, toPage } from '../common/pagination.js';
+import { todayVN } from '../common/time.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -153,11 +154,32 @@ export class DoctorsService {
       ...(q.specialtyId ? { specialtyId: q.specialtyId } : {}),
       ...(Object.keys(userWhere).length ? { user: userWhere } : {}),
     };
+    const now = new Date();
+    // Thêm cho danh sách: số chỗ còn trống hôm nay và công việc hiện tại (mốc công tác "đến nay")
+    const extra = {
+      _count: { select: { schedules: { where: { date: todayVN(now), isBooked: false, startTime: { gt: now } } } } },
+      history: { where: { kind: 'WORK', toYear: null }, orderBy: { fromYear: 'desc' }, take: 1, select: { title: true, place: true } },
+    } satisfies Prisma.DoctorSelect;
     const [items, total] = await Promise.all([
-      this.prisma.doctor.findMany({ where, select: forAdmin ? adminView : publicView, orderBy: { user: { fullName: 'asc' } }, ...skipTake(q) }),
+      this.prisma.doctor.findMany({
+        where,
+        select: { ...(forAdmin ? adminView : publicView), ...extra },
+        orderBy: { user: { fullName: 'asc' } },
+        ...skipTake(q),
+      }),
       this.prisma.doctor.count({ where }),
     ]);
-    return toPage(items.map((d) => present(d)), total, q);
+    return toPage(
+      items.map(({ _count, history, ...d }) => ({
+        ...present(d, now),
+        /** Số khung giờ còn trống hôm nay */
+        freeToday: _count.schedules,
+        /** "Chức vụ · Nơi công tác" của việc đang làm; null = chưa cập nhật */
+        currentPosition: history[0] ? `${history[0].title} · ${history[0].place}` : null,
+      })),
+      total,
+      q,
+    );
   }
 
   /** Hồ sơ đầy đủ cho bệnh nhân xem trước khi đặt lịch (chỉ bác sĩ đang hoạt động). */

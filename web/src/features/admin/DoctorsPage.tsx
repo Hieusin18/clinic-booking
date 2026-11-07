@@ -84,8 +84,24 @@ export function DoctorsPage() {
               </Space>
             ),
           },
-          { title: 'Kinh nghiệm', width: 120, render: (_, d) => (d.experienceYears != null ? `${d.experienceYears} năm` : '—') },
-          { title: 'Chuyên khoa', render: (_, d) => <Tag color="cyan">{d.specialty.name}</Tag> },
+          { title: 'Chuyên khoa', render: (_, d) => <Tag>{d.specialty.name}</Tag> },
+          {
+            title: 'Kinh nghiệm',
+            width: 130,
+            onHeaderCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+            render: (_, d) =>
+              d.experienceYears != null ? (
+                <span aria-label={`${d.experienceYears} năm kinh nghiệm`}>
+                  <span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{d.experienceYears}</span> năm
+                </span>
+              ) : (
+                <Typography.Text type="secondary">—</Typography.Text>
+              ),
+          },
+          {
+            title: 'Công việc hiện tại',
+            render: (_, d) => (d.currentPosition ? d.currentPosition : <Typography.Text type="secondary">Chưa cập nhật</Typography.Text>),
+          },
           { title: 'Số điện thoại (đăng nhập)', render: (_, d) => d.user.phone },
           {
             title: 'Hoạt động',

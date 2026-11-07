@@ -1,10 +1,12 @@
 import { BadRequestException, ConflictException, Controller, Delete, Get, HttpCode, Injectable, Module, NotFoundException, Param, Post, Query, Body, ForbiddenException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsDateString, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
 import { AuthUser, CurrentUser, Public, Roles } from '../auth/decorators.js';
 import { dateOnly, todayVN, vnDateString, vnDateTime } from '../common/time.js';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { queueRules, type QueueRules } from '../queue/queue-rules.js';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -24,6 +26,11 @@ export class DateQuery {
   @IsOptional() @IsDateString() date?: string;
 }
 
+export class SlotQuery extends DateQuery {
+  /** true = trả cả khung giờ đã có người đặt (isBooked) để app gạch đi */
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true') @IsBoolean() all?: boolean;
+}
+
 export class RangeQuery {
   @IsDateString() from: string;
   @IsDateString() to: string;
@@ -31,7 +38,14 @@ export class RangeQuery {
 
 @Injectable()
 export class SchedulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly rules: QueueRules;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    config: ConfigService,
+  ) {
+    this.rules = queueRules(config);
+  }
 
   async doctorIdOf(user: AuthUser) {
     const doctor = await this.prisma.doctor.findUnique({ where: { userId: user.sub } });
@@ -88,15 +102,22 @@ export class SchedulesService {
   }
 
   /** Khung giờ còn trống của một bác sĩ trong ngày (bệnh nhân xem). */
-  async available(doctorId: string, q: DateQuery) {
+  async available(doctorId: string, q: SlotQuery) {
     const doctor = await this.prisma.doctor.findUnique({ where: { id: doctorId }, include: { user: true } });
     if (!doctor || !doctor.user.isActive) throw new NotFoundException('Không tìm thấy bác sĩ');
     const ymd = q.date?.slice(0, 10) ?? vnDateString();
-    return this.prisma.schedule.findMany({
-      where: { doctorId, date: dateOnly(ymd), isBooked: false, startTime: { gt: new Date() } },
+    const slots = await this.prisma.schedule.findMany({
+      where: { doctorId, date: dateOnly(ymd), ...(q.all ? {} : { isBooked: false }), startTime: { gt: new Date() } },
       orderBy: { startTime: 'asc' },
-      select: { id: true, startTime: true, endTime: true },
+      select: { id: true, startTime: true, endTime: true, isBooked: true },
     });
+    // Kèm khung giờ được check-in để app nhắc ngay khi bệnh nhân chọn giờ
+    const MIN = 60_000;
+    return slots.map((x) => ({
+      ...x,
+      checkinOpensAt: new Date(x.startTime.getTime() - this.rules.checkinEarlyMinutes * MIN),
+      checkinClosesAt: new Date(x.startTime.getTime() + this.rules.checkinLateMinutes * MIN),
+    }));
   }
 
   /** Số khung giờ còn trống từng ngày trong vài ngày tới, cho trang hồ sơ bác sĩ. */
@@ -160,7 +181,7 @@ export class SchedulesController {
 
   @Public()
   @Get('doctors/:id/schedules')
-  available(@Param('id') id: string, @Query() q: DateQuery) {
+  available(@Param('id') id: string, @Query() q: SlotQuery) {
     return this.service.available(id, q);
   }
 }

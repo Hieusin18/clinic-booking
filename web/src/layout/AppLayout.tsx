@@ -16,7 +16,9 @@ import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { ROLE_LABEL, useAuth } from '../lib/auth';
 import type { Role } from '../lib/types';
+import { C } from '../lib/theme';
 import { PatientOnly } from './guards';
+import { Logo } from './Logo';
 
 type Item = Required<MenuProps>['items'][number] & { key: string };
 const item = (key: string, label: string, icon: ReactNode): Item => ({ key, label, icon });
@@ -55,11 +57,11 @@ export function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Layout.Sider breakpoint="lg" collapsedWidth={0} width={232} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
+      <Layout.Sider breakpoint="lg" collapsedWidth={0} width={232} theme="light" style={{ borderRight: `1px solid ${C.line}` }}>
         <Flex align="center" gap={10} style={{ padding: '20px 20px 16px' }}>
-          <img src="/favicon.svg" width={32} height={32} alt="" />
+          <Logo />
           <div>
-            <Typography.Text strong style={{ display: 'block', lineHeight: 1.2 }}>Phòng khám</Typography.Text>
+            <Typography.Text strong style={{ display: 'block', lineHeight: 1.2, fontSize: 15 }}>Phòng khám</Typography.Text>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>{ROLE_LABEL[user.role]}</Typography.Text>
           </div>
         </Flex>
@@ -72,9 +74,9 @@ export function AppLayout() {
         />
       </Layout.Sider>
       <Layout>
-        <Layout.Header style={{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0' }}>
+        <Layout.Header style={{ background: '#fff', padding: '0 24px', borderBottom: `1px solid ${C.line}` }}>
           <Flex justify="flex-end" align="center" gap={12} style={{ height: '100%' }}>
-            <Avatar style={{ background: '#0f766e' }}>{user.fullName.trim().split(' ').pop()?.[0]?.toUpperCase()}</Avatar>
+            <Avatar style={{ background: C.ink }}>{user.fullName.trim().split(' ').pop()?.[0]?.toUpperCase()}</Avatar>
             <Typography.Text>{user.fullName}</Typography.Text>
             <Button icon={<LogoutOutlined />} onClick={logout}>Đăng xuất</Button>
           </Flex>
