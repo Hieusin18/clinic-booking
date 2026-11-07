@@ -6,6 +6,7 @@ import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { ExamPage } from './features/exam/ExamPage';
+import { RecordsPage } from './features/exam/RecordsPage';
 import { CounterPage } from './features/reception/CounterPage';
 import { QueueBoardPage } from './features/reception/QueueBoardPage';
 import { ReceptionPage } from './features/reception/ReceptionPage';
@@ -26,6 +27,7 @@ function Home() {
  * - Lịch khám: /doctor/schedule
  * - Tiếp đón và hàng đợi: /reception, /reception/queue, /counter
  * - Khám bệnh: /doctor/queue
+ * - Bệnh án đã khám: /doctor/records
  * - Hồ sơ của tôi: /doctor/profile
  * - Tài khoản bệnh nhân lỡ đăng nhập trang quản lý: /patient-only
  */
@@ -53,6 +55,7 @@ export const routes: RouteObject[] = [
       { path: '/admin/receptionists', element: <RequireRole roles={['ADMIN']}><ReceptionistsPage /></RequireRole> },
       { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><MedicinesPage /></RequireRole> },
       { path: '/doctor/queue', element: <RequireRole roles={['DOCTOR']}><ExamPage /></RequireRole> },
+      { path: '/doctor/records', element: <RequireRole roles={['DOCTOR']}><RecordsPage /></RequireRole> },
       { path: '/doctor/schedule', element: <RequireRole roles={['DOCTOR']}><SchedulePage /></RequireRole> },
       { path: '/doctor/profile', element: <RequireRole roles={['DOCTOR']}><MyProfilePage /></RequireRole> },
       { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ReceptionPage /></RequireRole> },

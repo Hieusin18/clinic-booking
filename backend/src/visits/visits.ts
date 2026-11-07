@@ -8,6 +8,7 @@ import { patientIdOf } from '../appointments/appointments.js';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { clinicInfo } from '../common/clinic.js';
+import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { dateOnly } from '../common/time.js';
 import { ICD_REGEX } from '../icd10/icd10.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -122,6 +123,12 @@ export class PrescriptionDto {
 
 export class HistoryQuery {
   @IsString() patientId: string;
+}
+
+/** Tìm bệnh án đã khám: ?q=tên, SĐT, chẩn đoán hoặc mã ICD&from=YYYY-MM-DD&to=YYYY-MM-DD&page=1&pageSize=20 */
+export class ExaminedQuery extends PageQuery {
+  @IsOptional() @IsDateString() from?: string;
+  @IsOptional() @IsDateString() to?: string;
 }
 
 const prescriptionView = {
@@ -301,6 +308,48 @@ export class VisitsService {
   }
 
   /** Bác sĩ xem các lần khám trước của bệnh nhân để tham khảo. */
+  /**
+   * Bệnh án các lượt bác sĩ đã khám xong (mọi ngày), mới nhất trước. Tìm theo tên hoặc SĐT bệnh nhân,
+   * chẩn đoán hoặc mã ICD; lọc theo khoảng ngày khám.
+   */
+  async examined(user: AuthUser, q: ExaminedQuery) {
+    const doctorId = await this.doctorIdOf(user);
+    const text = q.q?.trim();
+    const where: Prisma.VisitWhereInput = {
+      doctorId,
+      status: 'DONE',
+      ...(q.from || q.to ? { date: { ...(q.from ? { gte: dateOnly(q.from.slice(0, 10)) } : {}), ...(q.to ? { lte: dateOnly(q.to.slice(0, 10)) } : {}) } } : {}),
+      ...(text
+        ? {
+            OR: [
+              { patient: { fullName: { contains: text, mode: 'insensitive' } } },
+              { patient: { phone: { startsWith: text } } },
+              { medicalRecord: { diagnosis: { contains: text, mode: 'insensitive' } } },
+              { medicalRecord: { icdCode: { startsWith: text.toUpperCase() } } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.visit.findMany({
+        where,
+        orderBy: [{ date: 'desc' }, { calledAt: 'desc' }, { createdAt: 'desc' }],
+        ...skipTake(q),
+        select: {
+          ...visitView,
+          medicalRecord: { select: { diagnosis: true, icdCode: true, followUpDate: true } },
+          prescriptions: { where: { status: 'FINALIZED' }, select: prescriptionView },
+        },
+      }),
+      this.prisma.visit.count({ where }),
+    ]);
+    return toPage(
+      rows.map(({ prescriptions, ...v }) => ({ ...v, prescription: currentPrescription(prescriptions) })),
+      total,
+      q,
+    );
+  }
+
   async patientHistory(user: AuthUser, patientId: string) {
     await this.doctorIdOf(user);
     return this.history(patientId);
@@ -395,6 +444,13 @@ export class VisitsController {
   @Get('visits/mine')
   myHistory(@CurrentUser() user: AuthUser) {
     return this.service.myHistory(user);
+  }
+
+  /** Bác sĩ tra cứu bệnh án các lượt mình đã khám xong (mọi ngày) */
+  @Roles('DOCTOR')
+  @Get('visits/examined')
+  examined(@CurrentUser() user: AuthUser, @Query() q: ExaminedQuery) {
+    return this.service.examined(user, q);
   }
 
   /** Bác sĩ xem các lần khám trước của một bệnh nhân */
