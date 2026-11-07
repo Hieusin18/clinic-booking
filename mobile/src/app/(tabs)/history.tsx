@@ -25,6 +25,7 @@ export default function History() {
           const { dm, year } = dayMonth(v.date);
           const rec = v.medicalRecord;
           const items = v.prescription?.items.length ?? 0;
+          const waiting = v.status === 'AWAITING_RESULTS';
           return (
             <Pressable
               key={v.id}
@@ -46,9 +47,14 @@ export default function History() {
                   {doctorName(v.doctor)}
                   {v.doctor.specialty ? ` · ${v.doctor.specialty.name}` : ''}
                 </Muted>
-                <Text style={{ fontSize: 13.5, fontWeight: '600', color: items ? colors.success : colors.faint }}>
-                  {items ? `Đơn ${items} thuốc` : 'Không kê đơn'}
-                </Text>
+                {waiting ? (
+                  <Text style={{ fontSize: 13.5, fontWeight: '600', color: colors.stamp }}>Đang chờ kết quả cận lâm sàng</Text>
+                ) : (
+                  <Text style={{ fontSize: 13.5, fontWeight: '600', color: items ? colors.success : colors.faint }}>
+                    {items ? `Đơn ${items} thuốc` : 'Không kê đơn'}
+                    {v.labOrders?.length ? ` · ${v.labOrders.length} kết quả CLS` : ''}
+                  </Text>
+                )}
               </View>
               <Icon name="chevron" color={colors.faint} size={20} />
             </Pressable>

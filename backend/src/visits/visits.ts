@@ -1,4 +1,5 @@
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, HttpCode, Injectable, Module, NotFoundException, Param, Patch, Post, Put, Query, StreamableFile } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { randomInt } from 'node:crypto';
@@ -11,6 +12,7 @@ import { dateOnly } from '../common/time.js';
 import { ICD_REGEX } from '../icd10/icd10.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { visitView } from '../queue/queue.service.js';
+import { labOrderView, presentLabOrders } from './lab-files.js';
 import { buildPrintDoc, renderDocx, renderHtml, renderPdf } from './record-export.js';
 
 const ICD_MESSAGE = 'Mã ICD-10 không hợp lệ (ví dụ J02.9)';
@@ -77,7 +79,8 @@ function recordData(dto: RecordDto) {
     generalExam: blank(dto.generalExam),
     organExam: blank(dto.organExam),
     labSummary: blank(dto.labSummary),
-    orders: blank(dto.orders),
+    // Web mới dùng danh sách chỉ định (LabOrder); không gửi ô này thì giữ nguyên ghi chú cũ
+    orders: dto.orders === undefined ? undefined : blank(dto.orders),
     diagnosis: dto.diagnosis.trim(),
     icdCode: blank(dto.icdCode),
     secondaryDiagnosis: blank(dto.secondaryDiagnosis),
@@ -152,7 +155,14 @@ function currentPrescription<T extends { status: string; finalizedAt: Date | nul
 
 @Injectable()
 export class VisitsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly secret: string;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    config: ConfigService,
+  ) {
+    this.secret = config.getOrThrow<string>('JWT_SECRET');
+  }
 
   async doctorIdOf(user: AuthUser) {
     const doctor = await this.prisma.doctor.findUnique({ where: { userId: user.sub } });
@@ -160,12 +170,12 @@ export class VisitsService {
     return doctor.id;
   }
 
-  /** Phiếu khám phải thuộc bác sĩ đang đăng nhập và đang khám (hoặc vừa khám xong). */
-  private async ownVisit(user: AuthUser, visitId: string) {
+  /** Phiếu khám phải thuộc bác sĩ đang đăng nhập và đang khám, đang chờ kết quả cận lâm sàng, hoặc đã khám xong. */
+  async ownVisit(user: AuthUser, visitId: string) {
     const doctorId = await this.doctorIdOf(user);
     const visit = await this.prisma.visit.findUnique({ where: { id: visitId } });
     if (!visit || visit.doctorId !== doctorId) throw new NotFoundException('Không tìm thấy phiếu khám');
-    if (!['IN_PROGRESS', 'DONE'].includes(visit.status)) {
+    if (!['IN_PROGRESS', 'AWAITING_RESULTS', 'DONE'].includes(visit.status)) {
       throw new ConflictException('Chỉ ghi được cho bệnh nhân đang khám, hãy gọi số trước');
     }
     return { visit, doctorId };
@@ -186,10 +196,19 @@ export class VisitsService {
     });
   }
 
-  /** Hoàn tất lượt khám: cần có bệnh án; lịch hẹn (nếu có) chuyển sang đã khám. */
+  /**
+   * Hoàn tất lượt khám: cần có bệnh án, mọi chỉ định cận lâm sàng đã có kết quả; lịch hẹn (nếu có) chuyển sang đã khám.
+   * Lượt đang chờ kết quả theo chế độ online hoàn tất được ngay (bác sĩ gửi kết quả và đơn lên app);
+   * chế độ quay lại thì phải đưa bệnh nhân vào lại hàng chờ và gọi vào trước.
+   */
   async complete(user: AuthUser, visitId: string) {
     const { visit } = await this.ownVisit(user, visitId);
     if (visit.status === 'DONE') throw new ConflictException('Lượt khám đã hoàn tất');
+    if (visit.status === 'AWAITING_RESULTS' && visit.resultMode !== 'ONLINE') {
+      throw new ConflictException('Bệnh nhân sẽ quay lại đọc kết quả: hãy đưa vào hàng chờ và gọi vào trước khi hoàn tất');
+    }
+    const pending = await this.prisma.labOrder.findMany({ where: { visitId, doneAt: null }, select: { name: true } });
+    if (pending.length > 0) throw new ConflictException(`Chưa trả kết quả: ${pending.map((p) => p.name).join(', ')}`);
     if (!(await this.prisma.medicalRecord.findUnique({ where: { visitId } }))) {
       throw new ConflictException('Cần ghi bệnh án trước khi hoàn tất lượt khám');
     }
@@ -209,19 +228,25 @@ export class VisitsService {
    * Lễ tân và admin không có quyền gọi (chặn ở controller).
    */
   async detail(user: AuthUser, visitId: string) {
-    const visit = await this.prisma.visit.findUnique({
+    const found = await this.prisma.visit.findUnique({
       where: { id: visitId },
-      select: { ...visitView, medicalRecord: true, prescriptions: { select: prescriptionView, orderBy: { createdAt: 'desc' } } },
+      select: {
+        ...visitView,
+        medicalRecord: true,
+        prescriptions: { select: prescriptionView, orderBy: { createdAt: 'desc' } },
+        labOrders: { select: labOrderView, orderBy: { createdAt: 'asc' } },
+      },
     });
-    if (!visit) throw new NotFoundException('Không tìm thấy phiếu khám');
+    if (!found) throw new NotFoundException('Không tìm thấy phiếu khám');
 
     if (user.role === 'PATIENT') {
-      if (visit.patient.id !== (await patientIdOf(this.prisma, user))) throw new NotFoundException('Không tìm thấy phiếu khám');
-      const { prescriptions, ...rest } = visit;
-      return { ...rest, prescription: currentPrescription(prescriptions) };
+      if (found.patient.id !== (await patientIdOf(this.prisma, user))) throw new NotFoundException('Không tìm thấy phiếu khám');
+      const { prescriptions, ...rest } = found;
+      // Bệnh nhân chỉ thấy kết quả cận lâm sàng khi bác sĩ đã đọc và hoàn tất lượt khám
+      return { ...rest, labOrders: presentLabOrders(this.secret, found.labOrders, found.status !== 'DONE'), prescription: currentPrescription(prescriptions) };
     }
-    if (visit.doctor.id !== (await this.doctorIdOf(user))) throw new NotFoundException('Không tìm thấy phiếu khám');
-    return { ...visit, prescription: currentPrescription(visit.prescriptions) };
+    if (found.doctor.id !== (await this.doctorIdOf(user))) throw new NotFoundException('Không tìm thấy phiếu khám');
+    return { ...found, labOrders: presentLabOrders(this.secret, found.labOrders), prescription: currentPrescription(found.prescriptions) };
   }
 
   /**
@@ -232,8 +257,22 @@ export class VisitsService {
     const visit = await this.detail(user, visitId);
     if (!visit.medicalRecord) throw new ConflictException('Lượt khám chưa có bệnh án');
     const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: visit.patient.id } });
+    // Kết quả cận lâm sàng in kèm ảnh, nên đọc cả dữ liệu ảnh (bệnh nhân chỉ thấy khi đã hoàn tất)
+    const showLab = user.role !== 'PATIENT' || visit.status === 'DONE';
+    const labOrders = showLab
+      ? await this.prisma.labOrder.findMany({
+          where: { visitId },
+          orderBy: { createdAt: 'asc' },
+          select: { name: true, note: true, resultText: true, doneAt: true, files: { select: { fileName: true, mimeType: true, data: true }, orderBy: { createdAt: 'asc' } } },
+        })
+      : visit.labOrders.map((o) => ({ name: o.name, note: o.note, resultText: null, doneAt: null, files: [] }));
     // Bác sĩ không ghi lại lý do khám thì dùng lý do bệnh nhân khai lúc đặt lịch/lấy số
-    return buildPrintDoc({ ...visit, patient, medicalRecord: { ...visit.medicalRecord, reason: visit.medicalRecord.reason ?? visit.reason } });
+    return buildPrintDoc({
+      ...visit,
+      patient,
+      labOrders,
+      medicalRecord: { ...visit.medicalRecord, reason: visit.medicalRecord.reason ?? visit.reason },
+    });
   }
 
   /**
@@ -269,7 +308,8 @@ export class VisitsService {
 
   private async history(patientId: string) {
     const visits = await this.prisma.visit.findMany({
-      where: { patientId, status: 'DONE' },
+      // Gồm cả lượt đang chờ kết quả cận lâm sàng để bệnh nhân nhận kết quả online biết đang chờ
+      where: { patientId, status: { in: ['DONE', 'AWAITING_RESULTS'] } },
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       select: { ...visitView, medicalRecord: true, prescriptions: { where: { status: 'FINALIZED' }, select: prescriptionView } },
     });
@@ -374,7 +414,7 @@ export class VisitsController {
   @Roles('DOCTOR', 'PATIENT')
   @Get('visits/:id/record.html')
   @Header('Content-Type', 'text/html; charset=utf-8')
-  @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors *")
+  @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors *")
   @Header('Cache-Control', 'no-store')
   previewHtml(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.preview(user, id);
@@ -435,5 +475,5 @@ export class VisitsController {
   }
 }
 
-@Module({ controllers: [VisitsController], providers: [VisitsService] })
+@Module({ controllers: [VisitsController], providers: [VisitsService], exports: [VisitsService] })
 export class VisitsModule {}

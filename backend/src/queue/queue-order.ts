@@ -1,6 +1,8 @@
 /**
  * Thứ tự gọi số. Mỗi lần bác sĩ bấm "Gọi số tiếp theo", xét lần lượt:
  *
+ *  0. Người quay lại với kết quả cận lâm sàng (đã khám, chỉ cần bác sĩ đọc kết quả và kết luận)
+ *     → gọi người có kết quả sớm nhất. Lượt này không tính vào chuỗi ưu tiên ở bước 1.
  *  1. Người vãng lai chờ quá lâu: đã có `walkInEvery` lượt liên tiếp gọi người đặt lịch (bước 2)
  *     mà vẫn còn người vãng lai chờ → gọi người vãng lai đến quầy sớm nhất.
  *  2. Người đặt lịch đã đến giờ hẹn (bây giờ ≥ giờ hẹn − `leadMinutes`) → gọi người có giờ hẹn sớm nhất.
@@ -9,7 +11,7 @@
  * Cùng một hàm dùng để gọi số và để dự đoán "trước bạn còn mấy người", nên con số
  * hiện trên app luôn khớp với cách bác sĩ gọi.
  */
-export type CallRuleName = 'FAIRNESS' | 'APPOINTMENT' | 'ARRIVAL' | 'MANUAL';
+export type CallRuleName = 'FAIRNESS' | 'APPOINTMENT' | 'ARRIVAL' | 'MANUAL' | 'RESULTS';
 
 export interface QueueEntry {
   id: string;
@@ -19,6 +21,8 @@ export interface QueueEntry {
   createdAt: Date;
   /** Giờ hẹn, chỉ có ở lượt đặt online */
   appointmentAt: Date | null;
+  /** Lúc quay lại hàng chờ với kết quả cận lâm sàng */
+  resultsReadyAt?: Date | null;
 }
 
 export interface OrderRules {
@@ -43,6 +47,11 @@ const byArrival = (a: QueueEntry, b: QueueEntry) => a.createdAt.getTime() - b.cr
 export function pickNext<T extends QueueEntry>(waiting: T[], streak: number, at: Date, rules: OrderRules): { entry: T; rule: CallRuleName } | null {
   if (waiting.length === 0) return null;
 
+  const back = waiting
+    .filter((e) => e.resultsReadyAt)
+    .sort((a, b) => a.resultsReadyAt!.getTime() - b.resultsReadyAt!.getTime() || byArrival(a, b))[0];
+  if (back) return { entry: back, rule: 'RESULTS' };
+
   if (rules.walkInEvery > 0 && streak >= rules.walkInEvery) {
     const walkIn = waiting.filter((e) => e.source === 'WALK_IN').sort(byArrival)[0];
     if (walkIn) return { entry: walkIn, rule: 'FAIRNESS' };
@@ -56,9 +65,12 @@ export function pickNext<T extends QueueEntry>(waiting: T[], streak: number, at:
   return { entry: [...waiting].sort(byArrival)[0], rule: 'ARRIVAL' };
 }
 
-/** Số lượt bước 2 liên tiếp sau khi gọi theo `rule`. Bác sĩ chọn đích danh thì không tính. */
+/** Lượt không làm đổi chuỗi ưu tiên: bác sĩ chọn đích danh, hoặc đọc kết quả cận lâm sàng. */
+const NEUTRAL: readonly (CallRuleName | null)[] = ['MANUAL', 'RESULTS'];
+
+/** Số lượt bước 2 liên tiếp sau khi gọi theo `rule`. */
 export function nextStreak(streak: number, rule: CallRuleName): number {
-  if (rule === 'MANUAL') return streak;
+  if (NEUTRAL.includes(rule)) return streak;
   return rule === 'APPOINTMENT' ? streak + 1 : 0;
 }
 
@@ -66,7 +78,7 @@ export function nextStreak(streak: number, rule: CallRuleName): number {
 export function currentStreak(recent: (CallRuleName | null)[]): number {
   let n = 0;
   for (const rule of recent) {
-    if (rule === 'MANUAL') continue;
+    if (NEUTRAL.includes(rule)) continue;
     if (rule !== 'APPOINTMENT') break;
     n++;
   }

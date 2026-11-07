@@ -44,6 +44,7 @@ export function QueueBoardPage() {
       <Flex gap={12} wrap>
         <Stat label="Đang chờ" value={count('WAITING')} color={C.amber} />
         <Stat label="Đang khám" value={count('IN_PROGRESS')} color={C.stamp} />
+        <Stat label="Đang làm CLS" value={count('AWAITING_RESULTS')} color="#6B4FBF" />
         <Stat label="Đã khám" value={count('DONE')} color={C.good} />
         <Stat label="Bỏ về" value={count('LEFT')} color={C.muted} />
       </Flex>

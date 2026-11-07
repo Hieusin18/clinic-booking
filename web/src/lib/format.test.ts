@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { age, doctorName, formatDay, formatTime, ticketLabel, todayYmd } from './format';
+import { age, doctorName, formatDay, formatTime, isToday, ticketLabel, todayYmd } from './format';
 
 describe('định dạng ngày giờ', () => {
   it('số thứ tự: A cho đặt lịch, B cho vãng lai', () => {
@@ -15,6 +15,9 @@ describe('định dạng ngày giờ', () => {
   it('ngày hôm nay theo giờ Việt Nam', () => {
     // 20:00 UTC ngày 1/11 = 03:00 sáng ngày 2/11 ở Việt Nam
     expect(todayYmd(new Date('2026-11-01T20:00:00Z'))).toBe('2026-11-02');
+    // Cột ngày khám so với hôm nay theo giờ Việt Nam
+    expect(isToday('2026-11-02T00:00:00.000Z', new Date('2026-11-01T20:00:00Z'))).toBe(true);
+    expect(isToday('2026-11-01T00:00:00.000Z', new Date('2026-11-01T20:00:00Z'))).toBe(false);
   });
   it('tính tuổi theo ngày sinh', () => {
     expect(age('1990-11-03T00:00:00.000Z', new Date('2026-11-02T00:00:00Z'))).toBe(35);

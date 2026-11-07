@@ -4,6 +4,7 @@ import type { BookingStanding, QueuePosition, VisitStatus } from './types';
 export const VISIT_STATUS: Record<VisitStatus, { label: string; tone: 'warning' | 'primary' | 'success' | 'neutral' }> = {
   WAITING: { label: 'Đang chờ', tone: 'warning' },
   IN_PROGRESS: { label: 'Mời vào khám', tone: 'primary' },
+  AWAITING_RESULTS: { label: 'Đi làm cận lâm sàng', tone: 'primary' },
   DONE: { label: 'Đã khám xong', tone: 'success' },
   LEFT: { label: 'Đã bỏ lượt', tone: 'neutral' },
 };
@@ -12,12 +13,31 @@ export const VISIT_STATUS: Record<VisitStatus, { label: string; tone: 'warning' 
  * Câu nhắc trên phiếu số. `note` giải thích vì sao con số có thể thay đổi:
  * người đặt lịch đến giờ hẹn được gọi trước, nên người vãng lai có thể bị lùi lượt.
  */
-export function waitHint(p: Pick<QueuePosition, 'peopleAhead' | 'due' | 'estimatedCallAt'> & { visit: Pick<QueuePosition['visit'], 'status' | 'source' | 'appointmentAt'> }): {
+export function waitHint(
+  p: Pick<QueuePosition, 'peopleAhead' | 'due' | 'estimatedCallAt'> & {
+    visit: Pick<QueuePosition['visit'], 'status' | 'source' | 'appointmentAt' | 'resultMode' | 'resultsReadyAt'>;
+  },
+): {
   text: string;
   note?: string;
 } {
-  const { status, source, appointmentAt } = p.visit;
+  const { status, source, appointmentAt, resultMode, resultsReadyAt } = p.visit;
   if (status === 'IN_PROGRESS') return { text: 'Đến lượt bạn, mời vào phòng khám.' };
+  if (status === 'AWAITING_RESULTS' && resultMode === 'ONLINE') {
+    return {
+      text: 'Làm xong cận lâm sàng là bạn có thể ra về.',
+      note: 'Bác sĩ sẽ đọc kết quả, kết luận và kê đơn; bạn xem trong tab Lịch sử của app.',
+    };
+  }
+  if (status === 'AWAITING_RESULTS') {
+    return {
+      text: 'Làm xong cận lâm sàng, mời bạn quay lại khu chờ và giữ nguyên số này.',
+      note: 'Khi bác sĩ có kết quả, bạn được gọi vào trước mọi người để đọc kết quả.',
+    };
+  }
+  if (status === 'WAITING' && resultsReadyAt) {
+    return { text: 'Đã có kết quả cận lâm sàng. Bạn được gọi vào trước, vui lòng chú ý loa gọi.' };
+  }
   if (status === 'DONE') return { text: 'Bạn đã khám xong. Xem đơn thuốc ở tab Lịch sử.' };
   if (status === 'LEFT') return { text: 'Lượt của bạn đã bị bỏ qua. Vui lòng liên hệ quầy lễ tân.' };
   if (p.peopleAhead === 0) return { text: 'Bạn là người tiếp theo, vui lòng chú ý loa gọi.' };

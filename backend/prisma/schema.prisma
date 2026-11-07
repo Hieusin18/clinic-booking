@@ -48,8 +48,18 @@ enum CheckinMethod {
 enum VisitStatus {
   WAITING
   IN_PROGRESS
+  /// Bác sĩ đã gửi đi làm cận lâm sàng, đang chờ kết quả (bác sĩ rảnh để gọi người khác)
+  AWAITING_RESULTS
   DONE
   LEFT
+}
+
+/// Bệnh nhân nhận kết quả cận lâm sàng thế nào
+enum ResultMode {
+  /// Làm xong quay lại phòng khám; có kết quả thì được ưu tiên gọi vào đọc kết quả
+  RETURN
+  /// Về nhà; bác sĩ đọc kết quả, kết luận, kê đơn và gửi lên app
+  ONLINE
 }
 
 /// Bác sĩ gọi lượt này theo quy tắc nào (xem src/queue/queue-order.ts)
@@ -62,6 +72,8 @@ enum CallRule {
   ARRIVAL
   /// Bác sĩ chọn đích danh
   MANUAL
+  /// Quay lại đọc kết quả cận lâm sàng (ưu tiên trước mọi người)
+  RESULTS
 }
 
 enum PrescriptionStatus {
@@ -226,6 +238,12 @@ model Visit {
   checkinOverride Boolean     @default(false)
   calledAt      DateTime?
   callRule      CallRule?
+  /// Cách nhận kết quả cận lâm sàng; null = chưa gửi đi làm cận lâm sàng
+  resultMode     ResultMode?
+  /// Lúc bác sĩ gửi đi làm cận lâm sàng
+  sentForTestsAt DateTime?
+  /// Lúc có kết quả và bệnh nhân vào lại hàng chờ (chế độ quay lại)
+  resultsReadyAt DateTime?
   createdAt     DateTime      @default(now())
 
   patient       Patient        @relation(fields: [patientId], references: [id])
@@ -233,6 +251,7 @@ model Visit {
   appointment   Appointment?   @relation(fields: [appointmentId], references: [id])
   medicalRecord MedicalRecord?
   prescriptions Prescription[]
+  labOrders     LabOrder[]
 
   @@unique([doctorId, date, source, queueNumber])
   @@index([patientId, date])
@@ -289,6 +308,41 @@ model MedicalRecord {
   updatedAt DateTime @updatedAt
 
   visit Visit @relation(fields: [visitId], references: [id])
+}
+
+/// Một chỉ định cận lâm sàng (X-quang, siêu âm, xét nghiệm…). Bác sĩ phụ trách ghi kết quả và tải tệp lên.
+model LabOrder {
+  id         String    @id @default(uuid())
+  visitId    String
+  /// Tên chỉ định, ví dụ "X-quang ngực thẳng"
+  name       String
+  /// Ghi chú kèm chỉ định (vị trí, yêu cầu)
+  note       String?
+  /// Mô tả và kết luận kết quả
+  resultText String?
+  /// Lúc bác sĩ trả kết quả; null = chưa có kết quả
+  doneAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  visit Visit     @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  files LabFile[]
+
+  @@index([visitId])
+}
+
+/// Tệp kết quả (ảnh chụp phim, phiếu kết quả PDF). Tách bảng để danh sách không phải đọc dữ liệu tệp.
+model LabFile {
+  id         String   @id @default(uuid())
+  labOrderId String
+  fileName   String
+  mimeType   String
+  size       Int
+  data       Bytes
+  createdAt  DateTime @default(now())
+
+  labOrder LabOrder @relation(fields: [labOrderId], references: [id], onDelete: Cascade)
+
+  @@index([labOrderId])
 }
 
 /// Danh mục thuốc do admin quản lý

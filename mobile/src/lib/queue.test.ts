@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { standingNotice, waitHint } from './queue';
 
-const pos = (over: { status?: 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'LEFT'; source?: 'ONLINE' | 'WALK_IN'; appointmentAt?: string | null; peopleAhead?: number; due?: boolean }) => ({
+const pos = (over: {
+  status?: 'WAITING' | 'IN_PROGRESS' | 'AWAITING_RESULTS' | 'DONE' | 'LEFT';
+  source?: 'ONLINE' | 'WALK_IN';
+  appointmentAt?: string | null;
+  peopleAhead?: number;
+  due?: boolean;
+  resultMode?: 'RETURN' | 'ONLINE' | null;
+  resultsReadyAt?: string | null;
+}) => ({
   peopleAhead: over.peopleAhead ?? 3,
   due: over.due ?? false,
   estimatedCallAt: '2026-11-09T01:22:00.000Z',
-  visit: { status: over.status ?? 'WAITING', source: over.source ?? 'WALK_IN', appointmentAt: over.appointmentAt ?? null },
+  visit: {
+    status: over.status ?? 'WAITING',
+    source: over.source ?? 'WALK_IN',
+    appointmentAt: over.appointmentAt ?? null,
+    resultMode: over.resultMode ?? null,
+    resultsReadyAt: over.resultsReadyAt ?? null,
+  },
 });
 
 describe('câu nhắc trên phiếu số', () => {
@@ -26,6 +40,17 @@ describe('câu nhắc trên phiếu số', () => {
   });
   it('là người tiếp theo', () => expect(waitHint(pos({ peopleAhead: 0 })).text).toMatch(/người tiếp theo/));
   it('đến lượt', () => expect(waitHint(pos({ status: 'IN_PROGRESS' })).text).toMatch(/mời vào phòng khám/));
+  it('đi làm cận lâm sàng rồi quay lại: giữ số, có kết quả được gọi trước', () => {
+    const h = waitHint(pos({ status: 'AWAITING_RESULTS', resultMode: 'RETURN' }));
+    expect(h.text).toMatch(/quay lại khu chờ và giữ nguyên số/);
+    expect(h.note).toMatch(/gọi vào trước/);
+    expect(waitHint(pos({ status: 'WAITING', resultsReadyAt: '2026-11-09T02:00:00.000Z' })).text).toMatch(/Đã có kết quả cận lâm sàng/);
+  });
+  it('nhận kết quả online: được ra về, xem trong Lịch sử', () => {
+    const h = waitHint(pos({ status: 'AWAITING_RESULTS', resultMode: 'ONLINE' }));
+    expect(h.text).toMatch(/ra về/);
+    expect(h.note).toMatch(/tab Lịch sử/);
+  });
   it('đã khám xong thì nhắc xem đơn thuốc', () => expect(waitHint(pos({ status: 'DONE' })).text).toMatch(/đơn thuốc/));
 });
 

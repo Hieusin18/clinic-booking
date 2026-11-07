@@ -14,6 +14,9 @@ export const formatDay = (iso: string) =>
 /** "YYYY-MM-DD" hôm nay theo giờ Việt Nam. */
 export const todayYmd = (at = new Date()) => at.toLocaleDateString('en-CA', { timeZone: TZ });
 
+/** Cột @db.Date ("YYYY-MM-DDT00:00:00.000Z") có phải hôm nay theo giờ Việt Nam không. */
+export const isToday = (isoDate: string, at = new Date()) => isoDate.slice(0, 10) === todayYmd(at);
+
 /** Tuổi tính từ ngày sinh (cột @db.Date). */
 export function age(dateOfBirth: string, now = new Date()) {
   const dob = new Date(dateOfBirth);

@@ -33,7 +33,12 @@ export const visitView = {
   checkinOverride: true,
   calledAt: true,
   callRule: true,
+  resultMode: true,
+  sentForTestsAt: true,
+  resultsReadyAt: true,
   createdAt: true,
+  /** Tên các chỉ định cận lâm sàng và đã có kết quả chưa (không kèm nội dung kết quả) */
+  labOrders: { select: { id: true, name: true, doneAt: true }, orderBy: { createdAt: 'asc' } },
   patient: { select: { id: true, fullName: true, phone: true, dateOfBirth: true, gender: true, allergies: true } },
   doctor: { select: { id: true, title: true, user: { select: { fullName: true } }, specialty: { select: { id: true, name: true } } } },
 } satisfies Prisma.VisitSelect;
@@ -209,7 +214,7 @@ export class QueueService {
     return this.call(doctorId, now, async (tx, date) => {
       const waiting = await tx.visit.findMany({
         where: { doctorId, date, status: 'WAITING' },
-        select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true },
+        select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true, resultsReadyAt: true },
       });
       const pick = pickNext(waiting, await this.streak(tx, doctorId, date), now, this.rules);
       if (!pick) throw new NotFoundException('Không còn bệnh nhân nào đang chờ');
@@ -268,7 +273,7 @@ export class QueueService {
     const visit = await this.prisma.visit.findUnique({ where: { id: visitId } });
     if (!visit || (doctorId && visit.doctorId !== doctorId)) throw new NotFoundException('Không tìm thấy phiếu khám');
     const { count } = await this.prisma.visit.updateMany({
-      where: { id: visitId, status: { in: ['WAITING', 'IN_PROGRESS'] } },
+      where: { id: visitId, status: { in: ['WAITING', 'IN_PROGRESS', 'AWAITING_RESULTS'] } },
       data: { status: 'LEFT' },
     });
     if (count === 0) throw new ConflictException('Phiếu khám đã kết thúc');
@@ -288,13 +293,13 @@ export class QueueService {
 
     const sameDay = await this.prisma.visit.findMany({
       where: { doctorId: visit.doctor.id, date: visit.date, status: { in: ['WAITING', 'IN_PROGRESS'] } },
-      select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true, status: true, calledAt: true, callRule: true },
+      select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true, resultsReadyAt: true, status: true, calledAt: true, callRule: true },
     });
     const called = await this.prisma.visit.findMany({
       where: { doctorId: visit.doctor.id, date: visit.date, calledAt: { not: null }, status: { notIn: ['WAITING', 'IN_PROGRESS'] } },
       orderBy: { calledAt: 'desc' },
       take: 50,
-      select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true, status: true, calledAt: true, callRule: true },
+      select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true, resultsReadyAt: true, status: true, calledAt: true, callRule: true },
     });
     const { predicted, current } = this.forecast([...sameDay, ...called], now);
     const mine = predicted.find((p) => p.entry.id === visit.id);

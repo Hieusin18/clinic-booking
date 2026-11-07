@@ -16,6 +16,7 @@ import {
   BorderStyle,
   Document,
   Footer,
+  ImageRun,
   Packer,
   PageBreak,
   Paragraph,
@@ -105,6 +106,14 @@ export type ExportVisit = {
     treatment: string | null;
     followUpDate: Date | null;
   };
+  /** Chỉ định cận lâm sàng; kết quả và tệp chỉ có khi được phép xem */
+  labOrders?: {
+    name: string;
+    note: string | null;
+    resultText: string | null;
+    doneAt: Date | null;
+    files: { fileName: string; mimeType: string; data: Uint8Array }[];
+  }[];
   prescription: {
     id: string;
     code: string | null;
@@ -164,6 +173,31 @@ export function medicineLabel(m: { name: string; activeIngredient: string | null
 
 const withIcd = (text: string, codes: string | null) => (codes ? `${text} (${codes})` : text);
 
+/** Kích thước ảnh (điểm ảnh) đọc từ phần đầu tệp PNG/JPEG; không đọc được thì trả null. */
+export function imageSize(buf: Uint8Array): { width: number; height: number } | null {
+  const b = Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (b.length >= 24 && b.readUInt32BE(0) === 0x89504e47) return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
+  let i = 2;
+  while (i + 9 < b.length) {
+    if (b[i] !== 0xff) return null;
+    const marker = b[i + 1];
+    const len = b.readUInt16BE(i + 2);
+    // SOF0..SOF15 trừ DHT (C4), JPG (C8), DAC (CC): chứa chiều cao, chiều rộng
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      return { height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7) };
+    }
+    i += 2 + len;
+  }
+  return null;
+}
+
+/** Thu nhỏ vào khung tối đa, giữ tỉ lệ. */
+const fitBox = (w: number, h: number, maxW: number, maxH: number) => {
+  const k = Math.min(1, maxW / w, maxH / h);
+  return { width: Math.round(w * k), height: Math.round(h * k) };
+};
+
 // ---------- Mô hình in dùng chung ----------
 
 /** Một ô "nhãn: giá trị". Giá trị rỗng in thành dòng chấm như mẫu giấy. */
@@ -173,7 +207,9 @@ type Block =
   | { kind: 'fields'; fields: Field[] } // nhiều ô cùng một dòng
   | { kind: 'text'; text: string; italic?: boolean; bold?: boolean; indent?: boolean }
   | { kind: 'grid'; cells: Field[]; columns: number } // bảng dấu hiệu sinh tồn
-  | { kind: 'medicine'; index: number; name: string; quantity: string; usage: string };
+  | { kind: 'medicine'; index: number; name: string; quantity: string; usage: string }
+  /** Ảnh kết quả cận lâm sàng; width/height là kích thước gốc (điểm ảnh) */
+  | { kind: 'image'; data: Uint8Array; mimeType: 'image/jpeg' | 'image/png'; width: number; height: number; caption: string };
 
 type Page = {
   headerLeft: string[];
@@ -198,6 +234,7 @@ export function buildPrintDoc(v: ExportVisit, now = new Date()) {
   const headerLeft = [clinic.name.toUpperCase(), clinic.address, clinic.phone && `Điện thoại: ${clinic.phone}`].filter(Boolean) as string[];
   const exported = `Bản điện tử xuất từ hệ thống đặt lịch khám lúc ${dateTime(now)}. Mã tra cứu: ${v.id}`;
 
+  const labDone = (v.labOrders ?? []).filter((o) => o.doneAt);
   const bmi = r.weight && r.height ? num(r.weight / (r.height / 100) ** 2) : null;
   const unit = (n: number | null, u: string) => (n == null ? null : `${num(n)} ${u}`);
   const icdText = (code: string | null) => (code ? `${code}${icdName(code) && icdName(code) !== r.diagnosis ? ` – ${icdName(code)}` : ''}` : null);
@@ -262,7 +299,15 @@ export function buildPrintDoc(v: ExportVisit, now = new Date()) {
       { kind: 'fields', fields: [{ label: '1. Toàn thân', value: r.generalExam }] },
       { kind: 'fields', fields: [{ label: '2. Các bộ phận', value: r.organExam }] },
       { kind: 'fields', fields: [{ label: '3. Tóm tắt kết quả cận lâm sàng', value: r.labSummary }] },
-      { kind: 'fields', fields: [{ label: '4. Chỉ định cận lâm sàng', value: r.orders }] },
+      {
+        kind: 'fields',
+        fields: [
+          {
+            label: '4. Chỉ định cận lâm sàng',
+            value: v.labOrders?.length ? `${v.labOrders.map((o) => o.name).join('; ')}${labDone.length ? ' (kết quả ở phiếu kết quả cận lâm sàng)' : ''}` : r.orders,
+          },
+        ],
+      },
 
       { kind: 'heading', text: 'V. CHẨN ĐOÁN' },
       { kind: 'fields', fields: [{ label: '1. Bệnh chính', value: r.diagnosis, bold: true }, { label: 'Mã ICD-10', value: icdText(r.icdCode) }] },
@@ -287,6 +332,7 @@ export function buildPrintDoc(v: ExportVisit, now = new Date()) {
   };
 
   const pages = [record];
+  if (labDone.length) pages.push(labPage(v, labDone, { headerLeft, recordNo, doctorName }));
   const rx = v.prescription;
   if (rx) {
     const blocks: Block[] = [
@@ -331,6 +377,46 @@ export function buildPrintDoc(v: ExportVisit, now = new Date()) {
   return { pages, footer: exported, fileName: `benh-an-${recordNo}` };
 }
 
+/** Phiếu kết quả cận lâm sàng: mỗi chỉ định gồm mô tả, kết luận và ảnh; tệp PDF ghi tên để tra trên hệ thống. */
+function labPage(
+  v: ExportVisit,
+  done: NonNullable<ExportVisit['labOrders']>,
+  ctx: { headerLeft: string[]; recordNo: string; doctorName: string },
+): Page {
+  const p = v.patient;
+  const blocks: Block[] = [
+    { kind: 'fields', fields: [{ label: 'Họ tên', value: p.fullName.toUpperCase(), bold: true }] },
+    { kind: 'fields', fields: [{ label: 'Ngày sinh', value: day(p.dateOfBirth) }, { label: 'Giới tính', value: GENDER[p.gender] }] },
+    { kind: 'fields', fields: [{ label: 'Chẩn đoán', value: withIcd(v.medicalRecord.diagnosis, v.medicalRecord.icdCode) }] },
+  ];
+  done.forEach((o, i) => {
+    blocks.push({ kind: 'heading', text: `${i + 1}. ${o.name.toUpperCase()}` });
+    if (o.note) blocks.push({ kind: 'fields', fields: [{ label: 'Yêu cầu', value: o.note }] });
+    blocks.push({ kind: 'fields', fields: [{ label: 'Kết quả', value: o.resultText }] });
+    const images = o.files.filter((f) => f.mimeType === 'image/jpeg' || f.mimeType === 'image/png');
+    images.forEach((f, k) => {
+      const size = imageSize(f.data);
+      if (size) {
+        blocks.push({ kind: 'image', data: f.data, mimeType: f.mimeType as 'image/jpeg' | 'image/png', ...size, caption: `Hình ${i + 1}.${k + 1}: ${f.fileName}` });
+      }
+    });
+    const others = o.files.filter((f) => !images.includes(f) || !imageSize(f.data));
+    if (others.length) {
+      blocks.push({ kind: 'text', text: `Tệp đính kèm (xem trên hệ thống): ${others.map((f) => f.fileName).join(', ')}`, italic: true });
+    }
+  });
+  const last = done.reduce((m, o) => (o.doneAt! > m ? o.doneAt! : m), done[0].doneAt!);
+  return {
+    headerLeft: ctx.headerLeft,
+    headerRight: [`Số bệnh án: ${ctx.recordNo}`],
+    title: 'PHIẾU KẾT QUẢ CẬN LÂM SÀNG',
+    blocks,
+    sign: { date: signDate(last), role: 'BÁC SĨ ĐỌC KẾT QUẢ', name: ctx.doctorName },
+  };
+}
+
+const dataUrl = (mime: string, data: Uint8Array) => `data:${mime};base64,${Buffer.from(data).toString('base64')}`;
+
 // ---------- PDF ----------
 
 const fieldText = (f: Field) => [
@@ -354,6 +440,18 @@ function pdfBlock(b: Block): Content {
         rows.push(b.cells.slice(i, i + b.columns).map((f) => ({ text: fieldText(f), fontSize: 11 })));
       }
       return { table: { widths: Array(b.columns).fill('*'), body: rows }, layout: 'lightHorizontalLines', margin: [0, 2, 0, 4] };
+    }
+    case 'image': {
+      // Vùng nội dung A4 rộng khoảng 497 pt
+      const box = fitBox(b.width, b.height, 420, 300);
+      return {
+        margin: [0, 4, 0, 4],
+        unbreakable: true,
+        stack: [
+          { image: dataUrl(b.mimeType, b.data), width: box.width, height: box.height, alignment: 'center' },
+          { text: b.caption, italics: true, fontSize: 9.5, alignment: 'center', margin: [0, 2, 0, 0] },
+        ],
+      };
     }
     case 'medicine':
       return {
@@ -460,6 +558,18 @@ function docxBlock(b: Block): (Paragraph | Table)[] {
       }
       return [new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }), para([], { after: 40 })];
     }
+    case 'image': {
+      const box = fitBox(b.width, b.height, 520, 380);
+      return [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          keepNext: true,
+          spacing: { before: 80, after: 20 },
+          children: [new ImageRun({ type: b.mimeType === 'image/png' ? 'png' : 'jpg', data: b.data, transformation: box, altText: { name: b.caption, description: b.caption, title: b.caption } })],
+        }),
+        para([run(b.caption, { italics: true, size: 9.5 })], { align: AlignmentType.CENTER, after: 80 }),
+      ];
+    }
     case 'medicine':
       return [
         para([run(`${b.index}. ${b.name}`, { bold: true }), tab(), run(b.quantity, { bold: true })], { before: 60, rightTab: true, keepNext: true }),
@@ -550,6 +660,8 @@ function htmlBlock(b: Block): string {
       }
       return `<table class="grid">${rows.join('')}</table>`;
     }
+    case 'image':
+      return `<figure><img src="${dataUrl(b.mimeType, b.data)}" alt="${esc(b.caption)}"><figcaption>${esc(b.caption)}</figcaption></figure>`;
     case 'medicine':
       return `<div class="med"><div class="row b"><div>${b.index}. ${esc(b.name)}</div><div class="r">${esc(b.quantity)}</div></div><p class="i ind">${esc(b.usage)}</p></div>`;
   }
@@ -590,6 +702,7 @@ export function renderHtml(doc: ReturnType<typeof buildPrintDoc>): string {
   .row { display: flex; gap: 1.867em; margin: .133em 0; } .row > div:last-child { flex: 1; }
   .grid { width: 100%; border-collapse: collapse; margin: .267em 0 .4em; font-size: .933em; }
   .grid td { border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: .2em .267em; }
+  figure { margin: .4em 0; text-align: center; } figure img { max-width: 28em; max-height: 20em; } figcaption { font-style: italic; font-size: .8em; }
   .med { margin: .267em 0; } .med .row > div:last-child { flex: 0 0 auto; }
   .sign { width: 20em; margin: .933em 0 0 auto; text-align: center; } .sign .name { margin-top: 3.733em; }
   .b { font-weight: bold; } .i { font-style: italic; } .r { text-align: right; } .ind { padding-left: 1.067em; } .small { font-size: .867em; }

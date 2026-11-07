@@ -11,10 +11,11 @@ const patient = { id: 'p1', fullName: 'Vũ Thị Khám', phone: '0902222222', da
 const doctor = { id: 'd1', title: 'BS', user: { fullName: 'An' } };
 const visit = (status: string, extra = {}) => ({ id: 'v1', date: '2026-11-02T00:00:00.000Z', queueNumber: 4, source: 'WALK_IN', checkinMethod: 'RECEPTION', status, reason: 'Đau đầu', appointmentId: null, createdAt: '2026-11-02T01:00:00.000Z', patient, doctor, ...extra });
 
-function mockApi(queue: unknown[], detail?: unknown) {
+function mockApi(queue: unknown[], detail?: unknown, awaiting: unknown[] = []) {
   return vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
     if (url === '/queue/doctor') return { data: queue };
-    if (url === '/visits/v1') return { data: detail };
+    if (url === '/lab/awaiting-visits') return { data: awaiting };
+    if (url === '/visits/v1') return { data: detail && { labOrders: [], ...(detail as object) } };
     if (url === '/visits/history') return { data: [] };
     if (url === '/icd10') return { data: [{ code: 'G43.9', name: 'Migraine, không đặc hiệu' }] };
     return { data: { items: [], total: 0, page: 1, pageSize: 20 } };
@@ -103,7 +104,7 @@ describe('Xem trước bản điện tử', () => {
 
   it('mở bản xem trước ngay trên trang, tải được từ hộp xem trước', async () => {
     const record = { id: 'r1', symptoms: 'Đau đầu', diagnosis: 'Migraine', icdCode: 'G43.9', followUpDate: null };
-    const detail = { ...visit('IN_PROGRESS'), medicalRecord: record, prescriptions: [], prescription: null };
+    const detail = { ...visit('IN_PROGRESS'), medicalRecord: record, prescriptions: [], prescription: null, labOrders: [] };
     const get = vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
       if (url === '/queue/doctor') return { data: [visit('IN_PROGRESS')] };
       if (url === '/visits/v1') return { data: detail };

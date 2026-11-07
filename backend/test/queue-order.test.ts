@@ -80,6 +80,20 @@ describe('thứ tự gọi số', () => {
     expect(pickNext(waiting, 0, at('08:20'), rules)?.entry.name).toBe('Lan');
   });
 
+  it('người quay lại với kết quả cận lâm sàng được gọi trước cả người đặt lịch đến giờ', () => {
+    const lan = { ...booked('Lan', '08:00', '08:15') };
+    const hung = { ...walkIn('Hùng', '07:50'), resultsReadyAt: at('08:40') };
+    const mai = { ...walkIn('Mai', '07:55'), resultsReadyAt: at('08:30') };
+    const pick = pickNext([lan, hung, mai], 3, at('08:45'), rules)!;
+    // Mai có kết quả trước Hùng; bước nhường vãng lai (streak = 3) cũng đứng sau
+    expect([pick.entry.name, pick.rule]).toEqual(['Mai', 'RESULTS']);
+    // Đọc kết quả không làm đổi chuỗi ưu tiên
+    expect(nextStreak(3, 'RESULTS')).toBe(3);
+    expect(currentStreak(['RESULTS', 'APPOINTMENT', 'APPOINTMENT'])).toBe(2);
+    const order = predictOrder([lan, hung, mai], 0, at('08:45'), rules).map((p) => p.entry.name);
+    expect(order).toEqual(['Mai', 'Hùng', 'Lan']);
+  });
+
   it('hàng chờ trống thì không gọi ai', () => expect(pickNext([], 0, at('08:00'), rules)).toBeNull());
 
   it('đếm lượt ưu tiên liên tiếp: bỏ qua lượt gọi đích danh, dừng ở lượt gọi khác', () => {
