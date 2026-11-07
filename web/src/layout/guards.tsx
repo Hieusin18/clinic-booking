@@ -1,4 +1,4 @@
-import { Result, Spin } from 'antd';
+import { Button, Flex, Result, Spin } from 'antd';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { HOME_BY_ROLE, useAuth } from '../lib/auth';
@@ -16,12 +16,33 @@ export function RequireRole({ roles, children }: { roles: Role[]; children: Reac
   return <>{children}</>;
 }
 
+/** Tài khoản bệnh nhân đăng nhập vào trang quản lý: hướng dẫn dùng app, cho đăng xuất để đổi tài khoản. */
 export function PatientOnly() {
+  const { logout } = useAuth();
   return (
-    <Result
-      status="info"
-      title="Trang quản lý dành cho nhân viên phòng khám"
-      subTitle="Bệnh nhân vui lòng dùng ứng dụng trên điện thoại để đặt lịch và lấy số."
-    />
+    <Flex align="center" justify="center" style={{ minHeight: '100vh', padding: 16 }}>
+      <Result
+        status="info"
+        title="Trang quản lý dành cho nhân viên phòng khám"
+        subTitle="Bệnh nhân vui lòng dùng ứng dụng trên điện thoại để đặt lịch và lấy số."
+        extra={
+          <Button type="primary" onClick={logout}>
+            Đăng xuất, dùng tài khoản khác
+          </Button>
+        }
+      />
+    </Flex>
   );
+}
+
+/**
+ * Trang chủ của tài khoản bệnh nhân (/patient-only). Trước đây đường dẫn này không có trong bảng định tuyến
+ * nên bị chuyển về "/" rồi lại về đây, lặp vô hạn và trang trắng.
+ */
+export function PatientOnlyPage() {
+  const { user, loading } = useAuth();
+  if (loading) return <Spin size="large" fullscreen />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'PATIENT') return <Navigate to={HOME_BY_ROLE[user.role]} replace />;
+  return <PatientOnly />;
 }

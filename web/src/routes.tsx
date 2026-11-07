@@ -11,7 +11,7 @@ import { QueueBoardPage } from './features/reception/QueueBoardPage';
 import { ReceptionPage } from './features/reception/ReceptionPage';
 import { SchedulePage } from './features/schedule/SchedulePage';
 import { AppLayout } from './layout/AppLayout';
-import { RequireRole } from './layout/guards';
+import { PatientOnlyPage, RequireRole } from './layout/guards';
 import { HOME_BY_ROLE, useAuth } from './lib/auth';
 
 function Home() {
@@ -27,10 +27,12 @@ function Home() {
  * - Tiếp đón và hàng đợi: /reception, /reception/queue, /counter
  * - Khám bệnh: /doctor/queue
  * - Hồ sơ của tôi: /doctor/profile
+ * - Tài khoản bệnh nhân lỡ đăng nhập trang quản lý: /patient-only
  */
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/patient-only', element: <PatientOnlyPage /> },
   {
     path: '/counter',
     element: (
