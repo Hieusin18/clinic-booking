@@ -10,12 +10,15 @@ import {
   ApartmentOutlined,
   IdcardOutlined,
 } from '@ant-design/icons';
+import { useQuery } from '@tanstack/react-query';
 import { Avatar, Button, Flex, Layout, Menu, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
+import { avatarUrl } from '../features/doctor-profile/profileForm';
+import { api } from '../lib/api';
 import { ROLE_LABEL, useAuth } from '../lib/auth';
-import type { Role } from '../lib/types';
+import type { Doctor, Role } from '../lib/types';
 import { C } from '../lib/theme';
 import { PatientOnly } from './guards';
 import { Logo } from './Logo';
@@ -47,6 +50,14 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // Bác sĩ có ảnh đại diện thì hiện ảnh ở góc phải; dùng chung cache với trang "Hồ sơ của tôi"
+  // nên đổi ảnh xong là cập nhật ngay
+  const me = useQuery({
+    queryKey: ['doctor', 'me'],
+    enabled: user?.role === 'DOCTOR',
+    queryFn: async () => (await api.get<Doctor>('/doctors/me')).data,
+    staleTime: 5 * 60_000,
+  });
   // Đăng xuất hoặc token hết hạn (401) → về trang đăng nhập, không để trang trắng
   if (!user) return <Navigate to="/login" replace state={{ from: pathname }} />;
   if (user.role === 'PATIENT') return <PatientOnly />;
@@ -76,7 +87,9 @@ export function AppLayout() {
       <Layout>
         <Layout.Header style={{ background: '#fff', padding: '0 24px', borderBottom: `1px solid ${C.line}` }}>
           <Flex justify="flex-end" align="center" gap={12} style={{ height: '100%' }}>
-            <Avatar style={{ background: C.ink }}>{user.fullName.trim().split(' ').pop()?.[0]?.toUpperCase()}</Avatar>
+            <Avatar src={me.data ? avatarUrl(me.data) : undefined} alt={me.data ? `Ảnh ${user.fullName}` : undefined} style={{ background: C.ink }}>
+              {user.fullName.trim().split(' ').pop()?.[0]?.toUpperCase()}
+            </Avatar>
             <Typography.Text>{user.fullName}</Typography.Text>
             <Button icon={<LogoutOutlined />} onClick={logout}>Đăng xuất</Button>
           </Flex>
