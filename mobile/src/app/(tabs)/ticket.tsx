@@ -29,7 +29,8 @@ function TicketCard({ visitId }: { visitId: string }) {
   const { visit, label, currentLabel, peopleAhead, estimatedCallAt, due } = pos.data;
   const hint = waitHint(pos.data);
   const st = VISIT_STATUS[visit.status];
-  const active = visit.status === 'WAITING' || visit.status === 'IN_PROGRESS';
+  const active = visit.status === 'WAITING' || visit.status === 'IN_PROGRESS' || visit.status === 'AWAITING_RESULTS';
+  const testing = visit.status === 'AWAITING_RESULTS';
   const online = visit.source === 'ONLINE';
 
   return (
@@ -53,13 +54,32 @@ function TicketCard({ visitId }: { visitId: string }) {
         >
           {label}
         </Text>
-        {visit.status === 'IN_PROGRESS' ? (
-          <Badge label="Mời vào phòng khám" tone="success" />
-        ) : active && due ? (
-          <Badge label="Đến giờ hẹn · đang được ưu tiên" tone="primary" />
-        ) : null}
+        <View style={{ alignSelf: 'center' }}>
+          {visit.status === 'IN_PROGRESS' ? (
+            <Badge label="Mời vào phòng khám" tone="success" />
+          ) : testing ? (
+            <Badge label={visit.resultMode === 'ONLINE' ? 'Đi làm cận lâm sàng · nhận kết quả online' : 'Đi làm cận lâm sàng'} tone="primary" />
+          ) : visit.status === 'WAITING' && visit.resultsReadyAt ? (
+            <Badge label="Có kết quả · được gọi trước" tone="success" />
+          ) : active && due ? (
+            <Badge label="Đến giờ hẹn · đang được ưu tiên" tone="primary" />
+          ) : null}
+        </View>
       </View>
-      {active ? (
+      {testing && visit.labOrders?.length ? (
+        <>
+          <Perforation />
+          <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.stamp, letterSpacing: 0.3 }}>CHỈ ĐỊNH CẦN LÀM</Text>
+            {visit.labOrders.map((o) => (
+              <View key={o.id} style={[styles.row, { justifyContent: 'space-between', gap: 8 }]}>
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: colors.text }}>{o.name}</Text>
+                <Badge label={o.doneAt ? 'Đã có kết quả' : 'Chờ kết quả'} tone={o.doneAt ? 'success' : 'neutral'} />
+              </View>
+            ))}
+          </View>
+        </>
+      ) : active && !testing ? (
         <>
           <Perforation />
           <View style={{ flexDirection: 'row', paddingHorizontal: 8, paddingBottom: 14 }}>
@@ -86,7 +106,7 @@ export default function Ticket() {
     refetchInterval: 30_000,
   });
   const visits = mine.data ?? [];
-  const hasActive = visits.some((v) => v.status === 'WAITING' || v.status === 'IN_PROGRESS');
+  const hasActive = visits.some((v) => v.status === 'WAITING' || v.status === 'IN_PROGRESS' || v.status === 'AWAITING_RESULTS');
 
   return (
     <Screen

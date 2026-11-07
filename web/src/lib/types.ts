@@ -2,7 +2,9 @@
 
 export type Role = 'PATIENT' | 'RECEPTIONIST' | 'DOCTOR' | 'ADMIN';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
-export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'LEFT';
+export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'AWAITING_RESULTS' | 'DONE' | 'LEFT';
+/** Cách nhận kết quả cận lâm sàng: quay lại phòng khám hoặc nhận online */
+export type ResultMode = 'RETURN' | 'ONLINE';
 export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 
 export interface Page<T> {
@@ -129,10 +131,16 @@ export interface Visit {
   estimatedCallAt?: string | null;
   /** Người đặt lịch đã đến giờ hẹn, được ưu tiên */
   due?: boolean;
+  /** Cận lâm sàng: cách nhận kết quả (null = chưa gửi đi), lúc gửi đi, lúc quay lại hàng chờ với kết quả */
+  resultMode?: ResultMode | null;
+  sentForTestsAt?: string | null;
+  resultsReadyAt?: string | null;
+  /** Tên các chỉ định cận lâm sàng và đã có kết quả chưa */
+  labOrders?: { id: string; name: string; doneAt: string | null }[];
 }
 
 /** Bác sĩ gọi lượt này theo quy tắc nào */
-export type CallRule = 'FAIRNESS' | 'APPOINTMENT' | 'ARRIVAL' | 'MANUAL';
+export type CallRule = 'FAIRNESS' | 'APPOINTMENT' | 'ARRIVAL' | 'MANUAL' | 'RESULTS';
 
 export interface Appointment {
   id: string;
@@ -199,8 +207,31 @@ export interface Prescription {
   items: PrescriptionItem[];
 }
 
-export interface VisitDetail extends Visit {
+/** Tệp kết quả; `url` (tương đối với API) có chữ ký, hết hạn sau 1 giờ */
+export interface LabFile {
+  id: string;
+  fileName: string;
+  mimeType: 'image/jpeg' | 'image/png' | 'application/pdf';
+  size: number;
+  createdAt: string;
+  url: string;
+}
+
+/** Một chỉ định cận lâm sàng và kết quả */
+export interface LabOrder {
+  id: string;
+  name: string;
+  note: string | null;
+  resultText: string | null;
+  /** Lúc trả kết quả; null = chưa có kết quả */
+  doneAt: string | null;
+  createdAt: string;
+  files: LabFile[];
+}
+
+export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   medicalRecord: MedicalRecord | null;
   prescriptions?: Prescription[];
   prescription: Prescription | null;
+  labOrders: LabOrder[];
 }

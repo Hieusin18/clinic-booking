@@ -242,18 +242,15 @@ export function RecordCard({ visitId, visitDate, reason, record }: { visitId: st
         <Form.Item label="Các bộ phận" name="organExam">
           <Input.TextArea rows={2} placeholder="Tim, phổi, bụng, tai mũi họng…" />
         </Form.Item>
-        <Row gutter={12}>
-          <Col xs={24} md={12}>
-            <Form.Item label="Chỉ định cận lâm sàng" name="orders">
-              <Input.TextArea rows={2} placeholder="Xét nghiệm, chẩn đoán hình ảnh…" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item label="Tóm tắt kết quả cận lâm sàng" name="labSummary">
-              <Input.TextArea rows={2} />
-            </Form.Item>
-          </Col>
-        </Row>
+        {/* Chỉ định cận lâm sàng nay ở thẻ "Cận lâm sàng"; ghi chú chỉ định của bệnh án cũ vẫn hiện để tham khảo */}
+        {record?.orders && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+            Ghi chú chỉ định (bệnh án cũ): {record.orders}
+          </Typography.Paragraph>
+        )}
+        <Form.Item label="Tóm tắt kết quả cận lâm sàng" name="labSummary" extra="Kết quả chi tiết và ảnh ghi ở thẻ Cận lâm sàng bên dưới">
+          <Input.TextArea rows={2} placeholder="Ví dụ: X-quang có đám mờ thùy dưới phổi phải" />
+        </Form.Item>
 
         <Section>Chẩn đoán</Section>
         <Row gutter={12}>

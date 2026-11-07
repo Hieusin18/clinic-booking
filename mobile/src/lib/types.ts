@@ -2,7 +2,9 @@
 
 export type Role = 'PATIENT' | 'RECEPTIONIST' | 'DOCTOR' | 'ADMIN';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
-export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'LEFT';
+export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'AWAITING_RESULTS' | 'DONE' | 'LEFT';
+/** Cách nhận kết quả cận lâm sàng: quay lại phòng khám hoặc nhận online */
+export type ResultMode = 'RETURN' | 'ONLINE';
 export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 
 export interface Page<T> {
@@ -125,6 +127,11 @@ export interface Visit {
   appointmentId: string | null;
   /** Giờ hẹn (lượt đặt online) */
   appointmentAt?: string | null;
+  /** Cận lâm sàng: cách nhận kết quả (null = chưa gửi đi), lúc quay lại hàng chờ với kết quả */
+  resultMode?: ResultMode | null;
+  resultsReadyAt?: string | null;
+  /** Tên các chỉ định cận lâm sàng và đã có kết quả chưa */
+  labOrders?: { id: string; name: string; doneAt: string | null }[];
   createdAt: string;
   patient: { id: string; fullName: string; phone: string; dateOfBirth: string; gender: Gender; allergies: string | null };
   doctor: DoctorRef;
@@ -215,8 +222,28 @@ export interface Prescription {
   items: PrescriptionItem[];
 }
 
-export interface VisitDetail extends Visit {
+/** Tệp kết quả cận lâm sàng; `url` (tương đối với API) có chữ ký, hết hạn sau 1 giờ */
+export interface LabFile {
+  id: string;
+  fileName: string;
+  mimeType: 'image/jpeg' | 'image/png' | 'application/pdf';
+  size: number;
+  url: string;
+}
+
+/** Chỉ định cận lâm sàng; kết quả và tệp chỉ có khi bác sĩ đã hoàn tất lượt khám */
+export interface LabOrder {
+  id: string;
+  name: string;
+  note: string | null;
+  resultText: string | null;
+  doneAt: string | null;
+  files: LabFile[];
+}
+
+export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   medicalRecord: MedicalRecord | null;
   prescriptions?: Prescription[];
   prescription: Prescription | null;
+  labOrders?: LabOrder[];
 }

@@ -13,7 +13,9 @@ import {
   Input,
   InputNumber,
   List,
+  Modal,
   Popconfirm,
+  Radio,
   Row,
   Space,
   Tag,
@@ -22,11 +24,12 @@ import {
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { C } from '../../lib/theme';
-import { age, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
+import { age, formatDay, formatTime, GENDER_LABEL, isToday, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
-import type { Prescription, Visit, VisitDetail } from '../../lib/types';
+import type { Prescription, ResultMode, Visit, VisitDetail } from '../../lib/types';
 import { arrivalTag, byCallOrder, VISIT_STATUS } from '../reception/visitStatus';
 import { MedicineSelect, medicineLabel } from './MedicineSelect';
+import { LabCard } from './LabCard';
 import { ExportButtons, RecordCard } from './RecordCard';
 
 type ItemForm = { medicineId: string; quantity: number; dosePerTime: string; timesPerDay: number; days: number; note?: string };
@@ -43,7 +46,13 @@ export function ExamPage() {
     queryFn: async () => (await api.get<Visit[]>('/queue/doctor')).data,
     refetchInterval: 15_000,
   });
-  const list = [...(queue.data ?? [])].sort(byCallOrder);
+  // Người đang làm cận lâm sàng hiện ở thẻ riêng bên dưới (gồm cả các ngày trước)
+  const list = [...(queue.data ?? [])].filter((v) => v.status !== 'AWAITING_RESULTS').sort(byCallOrder);
+  const awaiting = useQuery({
+    queryKey: ['queue', 'awaiting'],
+    queryFn: async () => (await api.get<Visit[]>('/lab/awaiting-visits')).data,
+    refetchInterval: 30_000,
+  });
   const current = list.find((v) => v.status === 'IN_PROGRESS');
   const activeId = selectedId ?? current?.id ?? null;
   const waiting = list.filter((v) => v.status === 'WAITING').length;
@@ -70,8 +79,8 @@ export function ExamPage() {
             {current ? `Đang khám số ${ticketLabel(current)}` : waiting === 0 ? 'Không còn ai đang chờ' : 'Gọi số tiếp theo'}
           </Button>
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>
-            Thứ tự gọi: người đặt lịch (số A) đã đến giờ hẹn được ưu tiên; còn lại theo thứ tự đến quầy. Sau vài lượt ưu tiên liên tiếp
-            sẽ gọi một người vãng lai (số B) đang chờ.
+            Thứ tự gọi: người quay lại với kết quả cận lâm sàng được gọi trước; rồi người đặt lịch (số A) đã đến giờ hẹn; còn lại theo
+            thứ tự đến quầy. Sau vài lượt ưu tiên giờ hẹn liên tiếp sẽ gọi một người vãng lai (số B) đang chờ.
           </Typography.Paragraph>
           <List
             loading={queue.isLoading}
@@ -129,6 +138,7 @@ export function ExamPage() {
             }}
           />
         </Card>
+        <AwaitingCard visits={awaiting.data ?? []} activeId={activeId} onOpen={setSelectedId} />
       </Col>
       <Col xs={24} lg={16}>
         {activeId ? (
@@ -140,6 +150,94 @@ export function ExamPage() {
         )}
       </Col>
     </Row>
+  );
+}
+
+/** Lượt đang chờ kết quả cận lâm sàng (mọi ngày): bấm để ghi kết quả, đưa vào hàng chờ hoặc hoàn tất online. */
+function AwaitingCard({ visits, activeId, onOpen }: { visits: Visit[]; activeId: string | null; onOpen: (id: string) => void }) {
+  if (visits.length === 0) return null;
+  return (
+    <Card title="Đang làm cận lâm sàng" style={{ marginTop: 16 }} extra={<Typography.Text type="secondary">{visits.length} lượt</Typography.Text>}>
+      <List
+        dataSource={visits}
+        renderItem={(v) => {
+          const total = v.labOrders?.length ?? 0;
+          const ready = v.labOrders?.filter((o) => o.doneAt).length ?? 0;
+          return (
+            <List.Item
+              onClick={() => onOpen(v.id)}
+              style={{ cursor: 'pointer', background: v.id === activeId ? C.stampSoft : undefined, paddingInline: 8, borderRadius: 8 }}
+            >
+              <Space align="start">
+                <span className="num" style={{ fontSize: 28, fontWeight: 700, lineHeight: '30px', width: 52, display: 'inline-block', color: C.muted }}>
+                  {ticketLabel(v)}
+                </span>
+                <div>
+                  <div>{v.patient.fullName}</div>
+                  <Space size={4} wrap style={{ marginTop: 2 }}>
+                    <Tag color={v.resultMode === 'ONLINE' ? 'processing' : 'purple'}>{v.resultMode === 'ONLINE' ? 'Nhận online' : 'Quay lại'}</Tag>
+                    <Tag color={ready === total ? 'success' : 'warning'}>
+                      Kết quả {ready}/{total}
+                    </Tag>
+                  </Space>
+                  <div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {v.labOrders?.map((o) => o.name).join(', ')}
+                      {v.sentForTestsAt ? ` · gửi đi ${formatTime(v.sentForTestsAt)}${isToday(v.date) ? '' : ` ngày ${formatDay(v.date)}`}` : ''}
+                    </Typography.Text>
+                  </div>
+                </div>
+              </Space>
+            </List.Item>
+          );
+        }}
+      />
+    </Card>
+  );
+}
+
+const MODE_INFO: Record<ResultMode, { title: string; text: string }> = {
+  RETURN: {
+    title: 'Quay lại phòng khám',
+    text: 'Làm xong bệnh nhân quay lại khu chờ, giữ nguyên số. Bác sĩ trả kết quả rồi đưa vào hàng chờ: được gọi trước mọi người để đọc kết quả, kết luận và kê đơn. Dùng khi cần kết quả để quyết định điều trị ngay hôm nay.',
+  },
+  ONLINE: {
+    title: 'Nhận kết quả online',
+    text: 'Bệnh nhân làm xong có thể ra về. Bác sĩ trả kết quả, kết luận, kê đơn rồi hoàn tất; bệnh nhân xem kết quả và đơn thuốc trên app. Nếu bất thường, ghi ngày hẹn tái khám để bệnh nhân đặt lịch.',
+  },
+};
+
+/** Hộp chọn cách nhận kết quả khi gửi đi cận lâm sàng. */
+function SendForTestsModal({ open, names, loading, onCancel, onSend }: { open: boolean; names: string[]; loading: boolean; onCancel: () => void; onSend: (m: ResultMode) => void }) {
+  const [mode, setMode] = useState<ResultMode>('RETURN');
+  return (
+    <Modal title="Gửi đi làm cận lâm sàng" open={open} onCancel={onCancel} okText="Gửi đi" cancelText="Hủy" confirmLoading={loading} onOk={() => onSend(mode)} destroyOnHidden>
+      <Typography.Paragraph>
+        Chỉ định: <b>{names.join(', ')}</b>
+      </Typography.Paragraph>
+      <Typography.Paragraph type="secondary">Bệnh nhân nhận kết quả thế nào?</Typography.Paragraph>
+      <Radio.Group value={mode} onChange={(e) => setMode(e.target.value)} style={{ width: '100%' }}>
+        <Flex vertical gap={10}>
+          {(Object.keys(MODE_INFO) as ResultMode[]).map((m) => (
+            <label
+              key={m}
+              style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, border: `1.5px solid ${mode === m ? C.stamp : C.line}`, background: mode === m ? C.stampSoft : '#fff', cursor: 'pointer' }}
+            >
+              <Radio value={m} />
+              <div>
+                <div style={{ fontWeight: 600 }}>{MODE_INFO[m].title}</div>
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                  {MODE_INFO[m].text}
+                </Typography.Text>
+              </div>
+            </label>
+          ))}
+        </Flex>
+      </Radio.Group>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 13 }}>
+        Sau khi gửi đi, bạn gọi được người tiếp theo. Lượt này nằm ở thẻ “Đang làm cận lâm sàng” bên trái.
+      </Typography.Paragraph>
+    </Modal>
   );
 }
 
@@ -156,12 +254,33 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
   });
 
   const complete = useAction(() => api.post(`/visits/${visitId}/complete`), { success: 'Đã hoàn tất lượt khám', invalidate: ['queue', 'visit'] });
+  const sendForTests = useAction((mode: ResultMode) => api.post(`/visits/${visitId}/send-for-tests`, { mode }), {
+    success: 'Đã gửi đi cận lâm sàng, bạn có thể gọi người tiếp theo',
+    invalidate: ['queue', 'visit'],
+  });
+  const resultsReady = useAction(() => api.post(`/visits/${visitId}/results-ready`), {
+    success: 'Đã đưa vào hàng chờ, lần gọi tới sẽ gọi bệnh nhân này trước',
+    invalidate: ['queue', 'visit'],
+  });
+  const [sending, setSending] = useState(false);
   const markLeft = useAction(() => api.patch(`/queue/${visitId}/left`), { success: 'Đã đánh dấu bỏ về', invalidate: ['queue'] });
 
   if (!v) return <Card loading />;
   const done = v.status === 'DONE';
   const draft = v.prescriptions?.find((p) => p.status === 'DRAFT') ?? null;
   const pastVisits = (history.data ?? []).filter((h) => h.id !== v.id);
+  const pendingLab = v.labOrders.filter((o) => !o.doneAt);
+  const awaitingReturn = v.status === 'AWAITING_RESULTS' && v.resultMode === 'RETURN';
+  const awaitingOnline = v.status === 'AWAITING_RESULTS' && v.resultMode === 'ONLINE';
+  // Hoàn tất được khi đang khám, hoặc chờ kết quả theo chế độ online
+  const canComplete = v.status === 'IN_PROGRESS' || awaitingOnline;
+  const blocker = !v.medicalRecord
+    ? 'Cần lưu bệnh án trước khi hoàn tất.'
+    : pendingLab.length
+      ? `Chưa trả kết quả: ${pendingLab.map((o) => o.name).join(', ')}.`
+      : draft
+        ? 'Đơn thuốc đang là bản nháp: hoàn tất hoặc xóa đơn trước.'
+        : null;
 
   return (
     <Flex vertical gap={16}>
@@ -171,6 +290,7 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
             <span className="num" style={{ fontSize: 30, fontWeight: 700, color: C.stamp }}>{ticketLabel(v)}</span>
             <span>{v.patient.fullName}</span>
             <Tag color={VISIT_STATUS[v.status].color}>{VISIT_STATUS[v.status].label}</Tag>
+            {v.resultMode && v.status === 'AWAITING_RESULTS' && <Tag>{v.resultMode === 'ONLINE' ? 'Nhận kết quả online' : 'Sẽ quay lại'}</Tag>}
           </Space>
         }
         extra={
@@ -225,20 +345,60 @@ function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }
 
       <RecordCard visitId={visitId} visitDate={v.date} reason={v.reason} record={v.medicalRecord} />
 
+      <LabCard visitId={visitId} orders={v.labOrders} readOnly={done} />
+
       <PrescriptionCard visitId={visitId} draft={draft} current={v.prescription} />
 
       {!done && (
         <Card>
-          <Flex justify="space-between" align="center" wrap gap={12}>
-            <Typography.Text type="secondary">
-              {!v.medicalRecord ? 'Cần lưu bệnh án trước khi hoàn tất.' : draft ? 'Đơn thuốc đang là bản nháp: hoàn tất hoặc xóa đơn trước.' : 'Kiểm tra lại rồi hoàn tất lượt khám.'}
-            </Typography.Text>
-            <Button type="primary" size="large" disabled={!v.medicalRecord || !!draft} loading={complete.isPending} onClick={() => complete.mutate(undefined, { onSuccess: onDone })}>
-              Hoàn tất lượt khám
-            </Button>
-          </Flex>
+          {awaitingReturn ? (
+            <Flex justify="space-between" align="center" wrap gap={12}>
+              <Typography.Text type="secondary" style={{ maxWidth: 520 }}>
+                {pendingLab.length
+                  ? `Bệnh nhân đang đi làm cận lâm sàng và sẽ quay lại. Trả kết quả: ${pendingLab.map((o) => o.name).join(', ')}, rồi đưa vào hàng chờ.`
+                  : 'Đã đủ kết quả. Đưa vào hàng chờ: lần gọi tới sẽ gọi bệnh nhân này trước để đọc kết quả.'}
+              </Typography.Text>
+              <Button type="primary" size="large" disabled={pendingLab.length > 0} loading={resultsReady.isPending} onClick={() => resultsReady.mutate(undefined, { onSuccess: onDone })}>
+                Đưa vào hàng chờ đọc kết quả
+              </Button>
+            </Flex>
+          ) : (
+            <Flex justify="space-between" align="center" wrap gap={12}>
+              <Typography.Text type="secondary" style={{ maxWidth: 520 }}>
+                {awaitingOnline
+                  ? blocker ?? 'Bệnh nhân nhận kết quả online. Hoàn tất để gửi kết quả, chẩn đoán và đơn thuốc lên app.'
+                  : pendingLab.length
+                    ? `Còn ${pendingLab.length} chỉ định chưa có kết quả: gửi bệnh nhân đi làm để gọi người tiếp theo, hoặc trả kết quả ngay nếu đã có.`
+                    : blocker ?? 'Kiểm tra lại rồi hoàn tất lượt khám.'}
+              </Typography.Text>
+              <Space wrap>
+                {v.status === 'IN_PROGRESS' && pendingLab.length > 0 && (
+                  <Button size="large" onClick={() => setSending(true)}>
+                    Gửi đi cận lâm sàng
+                  </Button>
+                )}
+                <Button type="primary" size="large" disabled={!canComplete || !!blocker} loading={complete.isPending} onClick={() => complete.mutate(undefined, { onSuccess: onDone })}>
+                  {awaitingOnline ? 'Hoàn tất và gửi lên app' : 'Hoàn tất lượt khám'}
+                </Button>
+              </Space>
+            </Flex>
+          )}
         </Card>
       )}
+      <SendForTestsModal
+        open={sending}
+        names={pendingLab.map((o) => o.name)}
+        loading={sendForTests.isPending}
+        onCancel={() => setSending(false)}
+        onSend={(mode) =>
+          sendForTests.mutate(mode, {
+            onSuccess: () => {
+              setSending(false);
+              onDone();
+            },
+          })
+        }
+      />
     </Flex>
   );
 }

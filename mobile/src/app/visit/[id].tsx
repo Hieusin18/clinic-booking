@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
+import { LabResults } from '@/components/LabResults';
 import { RecordActions } from '@/components/RecordActions';
+import { Icon } from '@/components/Icon';
 import { Text } from '@/components/Text';
 import { Badge, Button, Card, Empty, ErrorBox, Loading, Muted, Perforation, Screen, SectionLabel, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -42,6 +44,16 @@ export default function VisitScreen() {
   return (
     <Screen refreshing={visit.isRefetching} onRefresh={visit.refetch}>
       <Stack.Screen options={{ title: `Khám ngày ${formatDay(v.date)}` }} />
+      {v.status === 'AWAITING_RESULTS' ? (
+        <View style={{ flexDirection: 'row', gap: 10, backgroundColor: colors.stampSoft, borderRadius: 12, padding: 12 }}>
+          <Icon name="clock" color={colors.stamp} size={20} strokeWidth={2} />
+          <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, color: colors.text }}>
+            {v.resultMode === 'ONLINE'
+              ? 'Bác sĩ đang chờ kết quả cận lâm sàng. Khi bác sĩ đọc kết quả và kết luận, chẩn đoán cuối cùng và đơn thuốc sẽ hiện ở đây.'
+              : 'Bạn đang đi làm cận lâm sàng. Làm xong hãy quay lại khu chờ; có kết quả bạn được gọi vào trước.'}
+          </Text>
+        </View>
+      ) : null}
       <Card>
         <Muted>
           {doctorName(v.doctor)}
@@ -97,6 +109,8 @@ export default function VisitScreen() {
         )}
       </Card>
 
+      <LabResults orders={v.labOrders ?? []} pending={v.status !== 'DONE'} />
+
       {p ? (
         <View style={{ backgroundColor: colors.card, borderRadius: 16, borderWidth: 2, borderColor: colors.ink }}>
           <View style={{ padding: 16, gap: 2 }}>
@@ -135,9 +149,9 @@ export default function VisitScreen() {
             </View>
           </View>
         </View>
-      ) : (
+      ) : v.status === 'DONE' ? (
         <Empty title="Lần khám này không kê đơn" />
-      )}
+      ) : null}
 
       {r && (
         <Card>
