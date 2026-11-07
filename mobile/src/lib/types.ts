@@ -114,6 +114,8 @@ export interface DoctorRef {
   title: string | null;
   user: { fullName: string };
   specialty?: { id: string; name: string };
+  /** Phòng khám, ví dụ "Phòng 2" */
+  room?: string | null;
 }
 
 export interface Visit {

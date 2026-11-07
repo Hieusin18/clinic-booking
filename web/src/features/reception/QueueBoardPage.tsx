@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 import { doctorName, formatTime, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import type { Visit } from '../../lib/types';
+import { useRealtime } from '../../lib/realtime';
 import { C } from '../../lib/theme';
 import { useDoctorOptions } from './useDoctorOptions';
 import { arrivalTag, byCallOrder, VISIT_STATUS } from './visitStatus';
@@ -24,11 +25,12 @@ function Stat({ label, value, color = C.ink }: { label: string; value: number; c
 /** Hàng đợi hôm nay của cả phòng khám, xếp theo thứ tự gọi dự kiến; tự làm mới mỗi 10 giây. */
 export function QueueBoardPage() {
   const [doctorId, setDoctorId] = useState<string | undefined>();
+  const { connected } = useRealtime();
   const doctors = useDoctorOptions();
   const queue = useQuery({
     queryKey: ['queue', 'today', doctorId],
     queryFn: async () => (await api.get<Visit[]>('/queue/today', { params: doctorId ? { doctorId } : {} })).data,
-    refetchInterval: 10_000,
+    refetchInterval: connected ? 120_000 : 10_000,
   });
   const left = useAction((id: string) => api.patch(`/queue/${id}/left`), { success: 'Đã đánh dấu bỏ về', invalidate: ['queue'] });
 

@@ -87,12 +87,16 @@ export class CreateDoctorDto {
   /** Học hàm, học vị: "ThS.BS", "BSCKII"… */
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() @MaxLength(2000) bio?: string;
+  /** Phòng khám, ví dụ "Phòng 2" */
+  @IsOptional() @IsString() @MaxLength(40) room?: string;
 }
 
 export class UpdateDoctorDto extends ProfileDto {
   @IsOptional() @IsString() @MinLength(2) fullName?: string;
   @IsOptional() @IsString() specialtyId?: string;
   @IsOptional() @IsString() title?: string;
+  /** Phòng khám, ví dụ "Phòng 2"; chuỗi rỗng = xóa */
+  @IsOptional() @IsString() @MaxLength(40) room?: string;
   /** false = khóa tài khoản, bác sĩ không đăng nhập được và không hiện cho bệnh nhân */
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
@@ -106,6 +110,7 @@ const publicView = {
   id: true,
   title: true,
   bio: true,
+  room: true,
   practiceSince: true,
   expertise: true,
   specialty: { select: { id: true, name: true } },
@@ -205,6 +210,7 @@ export class DoctorsService {
       data: {
         title: dto.title,
         bio: dto.bio,
+        room: dto.room?.trim() || null,
         specialty: { connect: { id: dto.specialtyId } },
         user: {
           create: {
@@ -227,6 +233,7 @@ export class DoctorsService {
     if (dto.specialtyId) await this.ensureSpecialty(dto.specialtyId);
     await this.saveProfile(id, dto, {
       title: dto.title,
+      ...(dto.room === undefined ? {} : { room: dto.room.trim() || null }),
       ...(dto.specialtyId ? { specialty: { connect: { id: dto.specialtyId } } } : {}),
       user: { update: { fullName: dto.fullName, isActive: dto.isActive } },
     });

@@ -163,6 +163,14 @@ export class QueueController {
     return this.queue.callVisit(await this.queue.doctorIdOf(user.sub), visitId);
   }
 
+  /** Gọi lại số đang khám (bệnh nhân chưa vào phòng): loa ở quầy đọc lại */
+  @Roles('DOCTOR')
+  @Post(':visitId/recall')
+  @HttpCode(200)
+  async recall(@CurrentUser() user: AuthUser, @Param('visitId') visitId: string) {
+    return this.queue.recall(await this.queue.doctorIdOf(user.sub), visitId);
+  }
+
   /** Đánh dấu bỏ về; bác sĩ chỉ đánh dấu được bệnh nhân của mình */
   @Roles('DOCTOR', 'RECEPTIONIST')
   @Patch(':visitId/left')

@@ -1,4 +1,4 @@
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, SoundOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
@@ -23,6 +23,7 @@ import {
 } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useRealtime } from '../../lib/realtime';
 import { C } from '../../lib/theme';
 import { age, formatDay, formatTime, GENDER_LABEL, isToday, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
@@ -41,17 +42,19 @@ export const suggestQuantity = (timesPerDay?: number, days?: number) => (timesPe
 /** Bác sĩ: hàng đợi hôm nay, gọi số, ghi bệnh án, kê đơn, hoàn tất lượt khám. */
 export function ExamPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // WebSocket báo thay đổi ngay; hỏi lại định kỳ chỉ để dự phòng khi mất kết nối
+  const { connected } = useRealtime();
   const queue = useQuery({
     queryKey: ['queue', 'doctor'],
     queryFn: async () => (await api.get<Visit[]>('/queue/doctor')).data,
-    refetchInterval: 15_000,
+    refetchInterval: connected ? 120_000 : 15_000,
   });
   // Người đang làm cận lâm sàng hiện ở thẻ riêng bên dưới (gồm cả các ngày trước)
   const list = [...(queue.data ?? [])].filter((v) => v.status !== 'AWAITING_RESULTS').sort(byCallOrder);
   const awaiting = useQuery({
     queryKey: ['queue', 'awaiting'],
     queryFn: async () => (await api.get<Visit[]>('/lab/awaiting-visits')).data,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 120_000 : 30_000,
   });
   const current = list.find((v) => v.status === 'IN_PROGRESS');
   const activeId = selectedId ?? current?.id ?? null;
@@ -264,6 +267,8 @@ export function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () =>
     invalidate: ['queue', 'visit'],
   });
   const [sending, setSending] = useState(false);
+  // Bệnh nhân chưa vào phòng: loa ở quầy đọc lại số
+  const recall = useAction(() => api.post(`/queue/${visitId}/recall`), { success: 'Đã gọi lại trên loa ở quầy' });
   const markLeft = useAction(() => api.patch(`/queue/${visitId}/left`), { success: 'Đã đánh dấu bỏ về', invalidate: ['queue'] });
 
   if (!v) return <Card loading />;
@@ -296,9 +301,16 @@ export function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () =>
         }
         extra={
           !done && (
-            <Popconfirm title="Bệnh nhân không có mặt? Đánh dấu bỏ về." okText="Đồng ý" cancelText="Hủy" onConfirm={() => markLeft.mutate(undefined, { onSuccess: onDone })}>
-              <Button>Bỏ về</Button>
-            </Popconfirm>
+            <Space>
+              {v.status === 'IN_PROGRESS' && (
+                <Button icon={<SoundOutlined />} loading={recall.isPending} onClick={() => recall.mutate(undefined)}>
+                  Gọi lại
+                </Button>
+              )}
+              <Popconfirm title="Bệnh nhân không có mặt? Đánh dấu bỏ về." okText="Đồng ý" cancelText="Hủy" onConfirm={() => markLeft.mutate(undefined, { onSuccess: onDone })}>
+                <Button>Bỏ về</Button>
+              </Popconfirm>
+            </Space>
           )
         }
       >

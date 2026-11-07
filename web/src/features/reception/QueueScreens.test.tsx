@@ -1,7 +1,8 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api';
-import { fakeUser, page, renderPage } from '../../test/render';
+import { fakeSocket, fakeUser, page, renderPage } from '../../test/render';
 import { CounterPage } from './CounterPage';
 import { QueueBoardPage } from './QueueBoardPage';
 
@@ -41,6 +42,48 @@ describe('Màn hình hàng đợi', () => {
     const next = screen.getAllByText(/^[AB]0\d$/).map((e) => e.textContent);
     // A01 đang khám, rồi A02 (gọi tiếp theo) trước B01; B02 đã khám không hiện
     expect(next).toEqual(['A01', 'A02', 'B01']);
+  });
+
+  it('màn hình quầy: bác sĩ gọi số thì hiện số to kèm phòng và đọc loa khi đã bật', async () => {
+    mockGet();
+    const speak = vi.fn();
+    vi.stubGlobal('speechSynthesis', { speak, getVoices: () => [{ name: 'HoaiMy Natural', lang: 'vi-VN', localService: false }] });
+    vi.stubGlobal(
+      'SpeechSynthesisUtterance',
+      class {
+        text: string;
+        constructor(text: string) {
+          this.text = text;
+        }
+      },
+    );
+    const socket = fakeSocket();
+    renderPage([page('/counter', <CounterPage />)], { path: '/counter', user: fakeUser('RECEPTIONIST'), socket });
+    expect(await screen.findByText('● Trực tiếp')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Bật loa gọi số/ }));
+    expect(screen.getByText('Loa đang bật')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Bật loa gọi số/ })).not.toBeInTheDocument();
+
+    act(() => socket.fire('queue:called', { visitId: '3', label: 'B01', room: 'Phòng 2', doctorName: 'BS An', recall: false }));
+    const flash = screen.getByRole('status');
+    expect(within(flash).getByText('Mời số')).toBeInTheDocument();
+    expect(within(flash).getByText('B01')).toBeInTheDocument();
+    expect(within(flash).getByText('vào Phòng 2')).toBeInTheDocument();
+    await waitFor(() => expect(speak.mock.calls.map((c) => c[0].text)).toContain('Mời bệnh nhân số B 1, vào Phòng 2.'));
+
+    act(() => socket.fire('queue:called', { visitId: '1', label: 'A01', room: null, doctorName: 'BS An', recall: true }));
+    expect(within(screen.getByRole('status')).getByText('Mời lại số')).toBeInTheDocument();
+    expect(within(screen.getByRole('status')).getByText('vào phòng khám BS An')).toBeInTheDocument();
+    // Mở khóa (1 câu rỗng) + mỗi lần gọi đọc 2 lần
+    await waitFor(() => expect(speak).toHaveBeenCalledTimes(5));
+    vi.unstubAllGlobals();
+  });
+
+  it('màn hình quầy: chưa nối được WebSocket thì báo đang kết nối lại', async () => {
+    mockGet();
+    renderPage([page('/counter', <CounterPage />)], { path: '/counter', user: fakeUser('RECEPTIONIST') });
+    expect(await screen.findByText('● Đang kết nối lại…')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('bảng hàng đợi: đếm theo trạng thái', async () => {

@@ -7,6 +7,7 @@ import { dateOnly, todayVN, vnDateString } from '../common/time.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { appointmentsBooked } from '../metrics/metrics.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { RealtimeService } from '../realtime/realtime.js';
 import { noShowStanding, queueRules, type QueueRules } from '../queue/queue-rules.js';
 
 export class BookDto {
@@ -63,6 +64,7 @@ export class AppointmentsService {
   constructor(
     private readonly prisma: PrismaService,
     config: ConfigService,
+    private readonly realtime: RealtimeService,
   ) {
     this.rules = queueRules(config);
   }
@@ -134,6 +136,8 @@ export class AppointmentsService {
       });
     });
     appointmentsBooked.inc();
+    // Lễ tân thấy ngay lịch hẹn mới trong danh sách hôm nay
+    this.realtime.staffChanged();
     return appointment;
   }
 
@@ -162,10 +166,12 @@ export class AppointmentsService {
     if (appt.visit) throw new ConflictException('Bạn đã check-in, không hủy được lịch');
     if (appt.schedule.startTime <= new Date()) throw new ConflictException('Không hủy được lịch đã qua giờ khám');
 
-    return this.prisma.$transaction(async (tx) => {
+    const cancelled = await this.prisma.$transaction(async (tx) => {
       await tx.schedule.update({ where: { id: appt.scheduleId }, data: { isBooked: false } });
       return tx.appointment.update({ where: { id }, data: { status: 'CANCELLED' }, select: appointmentView });
     });
+    this.realtime.staffChanged();
+    return cancelled;
   }
 
   /** Lịch hẹn trong ngày của cả phòng khám (lễ tân dùng để check-in, kể cả lịch đã bị tính không đến). */

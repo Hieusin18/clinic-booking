@@ -5,6 +5,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import type { CheckinMethod, VisitSource } from '../generated/prisma/enums.js';
 import { queueTickets } from '../metrics/metrics.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { fireAndForget, RealtimeService } from '../realtime/realtime.js';
 import { currentStreak, isDue, pickNext, predictOrder, ticketLabel, type CallRuleName, type Predicted, type QueueEntry } from './queue-order.js';
 import { queueRules, type QueueRules } from './queue-rules.js';
 
@@ -40,7 +41,7 @@ export const visitView = {
   /** Tên các chỉ định cận lâm sàng và đã có kết quả chưa (không kèm nội dung kết quả) */
   labOrders: { select: { id: true, name: true, doneAt: true }, orderBy: { createdAt: 'asc' } },
   patient: { select: { id: true, fullName: true, phone: true, dateOfBirth: true, gender: true, allergies: true } },
-  doctor: { select: { id: true, title: true, user: { select: { fullName: true } }, specialty: { select: { id: true, name: true } } } },
+  doctor: { select: { id: true, title: true, room: true, user: { select: { fullName: true } }, specialty: { select: { id: true, name: true } } } },
 } satisfies Prisma.VisitSelect;
 
 export type QueueVisit = Prisma.VisitGetPayload<{ select: typeof visitView }>;
@@ -66,6 +67,7 @@ export class QueueService {
   constructor(
     private readonly prisma: PrismaService,
     config: ConfigService,
+    private readonly realtime: RealtimeService,
   ) {
     this.rules = queueRules(config);
   }
@@ -111,6 +113,7 @@ export class QueueService {
         });
       });
       queueTickets.inc({ source: input.source });
+      fireAndForget(this.realtime.visitChanged(visit.id));
       return visit;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -234,15 +237,27 @@ export class QueueService {
     });
   }
 
-  private call(doctorId: string, now: Date, choose: (tx: Tx, date: Date) => Promise<{ id: string; rule: CallRuleName }>) {
+  private async call(doctorId: string, now: Date, choose: (tx: Tx, date: Date) => Promise<{ id: string; rule: CallRuleName }>) {
     const date = todayVN(now);
-    return this.prisma.$transaction(async (tx) => {
+    const visit = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`call:${doctorId}:${date.toISOString()}`}))`;
       const current = await tx.visit.findFirst({ where: { doctorId, date, status: 'IN_PROGRESS' } });
       if (current) throw new ConflictException(`Bạn đang khám số ${ticketLabel(current)}, hãy hoàn tất trước khi gọi tiếp`);
       const { id, rule } = await choose(tx, date);
       return tx.visit.update({ where: { id }, data: { status: 'IN_PROGRESS', calledAt: now, callRule: rule }, select: visitView });
     });
+    // Sau khi giao dịch xong: loa ở quầy đọc số, app của bệnh nhân báo đến lượt
+    fireAndForget(this.realtime.called(visit.id));
+    return visit;
+  }
+
+  /** Gọi lại số đang khám (bệnh nhân chưa vào): loa đọc lại, không đổi thứ tự hàng chờ. */
+  async recall(doctorId: string, visitId: string) {
+    const visit = await this.prisma.visit.findUnique({ where: { id: visitId }, select: visitView });
+    if (!visit || visit.doctor.id !== doctorId) throw new NotFoundException('Không tìm thấy phiếu khám');
+    if (visit.status !== 'IN_PROGRESS') throw new ConflictException('Chỉ gọi lại được số đang khám');
+    await this.realtime.called(visit.id, true);
+    return visit;
   }
 
   /** Số lượt liên tiếp gần nhất gọi người đặt lịch đến giờ hẹn. */
@@ -280,6 +295,7 @@ export class QueueService {
     if (visit.appointmentId) {
       await this.prisma.appointment.update({ where: { id: visit.appointmentId }, data: { status: 'NO_SHOW' } });
     }
+    fireAndForget(this.realtime.visitChanged(visitId));
     return this.prisma.visit.findUniqueOrThrow({ where: { id: visitId }, select: visitView });
   }
 

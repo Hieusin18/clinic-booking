@@ -15,6 +15,7 @@ import { QueueService } from './queue/queue.service.js';
 import { SchedulesModule } from './schedules/schedules.js';
 import { SpecialtiesModule } from './specialties/specialties.js';
 import { StaffModule } from './staff/staff.js';
+import { RealtimeModule } from './realtime/realtime.js';
 import { LabModule } from './visits/lab-results.js';
 import { VisitsModule } from './visits/visits.js';
 import { Icd10Module } from './icd10/icd10.js';
@@ -31,6 +32,7 @@ import { Icd10Module } from './icd10/icd10.js';
     SchedulesModule,
     AppointmentsModule,
     PatientsModule,
+    RealtimeModule,
     VisitsModule,
     LabModule,
     Icd10Module,

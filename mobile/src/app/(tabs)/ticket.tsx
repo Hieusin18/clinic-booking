@@ -6,6 +6,7 @@ import { Badge, Button, Empty, Loading, Muted, Perforation, Screen, colors, styl
 import { api } from '@/lib/api';
 import { doctorName, formatTime } from '@/lib/format';
 import { VISIT_STATUS, waitHint } from '@/lib/queue';
+import { useRealtime } from '@/lib/realtime';
 import type { QueuePosition, Visit } from '@/lib/types';
 
 /** Một cột số nhỏ ở cuống phiếu. */
@@ -18,12 +19,13 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-/** Phiếu số đang chờ: tự cập nhật mỗi 15 giây. */
+/** Phiếu số đang chờ: cập nhật ngay qua WebSocket; mất kết nối thì tự hỏi lại mỗi 15 giây. */
 function TicketCard({ visitId }: { visitId: string }) {
+  const { connected, lastCall } = useRealtime();
   const pos = useQuery({
     queryKey: ['position', visitId],
     queryFn: async () => (await api.get<QueuePosition>(`/queue/${visitId}/position`)).data,
-    refetchInterval: 15_000,
+    refetchInterval: connected ? 120_000 : 15_000,
   });
   if (!pos.data) return <Loading />;
   const { visit, label, currentLabel, peopleAhead, estimatedCallAt, due } = pos.data;
@@ -32,6 +34,8 @@ function TicketCard({ visitId }: { visitId: string }) {
   const active = visit.status === 'WAITING' || visit.status === 'IN_PROGRESS' || visit.status === 'AWAITING_RESULTS';
   const testing = visit.status === 'AWAITING_RESULTS';
   const online = visit.source === 'ONLINE';
+  const room = visit.doctor.room?.trim();
+  const recalled = lastCall?.visitId === visitId && lastCall.recall && visit.status === 'IN_PROGRESS';
 
   return (
     <View style={{ backgroundColor: colors.card, borderRadius: 20, borderWidth: active ? 2 : 1, borderColor: active ? colors.ink : colors.border }}>
@@ -41,6 +45,7 @@ function TicketCard({ visitId }: { visitId: string }) {
           {active ? <Badge label={online ? 'Đặt lịch' : 'Vãng lai'} tone={online ? 'primary' : 'neutral'} /> : <Badge label={st.label} tone={st.tone} />}
         </View>
         <Muted>
+          {room ? `${room} · ` : ''}
           {visit.doctor.specialty?.name ? `${visit.doctor.specialty.name} · ` : ''}
           {visit.appointmentAt ? `Hẹn ${formatTime(visit.appointmentAt)} · ` : ''}Lấy số {formatTime(visit.createdAt)}
         </Muted>
@@ -56,7 +61,7 @@ function TicketCard({ visitId }: { visitId: string }) {
         </Text>
         <View style={{ alignSelf: 'center' }}>
           {visit.status === 'IN_PROGRESS' ? (
-            <Badge label="Mời vào phòng khám" tone="success" />
+            <Badge label={`${recalled ? 'Bác sĩ đang gọi lại · ' : ''}Mời vào ${room || 'phòng khám'}`} tone="success" />
           ) : testing ? (
             <Badge label={visit.resultMode === 'ONLINE' ? 'Đi làm cận lâm sàng · nhận kết quả online' : 'Đi làm cận lâm sàng'} tone="primary" />
           ) : visit.status === 'WAITING' && visit.resultsReadyAt ? (
@@ -100,10 +105,11 @@ function TicketCard({ visitId }: { visitId: string }) {
 }
 
 export default function Ticket() {
+  const { connected } = useRealtime();
   const mine = useQuery({
     queryKey: ['queue', 'mine'],
     queryFn: async () => (await api.get<Visit[]>('/queue/mine')).data,
-    refetchInterval: 30_000,
+    refetchInterval: connected ? 120_000 : 30_000,
   });
   const visits = mine.data ?? [];
   const hasActive = visits.some((v) => v.status === 'WAITING' || v.status === 'IN_PROGRESS' || v.status === 'AWAITING_RESULTS');

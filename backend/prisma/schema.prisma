@@ -111,6 +111,8 @@ model Doctor {
   specialtyId String
   title       String?
   bio         String?
+  /// Phòng khám, ví dụ "Phòng 2"; loa gọi số đọc tên phòng này
+  room        String?
   /// Năm bắt đầu hành nghề; số năm kinh nghiệm tính từ năm này nên luôn đúng theo thời gian
   practiceSince Int?
   /// Thế mạnh chuyên môn, mỗi dòng một mục (bệnh hoặc kỹ thuật)
