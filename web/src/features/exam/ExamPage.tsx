@@ -241,7 +241,8 @@ function SendForTestsModal({ open, names, loading, onCancel, onSend }: { open: b
   );
 }
 
-function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }) {
+/** Một lượt khám: thông tin bệnh nhân, lịch sử, bệnh án, cận lâm sàng, đơn thuốc; dùng ở trang khám và trang tra cứu bệnh án. */
+export function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () => void }) {
   const detail = useQuery({
     queryKey: ['visit', visitId],
     queryFn: async () => (await api.get<VisitDetail>(`/visits/${visitId}`)).data,
