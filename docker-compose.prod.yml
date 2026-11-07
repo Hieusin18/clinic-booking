@@ -46,6 +46,8 @@ services:
       NO_SHOW_LIMIT: ${NO_SHOW_LIMIT:-}
       NO_SHOW_WINDOW_DAYS: ${NO_SHOW_WINDOW_DAYS:-}
       NO_SHOW_LOCK_DAYS: ${NO_SHOW_LOCK_DAYS:-}
+      REMINDER_SWEEP_SECONDS: ${REMINDER_SWEEP_SECONDS:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
 
   # Dữ liệu mẫu, chỉ chạy khi gọi: docker compose -f docker-compose.prod.yml run --rm seed
   seed:

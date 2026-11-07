@@ -44,6 +44,8 @@ services:
       NO_SHOW_LIMIT: ${NO_SHOW_LIMIT:-}
       NO_SHOW_WINDOW_DAYS: ${NO_SHOW_WINDOW_DAYS:-}
       NO_SHOW_LOCK_DAYS: ${NO_SHOW_LOCK_DAYS:-}
+      REMINDER_SWEEP_SECONDS: ${REMINDER_SWEEP_SECONDS:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
 
   # Tạo dữ liệu mẫu (admin, bác sĩ, thuốc…) — chỉ chạy khi gọi tay, sau khi backend đã migrate:
   #   docker compose run --rm seed

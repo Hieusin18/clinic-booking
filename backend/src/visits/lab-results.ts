@@ -38,6 +38,7 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { AuthUser, CurrentUser, Public, Roles } from '../auth/decorators.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.js';
 import { fireAndForget, RealtimeService } from '../realtime/realtime.js';
 import { visitView } from '../queue/queue.service.js';
 import { cleanFileName, detectLabFile, LAB_FILE_MAX_BYTES, LAB_FILES_PER_ORDER, labOrderView, presentLabOrders, verifyFileLink } from './lab-files.js';
@@ -75,6 +76,7 @@ export class LabService {
     private readonly visits: VisitsService,
     config: ConfigService,
     private readonly realtime: RealtimeService,
+    private readonly notifications: NotificationsService,
   ) {
     this.secret = config.getOrThrow<string>('JWT_SECRET');
   }
@@ -176,6 +178,7 @@ export class LabService {
     await this.requireAllDone(visitId);
     await this.prisma.visit.update({ where: { id: visitId }, data: { status: 'WAITING', resultsReadyAt: now } });
     fireAndForget(this.realtime.visitChanged(visitId));
+    fireAndForget(this.notifications.resultsReady(visitId));
     return this.prisma.visit.findUniqueOrThrow({ where: { id: visitId }, select: visitView });
   }
 

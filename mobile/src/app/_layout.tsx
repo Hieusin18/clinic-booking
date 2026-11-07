@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { fontFor } from '@/components/Text';
 import { colors } from '@/components/ui';
 import { AuthProvider } from '@/lib/auth';
+import { NotificationsProvider } from '@/lib/notifications';
 import { RealtimeProvider } from '@/lib/realtime';
 
 export default function RootLayout() {
@@ -39,6 +40,7 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <RealtimeProvider>
+          <NotificationsProvider>
           <StatusBar style="dark" />
           <Stack
             screenOptions={{
@@ -59,7 +61,9 @@ export default function RootLayout() {
             <Stack.Screen name="scan" options={{ title: 'Quét mã QR' }} />
             <Stack.Screen name="visit/[id]" options={{ title: 'Chi tiết lần khám' }} />
             <Stack.Screen name="preview/[id]" options={{ title: 'Xem trước bản điện tử' }} />
+            <Stack.Screen name="notifications" options={{ title: 'Thông báo' }} />
           </Stack>
+          </NotificationsProvider>
           </RealtimeProvider>
         </AuthProvider>
       </QueryClientProvider>

@@ -9,6 +9,7 @@
  *  - queue:called   {visitId, label, room, doctorName, doctorFullName, recall} → staff: loa ở màn hình quầy đọc số
  *  - visit:changed  {visitId, status}      → bệnh nhân: phiếu số của mình vừa đổi
  *  - visit:called   {visitId, label, room} → bệnh nhân: đến lượt mình
+ *  - notification:new {id, type, title, body, url} → bệnh nhân: có thông báo mới (src/notifications)
  */
 import { Global, Injectable, Logger, Module } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -57,6 +58,11 @@ export class RealtimeService {
     private readonly gateway: RealtimeGateway,
     private readonly prisma: PrismaService,
   ) {}
+
+  /** Gửi riêng cho một tài khoản (vd. thông báo mới của bệnh nhân). */
+  toUser(userId: string, event: string, payload: object) {
+    this.gateway.emit(userRoom(userId), event, payload);
+  }
 
   /** Báo cho nhân viên rằng hàng đợi / lịch hẹn trong ngày vừa đổi (không gắn với một lượt khám cụ thể). */
   staffChanged(doctorId?: string) {

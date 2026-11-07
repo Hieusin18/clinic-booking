@@ -8,6 +8,7 @@ import { Text } from '@/components/Text';
 import { Badge, Button, Card, Empty, ErrorBox, Loading, Muted, Perforation, Screen, SectionLabel, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
+import { useMarkVisitRead } from '@/lib/notifications';
 import { doctorName, formatDate, formatDay } from '@/lib/format';
 import { medicineName, usage } from '@/lib/prescription';
 import { vitals, withIcd } from '@/lib/record';
@@ -34,6 +35,8 @@ export default function VisitScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const visit = useQuery({ queryKey: ['visit', id], queryFn: async () => (await api.get<VisitDetail>(`/visits/${id}`)).data });
   const v = visit.data;
+  // Mở chi tiết lần khám đã xong: tin "có kết quả / đã lưu bệnh án" của lần này thành đã đọc
+  useMarkVisitRead(id, ['VISIT_DONE'], v?.status === 'DONE');
 
   if (visit.isLoading) return <Screen><Loading /></Screen>;
   if (!v) return <Screen><ErrorBox message={visit.error ? errorMessage(visit.error) : 'Không tìm thấy lần khám'} /></Screen>;

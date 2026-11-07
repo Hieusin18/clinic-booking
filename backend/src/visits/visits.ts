@@ -12,6 +12,7 @@ import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { dateOnly } from '../common/time.js';
 import { ICD_REGEX } from '../icd10/icd10.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.js';
 import { fireAndForget, RealtimeService } from '../realtime/realtime.js';
 import { visitView } from '../queue/queue.service.js';
 import { labOrderView, presentLabOrders } from './lab-files.js';
@@ -169,6 +170,7 @@ export class VisitsService {
     private readonly prisma: PrismaService,
     config: ConfigService,
     private readonly realtime: RealtimeService,
+    private readonly notifications: NotificationsService,
   ) {
     this.secret = config.getOrThrow<string>('JWT_SECRET');
   }
@@ -231,6 +233,7 @@ export class VisitsService {
       return tx.visit.update({ where: { id: visitId }, data: { status: 'DONE' }, select: visitView });
     });
     fireAndForget(this.realtime.visitChanged(visitId));
+    fireAndForget(this.notifications.visitDone(visitId));
     return done;
   }
 

@@ -139,6 +139,18 @@ npm test
 - Màn hình nằm trong `mobile/src/app/` (Expo Router: mỗi file là một màn hình).
 - Build APK để nộp và demo: `eas build -p android --profile preview`, đặt `EXPO_PUBLIC_API_URL=https://<tên-miền>/api`.
 
+### Thông báo và nhắc lịch
+
+Server gửi thông báo khi bác sĩ gọi số (hoặc gọi lại), khi có kết quả cận lâm sàng cần quay lại, khi khám xong (kết quả, đơn thuốc đã có trên app), và nhắc lịch hẹn trước một ngày, trước một giờ (`REMINDER_SWEEP_SECONDS`, mặc định 60 giây quét một lần; `0` = tắt). Mọi thông báo đều vào hộp thư trong app (chuông ở góc màn hình); việc hiện lên màn hình điện thoại tùy máy:
+
+| Máy | Cách nhận |
+|---|---|
+| iPhone + Expo Go, APK / development build | Tin đẩy từ server (Expo Push), nhận cả khi đã tắt app. Cần gắn app với dự án EAS một lần: `cd mobile && npx eas init` (ghi `extra.eas.projectId` vào `app.json`). APK Android cần thêm cấu hình Firebase (FCM) trên EAS. |
+| Android + Expo Go | Expo Go không còn hỗ trợ tin đẩy từ SDK 53: app tự hiện thông báo khi đang mở (nhận qua WebSocket) và tự đặt lịch nhắc hẹn trên máy. |
+| Bản web | Chỉ có hộp thư trong app. |
+
+Tab Hồ sơ ghi máy đang nhận theo cách nào. `EXPO_ACCESS_TOKEN` (tùy chọn) chỉ cần khi bật "Enhanced Security for Push Notifications" trên tài khoản Expo.
+
 ## Deploy lên VPS (người 2)
 
 1. Trên VPS: cài Docker, `git clone` repo vào `~/clinic-booking`, tạo `.env` từ `.env.example` với mật khẩu và khóa thật, đặt `DOMAIN` là tên miền đã trỏ về IP của VPS.

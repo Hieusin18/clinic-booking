@@ -5,3 +5,4 @@ process.env.QR_SECRET ??= 'test-qr-secret';
 process.env.QR_TTL_SECONDS ??= '60';
 process.env.CLINIC_ID ??= 'phong-kham-test';
 process.env.QUEUE_SWEEP_SECONDS ??= '0';
+process.env.REMINDER_SWEEP_SECONDS ??= '0';

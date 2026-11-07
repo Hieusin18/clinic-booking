@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { Icon } from '@/components/Icon';
+import { NotificationBell } from '@/components/NotificationBell';
 import { Text } from '@/components/Text';
 import { Chip, Empty, ErrorBox, Loading, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -36,6 +37,7 @@ export default function BookHome() {
   return (
     <Screen
       title="Đặt lịch khám"
+      action={<NotificationBell />}
       subtitle="Chọn chuyên khoa, xem hồ sơ rồi chọn giờ"
       refreshing={doctors.isRefetching}
       onRefresh={() => void Promise.all([specialties.refetch(), doctors.refetch()])}
