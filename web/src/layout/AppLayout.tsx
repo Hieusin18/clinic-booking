@@ -32,6 +32,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
   DOCTOR: [
     item('/doctor/queue', 'Khám bệnh', <SolutionOutlined />),
     item('/doctor/schedule', 'Lịch làm việc', <CalendarOutlined />),
+    item('/doctor/profile', 'Hồ sơ của tôi', <IdcardOutlined />),
   ],
   RECEPTIONIST: [
     item('/reception', 'Tiếp đón', <UserOutlined />),

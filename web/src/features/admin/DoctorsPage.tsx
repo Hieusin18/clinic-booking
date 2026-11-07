@@ -1,19 +1,21 @@
-import { Button, Card, Form, Input, Modal, Select, Space, Switch, Table, Tag } from 'antd';
+import { UserOutlined } from '@ant-design/icons';
+import { Avatar, Button, Card, Divider, Form, Input, Modal, Select, Space, Switch, Table, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { useAction, usePagedList } from '../../lib/hooks';
 import type { Doctor } from '../../lib/types';
+import { AvatarField, ProfileFields } from '../doctor-profile/ProfileFields';
+import { avatarUrl, toProfileForm, toProfilePayload, type ProfileFormValues } from '../doctor-profile/profileForm';
 import { PageHeader } from './PageHeader';
 import { useSpecialtyOptions } from './useSpecialtyOptions';
 
-type FormValues = {
+type FormValues = ProfileFormValues & {
   fullName: string;
   phone?: string;
   email?: string;
   password?: string;
   specialtyId: string;
   title?: string;
-  bio?: string;
 };
 
 export function DoctorsPage() {
@@ -24,13 +26,16 @@ export function DoctorsPage() {
   const [form] = Form.useForm<FormValues>();
   const isNew = editing === 'new';
 
+  /** Bác sĩ đang sửa, đã tải đủ hồ sơ (quá trình đào tạo, công tác, ảnh) */
+  const [full, setFull] = useState<Doctor | null>(null);
+
   const save = useAction(
-    (v: FormValues): Promise<unknown> => {
-      if (editing && editing !== 'new') {
-        const { fullName, specialtyId: sid, title, bio } = v;
-        return api.patch(`/doctors/${editing.id}`, { fullName, specialtyId: sid, title, bio });
-      }
-      return api.post('/doctors', { ...v, email: v.email || undefined });
+    async (v: FormValues): Promise<unknown> => {
+      const { fullName, phone, email, password, specialtyId: sid, title, ...profile } = v;
+      const body = toProfilePayload(profile);
+      if (editing && editing !== 'new') return api.patch(`/doctors/${editing.id}`, { fullName, specialtyId: sid, title, ...body });
+      const created = (await api.post<Doctor>('/doctors', { fullName, phone, password, specialtyId: sid, title, email: email || undefined })).data;
+      return api.patch(`/doctors/${created.id}`, body);
     },
     { success: 'Đã lưu thông tin bác sĩ', invalidate: ['doctors', 'specialties'] },
   );
@@ -39,17 +44,20 @@ export function DoctorsPage() {
     invalidate: ['doctors'],
   });
 
-  const open = (d: Doctor | 'new') => {
+  const open = async (d: Doctor | 'new') => {
     setEditing(d);
+    setFull(null);
     form.resetFields();
-    if (d !== 'new') {
-      form.setFieldsValue({ fullName: d.user.fullName, specialtyId: d.specialty.id, title: d.title ?? '', bio: d.bio ?? '' });
-    }
+    if (d === 'new') return;
+    form.setFieldsValue({ fullName: d.user.fullName, specialtyId: d.specialty.id, title: d.title ?? '' });
+    const loaded = (await api.get<Doctor>(`/doctors/${d.id}/full`)).data;
+    setFull(loaded);
+    form.setFieldsValue(toProfileForm(loaded));
   };
 
   return (
     <Card>
-      <PageHeader title="Bác sĩ" onSearch={list.search} searchPlaceholder="Tìm theo tên" onAdd={() => open('new')} addLabel="Thêm bác sĩ" />
+      <PageHeader title="Bác sĩ" onSearch={list.search} searchPlaceholder="Tìm theo tên" onAdd={() => void open('new')} addLabel="Thêm bác sĩ" />
       <Select
         allowClear
         placeholder="Lọc theo chuyên khoa"
@@ -64,7 +72,19 @@ export function DoctorsPage() {
         dataSource={list.data?.items}
         pagination={list.pagination}
         columns={[
-          { title: 'Họ tên', render: (_, d) => <span>{d.title ? `${d.title} ` : ''}{d.user.fullName}</span> },
+          {
+            title: 'Họ tên',
+            render: (_, d) => (
+              <Space>
+                <Avatar src={avatarUrl(d)} icon={<UserOutlined />} />
+                <span>
+                  {d.title ? `${d.title} ` : ''}
+                  {d.user.fullName}
+                </span>
+              </Space>
+            ),
+          },
+          { title: 'Kinh nghiệm', width: 120, render: (_, d) => (d.experienceYears != null ? `${d.experienceYears} năm` : '—') },
           { title: 'Chuyên khoa', render: (_, d) => <Tag color="cyan">{d.specialty.name}</Tag> },
           { title: 'Số điện thoại (đăng nhập)', render: (_, d) => d.user.phone },
           {
@@ -73,7 +93,7 @@ export function DoctorsPage() {
             align: 'center',
             render: (_, d) => <Switch checked={d.user.isActive} loading={toggle.isPending && toggle.variables?.id === d.id} onChange={() => toggle.mutate(d)} />,
           },
-          { title: '', width: 80, render: (_, d) => <Button size="small" onClick={() => open(d)}>Sửa</Button> },
+          { title: '', width: 80, render: (_, d) => <Button size="small" onClick={() => void open(d)}>Sửa</Button> },
         ]}
       />
       <Modal
@@ -84,8 +104,15 @@ export function DoctorsPage() {
         confirmLoading={save.isPending}
         onCancel={() => setEditing(null)}
         onOk={() => form.validateFields().then((v) => save.mutateAsync(v)).then(() => setEditing(null)).catch(() => {})}
+        width={900}
         destroyOnHidden
       >
+        {full && (
+          <>
+            <AvatarField doctor={full} endpoint={`/doctors/${full.id}/avatar`} onChange={(next) => { setFull(next); void list.refetch(); }} />
+            <Divider />
+          </>
+        )}
         <Form form={form} layout="vertical" requiredMark={false}>
           <Space.Compact block>
             <Form.Item label="Học vị" name="title" style={{ width: 130 }}>
@@ -115,9 +142,9 @@ export function DoctorsPage() {
               </Form.Item>
             </>
           )}
-          <Form.Item label="Giới thiệu" name="bio">
-            <Input.TextArea rows={3} />
-          </Form.Item>
+          <Divider />
+          <Typography.Title level={5} style={{ marginTop: 0 }}>Hồ sơ hiện cho bệnh nhân</Typography.Title>
+          <ProfileFields />
         </Form>
       </Modal>
     </Card>

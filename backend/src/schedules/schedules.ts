@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsDateString, IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
 import { AuthUser, CurrentUser, Public, Roles } from '../auth/decorators.js';
-import { dateOnly, vnDateString, vnDateTime } from '../common/time.js';
+import { dateOnly, todayVN, vnDateString, vnDateTime } from '../common/time.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -98,6 +98,30 @@ export class SchedulesService {
       select: { id: true, startTime: true, endTime: true },
     });
   }
+
+  /** Số khung giờ còn trống từng ngày trong vài ngày tới, cho trang hồ sơ bác sĩ. */
+  async availability(doctorId: string, q: AvailabilityQuery, now = new Date()) {
+    const doctor = await this.prisma.doctor.findUnique({ where: { id: doctorId }, include: { user: true } });
+    if (!doctor || !doctor.user.isActive) throw new NotFoundException('Không tìm thấy bác sĩ');
+    const first = todayVN(now);
+    const dates = Array.from({ length: q.days ?? 7 }, (_, i) => new Date(first.getTime() + i * DAY));
+    const rows = await this.prisma.schedule.groupBy({
+      by: ['date'],
+      where: { doctorId, isBooked: false, startTime: { gt: now }, date: { gte: first, lte: dates.at(-1) } },
+      _count: { _all: true },
+    });
+    return dates.map((d) => ({
+      date: d.toISOString().slice(0, 10),
+      free: rows.find((r) => r.date.getTime() === d.getTime())?._count._all ?? 0,
+    }));
+  }
+}
+
+const DAY = 86_400_000;
+
+export class AvailabilityQuery {
+  /** Số ngày tính từ hôm nay (mặc định 7) */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(14) days?: number;
 }
 
 @ApiTags('schedules')
@@ -125,6 +149,13 @@ export class SchedulesController {
   @HttpCode(204)
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user, id);
+  }
+
+  /** Số giờ trống từng ngày trong 7 ngày tới (trang hồ sơ bác sĩ) */
+  @Public()
+  @Get('doctors/:id/availability')
+  availability(@Param('id') id: string, @Query() q: AvailabilityQuery) {
+    return this.service.availability(id, q);
   }
 
   @Public()

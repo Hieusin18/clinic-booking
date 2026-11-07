@@ -5,10 +5,12 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Card, Chip, Empty, ErrorBox, Loading, Muted, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
+import { experienceText } from '@/lib/doctor';
 import { doctorName } from '@/lib/format';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
 import type { Doctor, Page, Specialty } from '@/lib/types';
 
-/** Tab Đặt lịch: chọn chuyên khoa → chọn bác sĩ. */
+/** Tab Đặt lịch: chọn chuyên khoa → xem hồ sơ bác sĩ → đặt lịch. */
 export default function BookHome() {
   const [specialtyId, setSpecialtyId] = useState<string | null>(null);
   const specialties = useQuery({
@@ -38,18 +40,19 @@ export default function BookHome() {
         <Empty title="Chưa có bác sĩ" hint="Chuyên khoa này chưa có bác sĩ nhận lịch." />
       ) : (
         doctors.data?.map((d) => (
-          <Pressable key={d.id} accessibilityRole="button" onPress={() => router.push(`/book/${d.id}`)}>
+          <Pressable key={d.id} accessibilityRole="button" onPress={() => router.push(`/doctor/${d.id}`)}>
             {({ pressed }) => (
               <Card style={pressed ? { borderColor: colors.primary } : undefined}>
                 <View style={styles.row}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: colors.primaryDark, fontWeight: '700', fontSize: 18 }}>{d.user.fullName.split(' ').pop()?.[0]}</Text>
-                  </View>
+                  <DoctorAvatar doctor={d} size={48} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{doctorName(d)}</Text>
-                    <Muted>{d.specialty.name}</Muted>
+                    <Muted>
+                      {d.specialty.name}
+                      {experienceText(d) ? ` · ${experienceText(d)}` : ''}
+                    </Muted>
                   </View>
-                  <Text style={{ color: colors.primary, fontWeight: '600' }}>Chọn ›</Text>
+                  <Text style={{ color: colors.primary, fontWeight: '600' }}>Hồ sơ ›</Text>
                 </View>
                 {d.bio ? <Muted>{d.bio}</Muted> : null}
               </Card>
