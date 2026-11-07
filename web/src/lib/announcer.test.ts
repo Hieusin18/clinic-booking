@@ -11,10 +11,12 @@ describe('Loa gọi số', () => {
     expect(spellLabel('xyz')).toBe('xyz');
   });
 
-  it('câu mời đọc tên phòng, chưa đặt phòng thì đọc tên bác sĩ', () => {
+  it('câu mời đọc tên phòng, chưa đặt phòng thì đọc tên bác sĩ không kèm học vị viết tắt', () => {
     expect(announcement({ label: 'A07', room: 'Phòng 2', doctorName: 'BS An' })).toBe('Mời bệnh nhân số A 7, vào Phòng 2.');
-    expect(announcement({ label: 'B03', room: '  ', doctorName: 'BS An' })).toBe('Mời bệnh nhân số B 3, vào phòng khám BS An.');
-    expect(announcement({ label: 'B03', room: null, doctorName: 'BS An' })).toBe('Mời bệnh nhân số B 3, vào phòng khám BS An.');
+    expect(announcement({ label: 'B01', room: '  ', doctorName: 'BSCKI Trần Thị Bình', doctorFullName: 'Trần Thị Bình' })).toBe(
+      'Mời bệnh nhân số B 1, vào phòng khám bác sĩ Trần Thị Bình.',
+    );
+    expect(announcement({ label: 'B03', room: null, doctorName: 'An' })).toBe('Mời bệnh nhân số B 3, vào phòng khám bác sĩ An.');
   });
 
   it('chọn giọng tiếng Việt, ưu tiên giọng Natural/Online', () => {

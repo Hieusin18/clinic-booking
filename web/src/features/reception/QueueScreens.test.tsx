@@ -71,11 +71,13 @@ describe('Màn hình hàng đợi', () => {
     expect(within(flash).getByText('vào Phòng 2')).toBeInTheDocument();
     await waitFor(() => expect(speak.mock.calls.map((c) => c[0].text)).toContain('Mời bệnh nhân số B 1, vào Phòng 2.'));
 
-    act(() => socket.fire('queue:called', { visitId: '1', label: 'A01', room: null, doctorName: 'BS An', recall: true }));
+    act(() => socket.fire('queue:called', { visitId: '1', label: 'A01', room: null, doctorName: 'BS An', doctorFullName: 'An', recall: true }));
     expect(within(screen.getByRole('status')).getByText('Mời lại số')).toBeInTheDocument();
     expect(within(screen.getByRole('status')).getByText('vào phòng khám BS An')).toBeInTheDocument();
     // Mở khóa (1 câu rỗng) + mỗi lần gọi đọc 2 lần
     await waitFor(() => expect(speak).toHaveBeenCalledTimes(5));
+    // Chưa đặt phòng: loa đọc "bác sĩ An", không đánh vần học vị viết tắt
+    expect(speak.mock.calls.at(-1)![0].text).toBe('Mời bệnh nhân số A 1, vào phòng khám bác sĩ An.');
     vi.unstubAllGlobals();
   });
 

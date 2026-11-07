@@ -10,9 +10,14 @@ export function spellLabel(label: string) {
   return m ? `${m[1]} ${m[2]}` : label;
 }
 
-/** Câu mời: "Mời bệnh nhân số A 7, vào Phòng 2." (chưa đặt phòng thì đọc tên bác sĩ). */
-export function announcement(e: { label: string; room: string | null; doctorName: string }) {
-  return `Mời bệnh nhân số ${spellLabel(e.label)}, vào ${e.room?.trim() || `phòng khám ${e.doctorName}`}.`;
+type CallInfo = { label: string; room: string | null; doctorName: string; doctorFullName?: string };
+
+/**
+ * Câu mời: "Mời bệnh nhân số A 7, vào Phòng 2.". Bác sĩ chưa được đặt phòng thì đọc
+ * "phòng khám bác sĩ Trần Thị Bình": bỏ học vị viết tắt (BSCKI, ThS.BS…) vì giọng đọc đánh vần từng chữ cái.
+ */
+export function announcement(e: CallInfo) {
+  return `Mời bệnh nhân số ${spellLabel(e.label)}, vào ${e.room?.trim() || `phòng khám bác sĩ ${e.doctorFullName ?? e.doctorName}`}.`;
 }
 
 /** Giọng tiếng Việt tốt nhất có trên máy: ưu tiên giọng "Natural"/"Online" (Edge), rồi giọng có sẵn. */
@@ -66,7 +71,7 @@ export class Announcer {
   }
 
   /** Chuông rồi đọc câu mời hai lần. */
-  announce(e: { label: string; room: string | null; doctorName: string }) {
+  announce(e: CallInfo) {
     const delay = this.ctx ? chime(this.ctx) * 1000 : 0;
     const text = announcement(e);
     setTimeout(() => {

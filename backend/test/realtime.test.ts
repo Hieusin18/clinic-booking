@@ -72,7 +72,7 @@ describe('Cập nhật tức thì qua WebSocket và loa gọi số', () => {
 
     await api(app).post('/api/queue/call-next').set(doctor.auth).expect(200);
     await until(() => staff.some(([e]) => e === 'queue:called'));
-    expect(staff.find(([e]) => e === 'queue:called')![1]).toMatchObject({ visitId: ticket.body.id, label: 'B01', room: 'Phòng 2', recall: false });
+    expect(staff.find(([e]) => e === 'queue:called')![1]).toMatchObject({ visitId: ticket.body.id, label: 'B01', room: 'Phòng 2', doctorFullName: expect.any(String), recall: false });
     await until(() => mine.some(([e]) => e === 'visit:called'));
     expect(mine.find(([e]) => e === 'visit:called')![1]).toMatchObject({ label: 'B01', room: 'Phòng 2' });
 

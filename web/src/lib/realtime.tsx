@@ -9,7 +9,10 @@ export interface CalledEvent {
   visitId: string;
   label: string;
   room: string | null;
+  /** Tên hiển thị, có học vị: "BSCKI Trần Thị Bình" */
   doctorName: string;
+  /** Tên không kèm học vị, để loa đọc (giọng đọc đánh vần "BSCKI" thành từng chữ cái) */
+  doctorFullName?: string;
   recall: boolean;
 }
 
