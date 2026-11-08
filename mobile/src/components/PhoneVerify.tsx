@@ -6,7 +6,7 @@ import { Text } from './Text';
 import { Button, Card, ErrorBox, Loading, Muted, colors } from './ui';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
-import { mmss, secondsLeft, smsUrl, spacedCode } from '@/lib/sms';
+import { mmss, secondsLeft, smsUrl } from '@/lib/sms';
 
 export interface VerifiedPhone {
   verificationId: string;
@@ -20,7 +20,6 @@ interface Session {
   smsTo: string | null;
   smsBody: string;
   expiresAt: string;
-  simulator: boolean;
 }
 
 /**
@@ -87,14 +86,9 @@ export function PhoneVerify({ phone, purpose, onVerified }: { phone: string; pur
         <Button title="Mở tin nhắn và gửi" onPress={() => void Linking.openURL(smsUrl(session.smsTo!, session.smsBody, Platform.OS))} disabled={expired} />
       ) : session.smsTo ? (
         <Muted>Mở ứng dụng Tin nhắn trên điện thoại, soạn đúng nội dung trên và gửi tới số {session.smsTo}.</Muted>
-      ) : null}
-      {!session.smsTo && session.simulator ? (
-        <View style={{ backgroundColor: colors.warningSoft, borderRadius: 12, padding: 12 }}>
-          <Text style={{ color: colors.warning, fontSize: 14 }}>
-            Chế độ demo: phòng khám chưa có số nhận tin. Nhờ quản trị viên mở trang "Tin nhắn xác minh" và bấm Giả lập cho mã {spacedCode(session.code)}.
-          </Text>
-        </View>
-      ) : null}
+      ) : (
+        <ErrorBox message="Phòng khám chưa cấu hình số nhận tin. Vui lòng liên hệ quầy lễ tân." />
+      )}
 
       {expired ? (
         <>

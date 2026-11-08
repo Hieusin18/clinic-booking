@@ -121,37 +121,27 @@ describe('Xác minh số điện thoại bằng tin nhắn người dùng gửi 
     expect(await status(v)).toBe('VERIFIED');
   });
 
-  it('admin giả lập tin nhắn khi chưa có máy cổng; xem phiên đang chờ và tin đã nhận', async () => {
+  it('admin xem cấu hình cổng và tin đã nhận; không ai khác xem được', async () => {
     const admin = await createUser(app, prisma, 'ADMIN');
     const v = await start();
-    const pending = (await api(app).get('/api/sms/pending').set(admin.auth).expect(200)).body;
-    expect(pending).toEqual([expect.objectContaining({ phone: PHONE, code: v.code, purpose: 'REGISTER' })]);
+    await fromIphone(PHONE, `PKXM ${v.code}`).expect(200);
     await api(app)
-      .post('/api/sms/simulate')
+      .get('/api/sms/inbound')
       .set((await createUser(app, prisma, 'RECEPTIONIST')).auth)
-      .send({ from: PHONE, body: v.code })
       .expect(403);
-    expect(
-      (
-        await api(app)
-          .post('/api/sms/simulate')
-          .set(admin.auth)
-          .send({ from: PHONE, body: `PKXM ${v.code}` })
-          .expect(200)
-      ).body.result,
-    ).toBe('VERIFIED');
     expect((await api(app).get('/api/sms/inbound').set(admin.auth).expect(200)).body[0]).toMatchObject({
-      source: 'SIMULATOR',
+      source: 'IOS_SHORTCUT',
       result: 'VERIFIED',
       phone: PHONE,
     });
     expect((await api(app).get('/api/sms/config').set(admin.auth).expect(200)).body).toEqual({
       smsTo: '0988000999',
-      simulator: true,
       iphoneShortcut: true,
       androidGateway: true,
       prefix: 'PKXM',
     });
+    // Không còn chế độ giả lập
+    await api(app).post('/api/sms/simulate').set(admin.auth).send({ from: PHONE, body: v.code }).expect(404);
   });
 
   it('đăng ký bằng số của hồ sơ có sẵn: đã chứng minh giữ số thì thấy ngay lịch sử khám', async () => {
@@ -213,7 +203,7 @@ describe('Xác minh số điện thoại bằng tin nhắn người dùng gửi 
     const v = await start('0912000111');
     await prisma.phoneVerification.update({ where: { id: v.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
     expect(await status(v)).toBe('EXPIRED');
-    expect((await svc.handleInbound('SIMULATOR', '0912000111', `PKXM ${v.code}`)).result).toBe('NO_MATCH');
+    expect((await svc.handleInbound('IOS_SHORTCUT', '0912000111', `PKXM ${v.code}`)).result).toBe('NO_MATCH');
   });
 
   it('chuẩn hóa số người gửi và tìm mã trong tin', () => {
