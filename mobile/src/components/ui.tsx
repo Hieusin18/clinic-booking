@@ -39,10 +39,13 @@ export function Screen({
   footer,
   title,
   subtitle,
+  action,
 }: {
   children: ReactNode;
   /** Tiêu đề lớn đầu màn (màn tab không có thanh tiêu đề) */
   title?: string;
+  /** Nút nhỏ bên phải tiêu đề (vd. chuông thông báo) */
+  action?: ReactNode;
   subtitle?: string;
   refreshing?: boolean;
   onRefresh?: () => void;
@@ -53,9 +56,12 @@ export function Screen({
   return (
     <SafeAreaView style={styles.safe} edges={title ? ['top', 'left', 'right'] : ['left', 'right', 'bottom']}>
       {title ? (
-        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, gap: 2 }}>
-          <Text style={styles.heading}>{title}</Text>
-          {subtitle ? <Text style={styles.muted}>{subtitle}</Text> : null}
+        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.heading}>{title}</Text>
+            {subtitle ? <Text style={styles.muted}>{subtitle}</Text> : null}
+          </View>
+          {action}
         </View>
       ) : null}
       {scroll ? (

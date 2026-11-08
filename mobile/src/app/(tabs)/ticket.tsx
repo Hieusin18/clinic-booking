@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { View } from 'react-native';
+import { NotificationBell } from '@/components/NotificationBell';
 import { Text } from '@/components/Text';
 import { Badge, Button, Empty, Loading, Muted, Perforation, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { doctorName, formatTime } from '@/lib/format';
 import { VISIT_STATUS, waitHint } from '@/lib/queue';
+import { useMarkVisitRead } from '@/lib/notifications';
 import { useRealtime } from '@/lib/realtime';
 import type { QueuePosition, Visit } from '@/lib/types';
 
@@ -27,6 +29,9 @@ function TicketCard({ visitId }: { visitId: string }) {
     queryFn: async () => (await api.get<QueuePosition>(`/queue/${visitId}/position`)).data,
     refetchInterval: connected ? 120_000 : 15_000,
   });
+  // Đang xem phiếu số thì coi như đã đọc tin gọi số / mời quay lại của phiếu này
+  const focused = useIsFocused();
+  useMarkVisitRead(visitId, ['CALLED', 'RESULTS_READY'], focused);
   if (!pos.data) return <Loading />;
   const { visit, label, currentLabel, peopleAhead, estimatedCallAt, due } = pos.data;
   const hint = waitHint(pos.data);
@@ -117,6 +122,7 @@ export default function Ticket() {
   return (
     <Screen
       title="Số thứ tự của bạn"
+      action={<NotificationBell />}
       refreshing={mine.isRefetching}
       onRefresh={mine.refetch}
       footer={!hasActive ? <Button title="Quét mã QR tại quầy" icon="qr" onPress={() => router.push('/scan')} /> : undefined}

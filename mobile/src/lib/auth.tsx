@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, setApiToken, setUnauthorizedHandler } from './api';
 import { AppError } from './errors';
+import { takePushToken } from './pushToken';
 import { tokenStorage } from './storage';
 import type { Gender, User } from './types';
 
@@ -30,6 +31,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(async () => {
+    // Báo server thôi đẩy thông báo của tài khoản này về máy (khi còn token đăng nhập)
+    const push = takePushToken();
+    if (push) await api.post('/notifications/push-token/remove', { token: push }).catch(() => undefined);
     setApiToken(null);
     await tokenStorage.set(null);
     setUser(null);

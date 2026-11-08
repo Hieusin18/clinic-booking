@@ -2,19 +2,23 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { NotificationBell } from '@/components/NotificationBell';
 import { Text } from '@/components/Text';
 import { Badge, Empty, ErrorBox, Loading, Muted, Screen, colors } from '@/components/ui';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
+import { useInbox } from '@/lib/notifications';
+import { unreadResults } from '@/lib/notify';
 import { dayMonth, doctorName } from '@/lib/format';
 import type { VisitDetail } from '@/lib/types';
 
 /** Lịch sử các lần khám đã hoàn tất, mới nhất trước. */
 export default function History() {
   const list = useQuery({ queryKey: ['visits', 'mine'], queryFn: async () => (await api.get<VisitDetail[]>('/visits/mine')).data });
+  const fresh = unreadResults(useInbox().data?.items ?? []).visits;
 
   return (
-    <Screen title="Lịch sử khám" refreshing={list.isRefetching} onRefresh={list.refetch}>
+    <Screen title="Lịch sử khám" refreshing={list.isRefetching} onRefresh={list.refetch} action={<NotificationBell />}>
       <ErrorBox message={list.error ? errorMessage(list.error) : null} />
       {list.isLoading ? (
         <Loading />
@@ -26,13 +30,14 @@ export default function History() {
           const rec = v.medicalRecord;
           const items = v.prescription?.items.length ?? 0;
           const waiting = v.status === 'AWAITING_RESULTS';
+          const isNew = fresh.has(v.id);
           return (
             <Pressable
               key={v.id}
               accessibilityRole="button"
-              accessibilityLabel={`Lần khám ngày ${dm}/${year}: ${rec?.diagnosis ?? 'chưa có chẩn đoán'}`}
+              accessibilityLabel={`${isNew ? 'Có kết quả mới. ' : ''}Lần khám ngày ${dm}/${year}: ${rec?.diagnosis ?? 'chưa có chẩn đoán'}`}
               onPress={() => router.push(`/visit/${v.id}`)}
-              style={{ flexDirection: 'row', gap: 14, alignItems: 'center', backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 14 }}
+              style={{ flexDirection: 'row', gap: 14, alignItems: 'center', backgroundColor: colors.card, borderRadius: 16, borderWidth: isNew ? 2 : 1, borderColor: isNew ? colors.stamp : colors.border, padding: 14 }}
             >
               <View style={{ width: 62, alignItems: 'center', paddingRight: 12, borderRightWidth: 1, borderRightColor: colors.border }}>
                 <Text style={{ fontFamily: 'num', fontWeight: '700', fontSize: 26, lineHeight: 30, color: colors.text }}>{dm}</Text>
@@ -42,6 +47,7 @@ export default function History() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <Text style={{ fontSize: 15.5, fontWeight: '700', color: colors.text, flexShrink: 1 }}>{rec?.diagnosis ?? 'Chưa có chẩn đoán'}</Text>
                   {rec?.icdCode ? <Badge label={rec.icdCode} /> : null}
+                  {isNew ? <Badge label="Mới" tone="primary" /> : null}
                 </View>
                 <Muted>
                   {doctorName(v.doctor)}

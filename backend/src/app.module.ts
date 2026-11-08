@@ -6,6 +6,7 @@ import { DoctorsModule } from './doctors/doctors.js';
 import { HealthController } from './health/health.controller.js';
 import { MedicinesModule } from './medicines/medicines.js';
 import { MetricsModule } from './metrics/metrics.js';
+import { NotificationsModule } from './notifications/notifications.js';
 import { PatientsModule } from './patients/patients.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { QrController } from './qr/qr.controller.js';
@@ -33,6 +34,7 @@ import { Icd10Module } from './icd10/icd10.js';
     AppointmentsModule,
     PatientsModule,
     RealtimeModule,
+    NotificationsModule,
     VisitsModule,
     LabModule,
     Icd10Module,

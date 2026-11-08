@@ -5,6 +5,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import type { CheckinMethod, VisitSource } from '../generated/prisma/enums.js';
 import { queueTickets } from '../metrics/metrics.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.js';
 import { fireAndForget, RealtimeService } from '../realtime/realtime.js';
 import { currentStreak, isDue, pickNext, predictOrder, ticketLabel, type CallRuleName, type Predicted, type QueueEntry } from './queue-order.js';
 import { queueRules, type QueueRules } from './queue-rules.js';
@@ -68,6 +69,7 @@ export class QueueService {
     private readonly prisma: PrismaService,
     config: ConfigService,
     private readonly realtime: RealtimeService,
+    private readonly notifications: NotificationsService,
   ) {
     this.rules = queueRules(config);
   }
@@ -248,6 +250,7 @@ export class QueueService {
     });
     // Sau khi giao dịch xong: loa ở quầy đọc số, app của bệnh nhân báo đến lượt
     fireAndForget(this.realtime.called(visit.id));
+    fireAndForget(this.notifications.called(visit.id));
     return visit;
   }
 
@@ -257,6 +260,7 @@ export class QueueService {
     if (!visit || visit.doctor.id !== doctorId) throw new NotFoundException('Không tìm thấy phiếu khám');
     if (visit.status !== 'IN_PROGRESS') throw new ConflictException('Chỉ gọi lại được số đang khám');
     await this.realtime.called(visit.id, true);
+    fireAndForget(this.notifications.called(visit.id, true));
     return visit;
   }
 

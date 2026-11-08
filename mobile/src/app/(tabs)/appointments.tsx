@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { NotificationBell } from '@/components/NotificationBell';
 import { Text } from '@/components/Text';
 import { Badge, Card, Empty, ErrorBox, Loading, Muted, Screen, Stamp, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -118,7 +119,7 @@ export default function Appointments() {
   });
 
   return (
-    <Screen title="Lịch hẹn" refreshing={list.isRefetching} onRefresh={list.refetch}>
+    <Screen title="Lịch hẹn" refreshing={list.isRefetching} onRefresh={list.refetch} action={<NotificationBell />}>
       <Segmented
         value={when}
         onChange={setWhen}

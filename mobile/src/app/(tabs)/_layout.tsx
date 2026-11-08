@@ -5,6 +5,8 @@ import { Icon, type IconName } from '@/components/Icon';
 import { fontFor } from '@/components/Text';
 import { colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { useInbox } from '@/lib/notifications';
+import { unreadResults } from '@/lib/notify';
 
 const icon = (name: IconName) => ({ color }: { color: ColorValue }) => <Icon name={name} color={String(color)} size={24} />;
 
@@ -12,6 +14,8 @@ export default function TabsLayout() {
   const { user, loading } = useAuth();
   // Chữ Be Vietnam Pro cao hơn chữ hệ thống (dấu tiếng Việt): nới thanh tab để nhãn không bị cắt
   const insets = useSafeAreaInsets();
+  // Số lần khám có kết quả mới chưa xem: hiện trên tab Lịch sử
+  const results = unreadResults(useInbox().data?.items ?? []).count;
   if (!loading && !user) return <Redirect href="/login" />;
 
   return (
@@ -30,7 +34,16 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Đặt lịch', headerShown: false, tabBarIcon: icon('calendar') }} />
       <Tabs.Screen name="appointments" options={{ title: 'Lịch hẹn', headerShown: false, tabBarIcon: icon('list') }} />
       <Tabs.Screen name="ticket" options={{ title: 'Lấy số', headerShown: false, tabBarIcon: icon('qr') }} />
-      <Tabs.Screen name="history" options={{ title: 'Lịch sử', headerShown: false, tabBarIcon: icon('clock') }} />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'Lịch sử',
+          headerShown: false,
+          tabBarIcon: icon('clock'),
+          tabBarBadge: results || undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.stamp, fontFamily: fontFor('700'), fontSize: 11 },
+        }}
+      />
       <Tabs.Screen name="profile" options={{ title: 'Hồ sơ', headerShown: false, tabBarIcon: icon('user') }} />
     </Tabs>
   );

@@ -1,18 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, Vibration } from 'react-native';
-import { io } from 'socket.io-client';
+import { io, type Socket } from 'socket.io-client';
 import { API_URL, getApiToken } from './api';
 import { useAuth } from './auth';
 import { PATIENT_LIVE_KEYS, socketTarget, type VisitCalledEvent } from './socket';
 
 interface RealtimeState {
   connected: boolean;
+  socket: Socket | null;
   /** Lần gần nhất bác sĩ gọi số của bệnh nhân này (để hiện thông báo trên phiếu) */
   lastCall: (VisitCalledEvent & { at: number }) | null;
 }
 
-const RealtimeContext = createContext<RealtimeState>({ connected: false, lastCall: null });
+const RealtimeContext = createContext<RealtimeState>({ connected: false, socket: null, lastCall: null });
 
 /**
  * WebSocket của bệnh nhân: khi bác sĩ gọi số, chuyển đi cận lâm sàng, có kết quả hay khám xong,
@@ -21,7 +22,7 @@ const RealtimeContext = createContext<RealtimeState>({ connected: false, lastCal
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [state, setState] = useState<RealtimeState>({ connected: false, lastCall: null });
+  const [state, setState] = useState<RealtimeState>({ connected: false, socket: null, lastCall: null });
   const userId = user?.id;
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     // Điện thoại: dùng thẳng WebSocket; bản web qua proxy của Metro thì để Socket.IO tự lùi về long-polling
     const socket = io(url, { path, auth: { token }, ...(Platform.OS === 'web' ? {} : { transports: ['websocket'] }) });
     const refresh = () => PATIENT_LIVE_KEYS.forEach((queryKey) => void queryClient.invalidateQueries({ queryKey: [...queryKey] }));
+    setState((s) => ({ ...s, socket }));
     socket.on('connect', () => {
       setState((s) => ({ ...s, connected: true }));
       refresh();
@@ -44,7 +46,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       socket.disconnect();
-      setState({ connected: false, lastCall: null });
+      setState({ connected: false, socket: null, lastCall: null });
     };
   }, [userId, queryClient]);
 
@@ -52,3 +54,20 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 }
 
 export const useRealtime = () => useContext(RealtimeContext);
+
+/** Nghe một sự kiện trên kết nối hiện tại (vd. "notification:new"). */
+export function useSocketEvent<T>(event: string, handler: (payload: T) => void) {
+  const { socket } = useRealtime();
+  const ref = useRef(handler);
+  useEffect(() => {
+    ref.current = handler;
+  });
+  useEffect(() => {
+    if (!socket) return;
+    const listener = (p: T) => ref.current(p);
+    socket.on(event, listener);
+    return () => {
+      socket.off(event, listener);
+    };
+  }, [socket, event]);
+}

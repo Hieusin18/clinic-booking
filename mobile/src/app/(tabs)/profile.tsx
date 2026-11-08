@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, Platform, Pressable, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { NotificationBell } from '@/components/NotificationBell';
+import { usePushMode } from '@/lib/notifications';
+import type { PushMode } from '@/lib/notify';
 import { Text } from '@/components/Text';
 import { Button, Card, Chip, ErrorBox, Field, Loading, Muted, Screen, SectionLabel, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -16,6 +19,15 @@ const LOCAL_ERRORS: Record<string, string> = {
   relativePhone: 'SĐT người nhà gồm 10 chữ số, bắt đầu bằng 0',
 };
 
+
+const PUSH_MODE: Record<PushMode, { title: string; hint: string }> = {
+  remote: { title: 'Đang bật: nhận cả khi đã tắt ứng dụng', hint: 'Báo khi đến lượt, khi có kết quả, khi khám xong và nhắc trước giờ hẹn.' },
+  local: {
+    title: 'Đang bật: báo khi ứng dụng đang mở',
+    hint: 'Máy này chưa nhận được tin đẩy từ máy chủ (Expo Go trên Android), nên ứng dụng tự báo khi đang mở. Nhắc lịch hẹn vẫn được đặt sẵn trên máy.',
+  },
+  off: { title: 'Đang tắt', hint: 'Bật quyền thông báo cho ứng dụng trong Cài đặt của điện thoại để được báo khi đến lượt và nhắc lịch hẹn.' },
+};
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <View
@@ -122,6 +134,7 @@ export default function Profile() {
     onError: (err) => setError(err instanceof Error && err.message in LOCAL_ERRORS ? LOCAL_ERRORS[err.message] : errorMessage(err)),
   });
 
+  const pushMode = usePushMode();
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   if (profile.isLoading)
@@ -136,7 +149,7 @@ export default function Profile() {
   const meta = [user?.phone, p ? GENDER_LABEL[p.gender] : null, p?.dateOfBirth ? `${ageOf(p.dateOfBirth)} tuổi` : null].filter(Boolean).join(' · ');
 
   return (
-    <Screen title="Hồ sơ" refreshing={profile.isRefetching} onRefresh={profile.refetch}>
+    <Screen title="Hồ sơ" refreshing={profile.isRefetching} onRefresh={profile.refetch} action={<NotificationBell />}>
       <View style={[styles.row, { gap: 14 }]}>
         <View
           style={{
@@ -216,6 +229,13 @@ export default function Profile() {
           <Button title="Hủy" variant="secondary" onPress={() => setEditing(false)} disabled={save.isPending} />
         </Card>
       )}
+      {Platform.OS !== 'web' ? (
+        <Card>
+          <SectionLabel>THÔNG BÁO TRÊN MÁY NÀY</SectionLabel>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{PUSH_MODE[pushMode].title}</Text>
+          <Muted>{PUSH_MODE[pushMode].hint}</Muted>
+        </Card>
+      ) : null}
       <Pressable accessibilityRole="button" onPress={() => void logout()} style={{ alignSelf: 'center', padding: 12 }}>
         <Text style={{ fontSize: 15, fontWeight: '600', color: colors.danger }}>Đăng xuất</Text>
       </Pressable>

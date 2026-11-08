@@ -92,8 +92,10 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  patient Patient?
-  doctor  Doctor?
+  patient       Patient?
+  doctor        Doctor?
+  notifications Notification[]
+  pushTokens    PushToken[]
 }
 
 model Specialty {
@@ -187,6 +189,10 @@ model Appointment {
   status     AppointmentStatus @default(PENDING)
   reason     String?
   createdAt  DateTime          @default(now())
+
+  /// Đã gửi nhắc lịch trước một ngày / trước một giờ (tránh gửi trùng)
+  remindedDayAt  DateTime?
+  remindedHourAt DateTime?
 
   patient  Patient  @relation(fields: [patientId], references: [id])
   schedule Schedule @relation(fields: [scheduleId], references: [id])
@@ -391,4 +397,47 @@ model PrescriptionItem {
 
   prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
   medicine     Medicine     @relation(fields: [medicineId], references: [id])
+}
+
+enum NotificationType {
+  /// Bác sĩ gọi số (hoặc gọi lại)
+  CALLED
+  /// Có kết quả cận lâm sàng, mời quay lại phòng khám (chế độ quay lại)
+  RESULTS_READY
+  /// Khám xong: có kết luận, đơn thuốc và kết quả (chế độ nhận kết quả online)
+  VISIT_DONE
+  /// Nhắc lịch hẹn sắp tới
+  APPOINTMENT_REMINDER
+}
+
+/// Hộp thư thông báo của bệnh nhân; đồng thời được đẩy về điện thoại nếu đã đăng ký token
+model Notification {
+  id            String           @id @default(uuid())
+  userId        String
+  type          NotificationType
+  title         String
+  body          String
+  /// Màn hình trong app mở khi bấm, ví dụ "/visit/<id>"
+  url           String?
+  visitId       String?
+  appointmentId String?
+  readAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Expo push token của từng máy đã đăng nhập (một tài khoản có thể dùng nhiều máy)
+model PushToken {
+  token     String   @id
+  userId    String
+  platform  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

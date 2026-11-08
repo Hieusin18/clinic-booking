@@ -33,7 +33,13 @@
           "barcodeScannerEnabled": true
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#3A3FB0"
+        }
+      ]
     ],
     "scheme": "clinicbooking",
     "experiments": {
