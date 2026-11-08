@@ -52,7 +52,7 @@ export function SmsPage() {
         {c && (
           <Card size="small">
             <Descriptions size="small" column={{ xs: 1, md: 2 }}>
-              <Descriptions.Item label="Số nhận tin (SMS_VERIFY_NUMBER)">
+              <Descriptions.Item label="Số nhận tin">
                 {c.smsTo ? (
                   <span style={{ fontFamily: NUM, fontSize: 18, fontWeight: 600 }}>{c.smsTo}</span>
                 ) : (
