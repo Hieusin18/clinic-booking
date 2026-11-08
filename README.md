@@ -123,6 +123,20 @@ docker compose run --rm seed              # tài khoản và dữ liệu mẫu
 - Windows chặn cổng 80 từ máy khác thì mở bằng CMD quyền Administrator:
   `netsh advfirewall firewall add rule name="Clinic demo" dir=in action=allow protocol=TCP localport=80`
 
+## Thống kê (admin)
+
+Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/stats/stats.ts` (và trong nút ⓘ trên trang).
+
+Máy demo mới cài chưa có lịch sử khám nên trang gần như trống. Muốn có số liệu để trình diễn, tạo **dữ liệu lịch sử mẫu** (bệnh nhân hư cấu, số điện thoại 0989xxxxxx, 60 ngày gần nhất):
+
+```bash
+docker compose run --rm seed npx tsx prisma/seed-history.ts            # tạo
+docker compose run --rm seed npx tsx prisma/seed-history.ts --reset    # xóa
+# chạy trực tiếp: cd backend && npm run seed:history -- --days 90
+```
+
+Số liệu này là **mẫu sinh ngẫu nhiên**: khi đưa lên slide cần ghi rõ "dữ liệu mô phỏng", hoặc xóa đi và dùng số liệu của các buổi chạy thử thật.
+
 ## Chạy app mobile (bệnh nhân)
 
 ```bash

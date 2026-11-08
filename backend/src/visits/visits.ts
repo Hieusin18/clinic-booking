@@ -230,7 +230,7 @@ export class VisitsService {
       if (visit.appointmentId) {
         await tx.appointment.update({ where: { id: visit.appointmentId }, data: { status: 'COMPLETED' } });
       }
-      return tx.visit.update({ where: { id: visitId }, data: { status: 'DONE' }, select: visitView });
+      return tx.visit.update({ where: { id: visitId }, data: { status: 'DONE', completedAt: new Date() }, select: visitView });
     });
     fireAndForget(this.realtime.visitChanged(visitId));
     fireAndForget(this.notifications.visitDone(visitId));

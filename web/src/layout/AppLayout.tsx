@@ -9,6 +9,7 @@ import {
   UnorderedListOutlined,
   UserOutlined,
   ApartmentOutlined,
+  BarChartOutlined,
   IdcardOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
@@ -30,6 +31,7 @@ const item = (key: string, label: string, icon: ReactNode): Item => ({ key, labe
 /** Menu bên trái theo vai trò. key = đường dẫn trang. */
 export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
   ADMIN: [
+    item('/admin/stats', 'Thống kê', <BarChartOutlined />),
     item('/admin/specialties', 'Chuyên khoa', <ApartmentOutlined />),
     item('/admin/doctors', 'Bác sĩ', <TeamOutlined />),
     item('/admin/receptionists', 'Lễ tân', <IdcardOutlined />),
