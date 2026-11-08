@@ -463,3 +463,45 @@ model PushToken {
 
   @@index([userId])
 }
+
+enum PhoneVerifyPurpose {
+  /// Đăng ký tài khoản app
+  REGISTER
+  /// Quên mật khẩu
+  RESET_PASSWORD
+}
+
+/// Xác minh số điện thoại kiểu "nhắn tin để xác thực": người dùng nhắn mã từ chính SIM của họ tới số của phòng khám
+model PhoneVerification {
+  id         String             @id @default(uuid())
+  phone      String
+  purpose    PhoneVerifyPurpose
+  /// 6 chữ số, người dùng nhắn "PKXM <mã>"
+  code       String
+  /// SHA-256 của vé bí mật trả cho app (chỉ app tạo phiên mới hỏi trạng thái / dùng được phiên)
+  ticketHash String
+  ip         String?
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  usedAt     DateTime?
+  createdAt  DateTime           @default(now())
+
+  @@index([phone, createdAt])
+  @@index([code])
+}
+
+/// Tin nhắn cổng SMS chuyển tới (iPhone Phím tắt, Android SMS Gateway, hoặc giả lập), để admin theo dõi
+model InboundSms {
+  id             String   @id @default(uuid())
+  source         String
+  fromRaw        String
+  /// Số đã chuẩn hóa 0xxxxxxxxx (null nếu người gửi không phải số điện thoại, vd. email iMessage)
+  phone          String?
+  body           String
+  /// VERIFIED / WRONG_SENDER / NO_MATCH / INVALID_SENDER
+  result         String
+  verificationId String?
+  receivedAt     DateTime @default(now())
+
+  @@index([receivedAt])
+}

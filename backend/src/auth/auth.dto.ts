@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 import { Gender } from '../generated/prisma/enums.js';
 
 export const PHONE_REGEX = /^0\d{9}$/;
@@ -13,6 +13,16 @@ export class RegisterDto {
   @IsDateString() dateOfBirth: string;
   @IsEnum(Gender) gender: Gender;
   @IsOptional() @IsEmail() email?: string;
+  /** Phiên xác minh số điện thoại đã xong (POST /auth/phone-verifications), bắt buộc trừ khi REQUIRE_PHONE_VERIFICATION=false */
+  @IsOptional() @IsUUID() verificationId?: string;
+  @IsOptional() @IsString() @MaxLength(100) ticket?: string;
+}
+
+/** Quên mật khẩu: dùng phiên xác minh số điện thoại (mục đích RESET_PASSWORD) để đặt mật khẩu mới */
+export class ResetPasswordDto {
+  @IsUUID() verificationId: string;
+  @IsString() @MaxLength(100) ticket: string;
+  @IsString() @MaxLength(72) newPassword: string;
 }
 
 export class LoginDto {

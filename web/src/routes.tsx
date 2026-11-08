@@ -5,6 +5,7 @@ import { MedicinesPage } from './features/admin/MedicinesPage';
 import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
 import { StatsPage } from './features/admin/stats/StatsPage';
+import { SmsPage } from './features/admin/SmsPage';
 import { ChangePasswordPage } from './features/account/ChangePasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { ExamPage } from './features/exam/ExamPage';
@@ -56,6 +57,7 @@ export const routes: RouteObject[] = [
         path: CHANGE_PASSWORD_PATH,
         element: <RequireRole roles={['ADMIN', 'DOCTOR', 'RECEPTIONIST']}><ChangePasswordPage /></RequireRole>,
       },
+      { path: '/admin/sms', element: <RequireRole roles={['ADMIN']}><SmsPage /></RequireRole> },
       { path: '/admin/stats', element: <RequireRole roles={['ADMIN']}><StatsPage /></RequireRole> },
       { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><SpecialtiesPage /></RequireRole> },
       { path: '/admin/doctors', element: <RequireRole roles={['ADMIN']}><DoctorsPage /></RequireRole> },

@@ -2,7 +2,8 @@ import { BadRequestException, ConflictException, HttpException, HttpStatus, Inje
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
-import { ChangePasswordDto, LoginDto, RegisterDto } from './auth.dto.js';
+import { phoneVerificationRequired, PhoneVerifyService } from '../sms/phone-verify.js';
+import { ChangePasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto.js';
 import { AuthUser } from './decorators.js';
 import { hashPassword, passwordProblem, verifyPassword } from './password.js';
 
@@ -23,6 +24,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly phoneVerify: PhoneVerifyService,
   ) {}
 
   /**
@@ -36,17 +38,27 @@ export class AuthService {
       throw new ConflictException('Số điện thoại đã được đăng ký');
     }
     const passwordHash = await hashPassword(dto.password);
+    const verification = dto.verificationId && dto.ticket ? { verificationId: dto.verificationId, ticket: dto.ticket } : undefined;
+    const mustVerify = phoneVerificationRequired();
 
     const user = await this.prisma.$transaction(async (tx) => {
+      // Số điện thoại phải được chứng minh bằng tin nhắn gửi từ chính SIM đó (sms/phone-verify.ts)
+      const phoneProven = mustVerify || verification ? (await this.phoneVerify.consume(tx, verification, 'REGISTER', dto.phone), true) : false;
       const created = await tx.user.create({
         data: { fullName: dto.fullName, phone: dto.phone, email: dto.email, passwordHash, role: 'PATIENT' },
       });
       const existing = await tx.patient.findUnique({ where: { phone: dto.phone } });
       if (existing) {
         if (existing.userId) throw new ConflictException('Số điện thoại đã được đăng ký');
-        // Hồ sơ có sẵn (lễ tân tạo khi khám vãng lai): gắn tài khoản nhưng ẩn bệnh án cũ cho tới khi
-        // chứng minh là chính chủ (mã liên kết trên phiếu khám hoặc lễ tân xem CCCD), xem patients/account-link.ts
-        await tx.patient.update({ where: { id: existing.id }, data: { userId: created.id, historyLockedBefore: new Date(), verifyFailures: 0 } });
+        // Hồ sơ có sẵn (lễ tân tạo khi khám vãng lai). Đã chứng minh giữ số điện thoại (nhắn tin xác minh) thì
+        // thấy ngay lịch sử khám; chưa thì ẩn bệnh án cũ cho tới khi xác minh bằng mã liên kết / tại quầy
+        // (patients/account-link.ts)
+        await tx.patient.update({
+          where: { id: existing.id },
+          data: phoneProven
+            ? { userId: created.id, historyLockedBefore: null, verifiedAt: new Date(), verifyFailures: 0 }
+            : { userId: created.id, historyLockedBefore: new Date(), verifyFailures: 0 },
+        });
       } else {
         await tx.patient.create({
           data: {
@@ -129,6 +141,28 @@ export class AuthService {
         tokenVersion: { increment: 1 },
       },
     });
+    return this.issueToken(updated);
+  }
+
+  /**
+   * Quên mật khẩu (bệnh nhân): đã nhắn tin xác minh số điện thoại thì đặt mật khẩu mới, mọi máy đang đăng nhập
+   * bị đăng xuất, tạm khóa do nhập sai được gỡ; trả token để đăng nhập luôn.
+   */
+  async resetPassword(dto: ResetPasswordDto) {
+    const v = await this.prisma.phoneVerification.findUnique({ where: { id: dto.verificationId }, select: { phone: true } });
+    const user = v && (await this.prisma.user.findUnique({ where: { phone: v.phone } }));
+    if (!v || !user || user.role !== 'PATIENT') throw new BadRequestException('Phiên xác minh không hợp lệ, vui lòng xác minh lại');
+    const weak = passwordProblem(dto.newPassword, user.phone);
+    if (weak) throw new BadRequestException(weak);
+    const passwordHash = await hashPassword(dto.newPassword);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.phoneVerify.consume(tx, dto, 'RESET_PASSWORD', user.phone);
+      return tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date(), failedLogins: 0, lockedUntil: null, tokenVersion: { increment: 1 } },
+      });
+    });
+    if (!updated.isActive) throw new UnauthorizedException('Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên');
     return this.issueToken(updated);
   }
 

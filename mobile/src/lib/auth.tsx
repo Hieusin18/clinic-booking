@@ -12,6 +12,9 @@ export interface RegisterInput {
   password: string;
   dateOfBirth: string;
   gender: Gender;
+  /** Phiên xác minh số điện thoại bằng tin nhắn (components/PhoneVerify) */
+  verificationId?: string;
+  ticket?: string;
 }
 
 interface AuthState {
@@ -25,6 +28,8 @@ interface AuthState {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Đăng xuất khỏi mọi thiết bị (kể cả máy này) */
   logoutAll: () => Promise<void>;
+  /** Quên mật khẩu: đặt mật khẩu mới sau khi nhắn tin xác minh số, rồi đăng nhập luôn */
+  resetPassword: (verification: { verificationId: string; ticket: string }, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -108,9 +113,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
+  const resetPassword = useCallback(
+    async (verification: { verificationId: string; ticket: string }, newPassword: string) => {
+      const res = await api.post('/auth/reset-password', { ...verification, newPassword });
+      await accept(res.data);
+    },
+    [accept],
+  );
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, changePassword, logoutAll }),
-    [user, loading, login, register, logout, changePassword, logoutAll],
+    () => ({ user, loading, login, register, logout, changePassword, logoutAll, resetPassword }),
+    [user, loading, login, register, logout, changePassword, logoutAll, resetPassword],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

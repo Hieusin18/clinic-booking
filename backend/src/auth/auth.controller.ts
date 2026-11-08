@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Ip, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ChangePasswordDto, LoginDto, RegisterDto } from './auth.dto.js';
+import { ChangePasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { AllowPendingPassword, AuthUser, CurrentUser, Public } from './decorators.js';
 
@@ -30,6 +30,14 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     return this.auth.me(user);
+  }
+
+  /** Quên mật khẩu: đặt mật khẩu mới sau khi nhắn tin xác minh số điện thoại */
+  @Public()
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto);
   }
 
   /** Đổi mật khẩu; trả về token mới (các máy khác bị đăng xuất) */

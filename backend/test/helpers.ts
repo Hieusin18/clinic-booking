@@ -7,7 +7,7 @@ import { PrismaService } from '../src/prisma/prisma.service.js';
 /** Tạo app giống main.ts (prefix /api, ValidationPipe) để test qua HTTP thật. */
 export async function createTestApp(): Promise<{ app: INestApplication; prisma: PrismaService }> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication();
+  const app = moduleRef.createNestApplication({ rawBody: true });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   // Lắng nghe cổng ngẫu nhiên để nhiều request đồng thời dùng chung một server
