@@ -7,6 +7,7 @@ import { dateOnly, todayVN, vnDateString } from '../common/time.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { appointmentsBooked } from '../metrics/metrics.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { patientScopeOf, visibleSince } from '../patients/account-link.js';
 import { RealtimeService } from '../realtime/realtime.js';
 import { noShowStanding, queueRules, type QueueRules } from '../queue/queue-rules.js';
 
@@ -142,14 +143,14 @@ export class AppointmentsService {
   }
 
   async mine(user: AuthUser, q: MineQuery) {
-    const patientId = await patientIdOf(this.prisma, user);
+    const { patientId, lockedBefore } = await patientScopeOf(this.prisma, user);
     // Lịch hẹn còn check-in được (chưa quá giờ hẹn + CHECKIN_LATE) vẫn tính là sắp tới
     const cutoff = new Date(Date.now() - this.rules.checkinLateMinutes * MINUTE);
     const upcoming = (q.when ?? 'upcoming') === 'upcoming';
     const list = await this.prisma.appointment.findMany({
       where: upcoming
-        ? { patientId, status: { in: [...ACTIVE] }, schedule: { startTime: { gt: cutoff } } }
-        : { patientId, OR: [{ status: { notIn: [...ACTIVE] } }, { schedule: { startTime: { lte: cutoff } } }] },
+        ? { patientId, ...visibleSince(lockedBefore), status: { in: [...ACTIVE] }, schedule: { startTime: { gt: cutoff } } }
+        : { patientId, ...visibleSince(lockedBefore), OR: [{ status: { notIn: [...ACTIVE] } }, { schedule: { startTime: { lte: cutoff } } }] },
       orderBy: { schedule: { startTime: upcoming ? 'asc' : 'desc' } },
       select: appointmentView,
     });

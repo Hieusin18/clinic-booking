@@ -201,7 +201,11 @@ export default function Profile() {
             <InfoRow label="Địa chỉ" value={p?.address} />
             <InfoRow label="Người nhà" value={[p?.relativeName, p?.relativePhone].filter(Boolean).join(' · ')} />
           </View>
-          <Button title="Sửa hồ sơ" variant="secondary" onPress={() => setEditing(true)} />
+          {p?.verified === false ? (
+            <Muted>Thông tin lễ tân đã ghi (CCCD, BHYT, địa chỉ, dị ứng…) đang được che và chưa sửa được cho tới khi bạn xác minh hồ sơ ở tab Lịch sử khám.</Muted>
+          ) : (
+            <Button title="Sửa hồ sơ" variant="secondary" onPress={() => setEditing(true)} />
+          )}
         </Card>
       ) : (
         <Card>

@@ -91,6 +91,15 @@ export interface Patient {
   relativeName: string | null;
   relativePhone: string | null;
   userId: string | null;
+  /** GET /patients/me: false khi tài khoản gắn vào hồ sơ có sẵn mà chưa xác minh (thông tin cá nhân bị che) */
+  verified?: boolean;
+}
+
+/** GET /patients/me/link */
+export interface LinkStatus {
+  verified: boolean;
+  /** Số lần khám có từ trước khi đăng ký, đang bị ẩn */
+  hiddenVisits: number;
 }
 
 export interface Slot {

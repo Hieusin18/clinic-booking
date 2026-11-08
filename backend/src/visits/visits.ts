@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { randomInt } from 'node:crypto';
 import { ArrayMinSize, IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
-import { patientIdOf } from '../appointments/appointments.js';
+import { ensureLinkCode, patientScopeOf, PRIVATE_FIELDS, visibleSince } from '../patients/account-link.js';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { clinicInfo } from '../common/clinic.js';
@@ -254,7 +254,10 @@ export class VisitsService {
     if (!found) throw new NotFoundException('Không tìm thấy phiếu khám');
 
     if (user.role === 'PATIENT') {
-      if (found.patient.id !== (await patientIdOf(this.prisma, user))) throw new NotFoundException('Không tìm thấy phiếu khám');
+      const scope = await patientScopeOf(this.prisma, user);
+      if (found.patient.id !== scope.patientId || (scope.lockedBefore && found.createdAt < scope.lockedBefore)) {
+        throw new NotFoundException('Không tìm thấy phiếu khám');
+      }
       const { prescriptions, ...rest } = found;
       // Bệnh nhân chỉ thấy kết quả cận lâm sàng khi bác sĩ đã đọc và hoàn tất lượt khám
       return { ...rest, labOrders: presentLabOrders(this.secret, found.labOrders, found.status !== 'DONE'), prescription: currentPrescription(prescriptions) };
@@ -270,7 +273,10 @@ export class VisitsService {
   private async printDoc(user: AuthUser, visitId: string) {
     const visit = await this.detail(user, visitId);
     if (!visit.medicalRecord) throw new ConflictException('Lượt khám chưa có bệnh án');
-    const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: visit.patient.id } });
+    const record = await this.prisma.patient.findUniqueOrThrow({ where: { id: visit.patient.id } });
+    // Hồ sơ chưa xác minh: bản bệnh nhân tự tải không in thông tin cá nhân lễ tân đã nhập (CCCD, địa chỉ, BHYT…)
+    const patient =
+      user.role === 'PATIENT' && record.historyLockedBefore ? { ...record, ...Object.fromEntries(PRIVATE_FIELDS.map((f) => [f, null])) } : record;
     // Kết quả cận lâm sàng in kèm ảnh, nên đọc cả dữ liệu ảnh (bệnh nhân chỉ thấy khi đã hoàn tất)
     const showLab = user.role !== 'PATIENT' || visit.status === 'DONE';
     const labOrders = showLab
@@ -281,12 +287,18 @@ export class VisitsService {
         })
       : visit.labOrders.map((o) => ({ name: o.name, note: o.note, resultText: null, doneAt: null, files: [] }));
     // Bác sĩ không ghi lại lý do khám thì dùng lý do bệnh nhân khai lúc đặt lịch/lấy số
-    return buildPrintDoc({
-      ...visit,
-      patient,
-      labOrders,
-      medicalRecord: { ...visit.medicalRecord, reason: visit.medicalRecord.reason ?? visit.reason },
-    });
+    // Bản bác sĩ in đưa bệnh nhân có mã liên kết; bản bệnh nhân tự tải thì không (tránh lộ mã cho tài khoản chưa xác minh)
+    const linkCode = user.role === 'DOCTOR' ? await ensureLinkCode(this.prisma, patient.id) : undefined;
+    return buildPrintDoc(
+      {
+        ...visit,
+        patient,
+        labOrders,
+        medicalRecord: { ...visit.medicalRecord, reason: visit.medicalRecord.reason ?? visit.reason },
+      },
+      new Date(),
+      { linkCode },
+    );
   }
 
   /**
@@ -310,8 +322,8 @@ export class VisitsService {
 
   /** Lịch sử khám của bệnh nhân đang đăng nhập (mới nhất trước). */
   async myHistory(user: AuthUser) {
-    const patientId = await patientIdOf(this.prisma, user);
-    return this.history(patientId);
+    const { patientId, lockedBefore } = await patientScopeOf(this.prisma, user);
+    return this.history(patientId, lockedBefore);
   }
 
   /** Bác sĩ xem các lần khám trước của bệnh nhân để tham khảo. */
@@ -362,10 +374,11 @@ export class VisitsService {
     return this.history(patientId);
   }
 
-  private async history(patientId: string) {
+  private async history(patientId: string, lockedBefore: Date | null = null) {
     const visits = await this.prisma.visit.findMany({
-      // Gồm cả lượt đang chờ kết quả cận lâm sàng để bệnh nhân nhận kết quả online biết đang chờ
-      where: { patientId, status: { in: ['DONE', 'AWAITING_RESULTS'] } },
+      // Gồm cả lượt đang chờ kết quả cận lâm sàng để bệnh nhân nhận kết quả online biết đang chờ.
+      // Hồ sơ chưa xác minh: chỉ các lượt từ lúc tài khoản gắn vào hồ sơ
+      where: { patientId, status: { in: ['DONE', 'AWAITING_RESULTS'] }, ...visibleSince(lockedBefore) },
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       select: { ...visitView, medicalRecord: true, prescriptions: { where: { status: 'FINALIZED' }, select: prescriptionView } },
     });

@@ -44,7 +44,9 @@ export class AuthService {
       const existing = await tx.patient.findUnique({ where: { phone: dto.phone } });
       if (existing) {
         if (existing.userId) throw new ConflictException('Số điện thoại đã được đăng ký');
-        await tx.patient.update({ where: { id: existing.id }, data: { userId: created.id } });
+        // Hồ sơ có sẵn (lễ tân tạo khi khám vãng lai): gắn tài khoản nhưng ẩn bệnh án cũ cho tới khi
+        // chứng minh là chính chủ (mã liên kết trên phiếu khám hoặc lễ tân xem CCCD), xem patients/account-link.ts
+        await tx.patient.update({ where: { id: existing.id }, data: { userId: created.id, historyLockedBefore: new Date(), verifyFailures: 0 } });
       } else {
         await tx.patient.create({
           data: {

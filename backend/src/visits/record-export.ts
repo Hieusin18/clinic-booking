@@ -222,7 +222,11 @@ type Page = {
   note?: string;
 };
 
-export function buildPrintDoc(v: ExportVisit, now = new Date()) {
+/**
+ * `linkCode`: mã liên kết hồ sơ (chỉ in trên bản bác sĩ in ra đưa bệnh nhân), để bệnh nhân đăng ký app
+ * bằng số điện thoại của hồ sơ rồi nhập mã này mà xem lại lịch sử khám (xem patients/account-link.ts).
+ */
+export function buildPrintDoc(v: ExportVisit, now = new Date(), opts: { linkCode?: string } = {}) {
   const clinic = clinicInfo();
   const r = v.medicalRecord;
   const p = v.patient;
@@ -329,6 +333,9 @@ export function buildPrintDoc(v: ExportVisit, now = new Date()) {
       { kind: 'fields', fields: [{ label: '3. Hẹn tái khám', value: r.followUpDate ? `ngày ${day(r.followUpDate)}` : 'Khi có dấu hiệu bất thường' }] },
     ],
     sign: { date: signDate(v.createdAt), role: 'BÁC SĨ KHÁM BỆNH', name: doctorName },
+    ...(opts.linkCode
+      ? { note: `Xem lại kết quả khám trên ứng dụng: đăng ký bằng số điện thoại ${p.phone}, vào Lịch sử khám và nhập mã liên kết ${opts.linkCode}.` }
+      : {}),
   };
 
   const pages = [record];

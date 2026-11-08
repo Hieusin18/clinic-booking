@@ -136,6 +136,13 @@ docker compose run --rm seed              # tài khoản và dữ liệu mẫu
   lệnh in ra mật khẩu tạm.
 - Mọi người dùng đổi mật khẩu và **đăng xuất khỏi mọi thiết bị** được: web (bấm tên ở góc phải → Đổi mật khẩu), app (Hồ sơ → Đổi mật khẩu).
 
+### Liên kết tài khoản app với hồ sơ có sẵn
+
+Bệnh nhân từng khám vãng lai (lễ tân tạo hồ sơ) rồi mới đăng ký app bằng cùng số điện thoại: tài khoản dùng được ngay nhưng **lịch sử khám cũ bị ẩn và thông tin cá nhân bị che** cho tới khi chứng minh là chính chủ, để người biết số điện thoại không đọc được bệnh án người khác. Cách xác minh:
+
+- nhập **mã liên kết** (6 ký tự) in trên phiếu số lễ tân in và trên bệnh án bác sĩ in, ở tab Lịch sử khám của app; sai 5 lần thì khóa nhập mã 60 phút;
+- hoặc ra quầy: lễ tân chọn bệnh nhân, đối chiếu CCCD rồi bấm **Xác minh chính chủ**. Nếu người khác đã đăng ký trước bằng số của bệnh nhân, bấm **Không phải chính chủ** để gỡ tài khoản đó; chính chủ đăng ký lại được.
+
 ## Thống kê (admin)
 
 Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/stats/stats.ts` (và trong nút ⓘ trên trang).

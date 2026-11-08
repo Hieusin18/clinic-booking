@@ -8,6 +8,7 @@ import { useAction } from '../../lib/hooks';
 import type { Appointment, Gender, Page, Patient, Visit } from '../../lib/types';
 import { useRealtime } from '../../lib/realtime';
 import { C } from '../../lib/theme';
+import { AppAccount } from './AppAccount';
 import { TicketModal } from './TicketPrint';
 import { useDoctorOptions } from './useDoctorOptions';
 
@@ -179,6 +180,7 @@ export function ReceptionPage() {
                 <Descriptions.Item label="BHYT">{selected.insuranceNo || '—'}</Descriptions.Item>
               </Descriptions>
               {selected.allergies && <Alert type="warning" showIcon title={`Dị ứng: ${selected.allergies}`} style={{ marginBottom: 12 }} />}
+              <AppAccount patientId={selected.id} />
               <Form
                 form={ticketForm}
                 layout="vertical"

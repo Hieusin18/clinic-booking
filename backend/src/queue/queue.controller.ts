@@ -1,10 +1,11 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { patientIdOf } from '../appointments/appointments.js';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
 import { todayVN } from '../common/time.js';
+import { patientScopeOf, visibleSince } from '../patients/account-link.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { verifyQrToken } from '../qr/qr-token.js';
 import { QueueService, visitView } from './queue.service.js';
@@ -103,9 +104,9 @@ export class QueueController {
   @Roles('PATIENT')
   @Get('mine')
   async mine(@CurrentUser() user: AuthUser) {
-    const patientId = await patientIdOf(this.prisma, user);
+    const { patientId, lockedBefore } = await patientScopeOf(this.prisma, user);
     return this.prisma.visit.findMany({
-      where: { patientId, date: todayVN() },
+      where: { patientId, date: todayVN(), ...visibleSince(lockedBefore) },
       orderBy: { createdAt: 'desc' },
       select: visitView,
     });
@@ -114,8 +115,9 @@ export class QueueController {
   @Roles('PATIENT', 'RECEPTIONIST', 'ADMIN', 'DOCTOR')
   @Get(':visitId/position')
   async position(@CurrentUser() user: AuthUser, @Param('visitId') visitId: string) {
-    const patientId = user.role === 'PATIENT' ? await patientIdOf(this.prisma, user) : undefined;
-    const pos = await this.queue.position(visitId, patientId);
+    const scope = user.role === 'PATIENT' ? await patientScopeOf(this.prisma, user) : undefined;
+    const pos = await this.queue.position(visitId, scope?.patientId);
+    if (scope?.lockedBefore && pos.visit.createdAt < scope.lockedBefore) throw new NotFoundException('Không tìm thấy phiếu khám');
     return { ...pos, label: ticketLabel(pos.visit), currentLabel: pos.current ? ticketLabel(pos.current) : null };
   }
 
