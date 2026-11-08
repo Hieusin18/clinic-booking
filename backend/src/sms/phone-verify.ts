@@ -8,7 +8,6 @@
  *  3. Cổng SMS chuyển tin tới POST /sms/inbound:
  *     - iPhone Phím tắt: header X-Gateway-Token = SMS_GATEWAY_TOKEN, thân {from, body}
  *     - Android SMS Gateway: chữ ký HMAC-SHA256 (X-Signature, X-Timestamp) bằng SMS_GATEWAY_SIGNING_KEY
- *     - hoặc admin bấm "Giả lập tin nhắn" (POST /sms/simulate, khi SMS_SIMULATOR khác false)
  *  4. Mã đúng VÀ số gửi trùng số khai báo → phiên "đã xác minh"; app hỏi trạng thái (kèm ticket) rồi
  *     dùng phiên để đăng ký (POST /auth/register) hoặc đặt lại mật khẩu (POST /auth/reset-password).
  */
@@ -85,11 +84,6 @@ class StatusQuery {
   @IsString() @MaxLength(100) ticket: string;
 }
 
-class SimulateDto {
-  @IsString() @MaxLength(80) from: string;
-  @IsString() @MaxLength(320) body: string;
-}
-
 class ListQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number;
 }
@@ -103,13 +97,9 @@ export class PhoneVerifyService {
     private readonly config: ConfigService,
   ) {}
 
-  /** Số nhận tin của phòng khám (số SIM của máy cổng); chưa cấu hình thì chỉ dùng được giả lập */
+  /** Số nhận tin của phòng khám (số SIM của máy cổng) */
   get smsTo(): string | null {
     return String(this.config.get('SMS_VERIFY_NUMBER') ?? '').trim() || null;
-  }
-
-  get simulatorEnabled() {
-    return String(this.config.get('SMS_SIMULATOR') ?? '').trim() !== 'false';
   }
 
   async start(dto: StartDto, ip: string, now = new Date()) {
@@ -139,7 +129,7 @@ export class PhoneVerifyService {
     const v = await this.prisma.phoneVerification.create({
       data: { phone: dto.phone, purpose: dto.purpose, code, ticketHash: sha256(ticket), ip, expiresAt: new Date(now.getTime() + VERIFY_TTL_MINUTES * MINUTE) },
     });
-    return { id: v.id, ticket, code, smsTo: this.smsTo, smsBody: `${SMS_PREFIX} ${code}`, expiresAt: v.expiresAt, simulator: this.simulatorEnabled };
+    return { id: v.id, ticket, code, smsTo: this.smsTo, smsBody: `${SMS_PREFIX} ${code}`, expiresAt: v.expiresAt };
   }
 
   async status(id: string, ticket: string, now = new Date()) {
@@ -206,21 +196,9 @@ export class PhoneVerifyService {
     return this.prisma.inboundSms.findMany({ orderBy: { receivedAt: 'desc' }, take: limit });
   }
 
-  /** Phiên đang chờ (chỉ khi bật giả lập, để admin bấm "Giả lập tin nhắn" lúc demo) */
-  async pending(now = new Date()) {
-    if (!this.simulatorEnabled) return [];
-    return this.prisma.phoneVerification.findMany({
-      where: { verifiedAt: null, expiresAt: { gt: now } },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      select: { id: true, phone: true, purpose: true, code: true, expiresAt: true, createdAt: true },
-    });
-  }
-
   configView() {
     return {
       smsTo: this.smsTo,
-      simulator: this.simulatorEnabled,
       iphoneShortcut: !!String(this.config.get('SMS_GATEWAY_TOKEN') ?? '').trim(),
       androidGateway: !!String(this.config.get('SMS_GATEWAY_SIGNING_KEY') ?? '').trim(),
       prefix: SMS_PREFIX,
@@ -300,28 +278,11 @@ export class SmsController {
     return this.service.handleInbound(msg.source, msg.from, msg.body);
   }
 
-  /** Admin giả lập một tin nhắn đến (demo khi chưa có máy cổng) */
-  @ApiBearerAuth()
-  @Roles('ADMIN')
-  @Post('simulate')
-  @HttpCode(200)
-  simulate(@Body() dto: SimulateDto) {
-    if (!this.service.simulatorEnabled) throw new BadRequestException('Chế độ giả lập đang tắt (SMS_SIMULATOR=false)');
-    return this.service.handleInbound('SIMULATOR', dto.from, dto.body);
-  }
-
   @ApiBearerAuth()
   @Roles('ADMIN')
   @Get('inbound')
   recent(@Query() q: ListQuery) {
     return this.service.recentInbound(q.limit);
-  }
-
-  @ApiBearerAuth()
-  @Roles('ADMIN')
-  @Get('pending')
-  pending() {
-    return this.service.pending();
   }
 
   @ApiBearerAuth()
