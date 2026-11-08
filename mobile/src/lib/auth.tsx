@@ -21,6 +21,10 @@ interface AuthState {
   login: (phone: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
+  /** Đổi mật khẩu: máy này nhận token mới, các máy khác bị đăng xuất */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** Đăng xuất khỏi mọi thiết bị (kể cả máy này) */
+  logoutAll: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -86,7 +90,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [accept],
   );
 
-  const value = useMemo(() => ({ user, loading, login, register, logout }), [user, loading, login, register, logout]);
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      const res = await api.post('/auth/change-password', { currentPassword, newPassword });
+      await accept(res.data);
+    },
+    [accept],
+  );
+
+  const logoutAll = useCallback(async () => {
+    await api.post('/auth/logout-all');
+    // Token đã hết hiệu lực: không gọi được API gỡ token thông báo nữa, chỉ xóa trên máy
+    takePushToken();
+    setApiToken(null);
+    await tokenStorage.set(null);
+    setUser(null);
+    queryClient.clear();
+  }, [queryClient]);
+
+  const value = useMemo(
+    () => ({ user, loading, login, register, logout, changePassword, logoutAll }),
+    [user, loading, login, register, logout, changePassword, logoutAll],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

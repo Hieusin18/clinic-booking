@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../lib/api';
@@ -18,7 +18,25 @@ const routes = [
 function WithAuth({ initial }: { initial: User }) {
   const [user, setUser] = useState<User | null>(initial);
   const [router] = useState(() => createMemoryRouter(routes, { initialEntries: ['/admin/doctors'] }));
-  const auth = { user, loading: false, login: async () => initial, logout: () => setUser(null) };
+  const auth = { user, loading: false, login: async () => initial, logout: () => setUser(null), updateSession: () => {}, notice: null };
+  return (
+    <QueryClientProvider client={new QueryClient()}>
+      <AuthContext.Provider value={auth}>
+        <RouterProvider router={router} />
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
+/** Mở lại trang (F5): lúc đầu đang kiểm tra token đã lưu (loading), sau đó mới có user */
+function Reloading() {
+  const [state, setState] = useState<{ user: User | null; loading: boolean }>({ user: null, loading: true });
+  const [router] = useState(() => createMemoryRouter(routes, { initialEntries: ['/admin/doctors'] }));
+  useEffect(() => {
+    const t = setTimeout(() => setState({ user: fakeUser('ADMIN'), loading: false }), 30);
+    return () => clearTimeout(t);
+  }, []);
+  const auth = { ...state, login: async () => fakeUser('ADMIN'), logout: () => {}, updateSession: () => {}, notice: null };
   return (
     <QueryClientProvider client={new QueryClient()}>
       <AuthContext.Provider value={auth}>
@@ -30,6 +48,16 @@ function WithAuth({ initial }: { initial: User }) {
 
 describe('AppLayout', () => {
   afterEach(() => vi.restoreAllMocks());
+  it('mở lại trang (F5) thì ở nguyên trang đang xem, không bị đẩy về trang đăng nhập', async () => {
+    render(<Reloading />);
+    expect(await screen.findByText('Danh sách bác sĩ')).toBeInTheDocument();
+    expect(screen.queryByText('Trang đăng nhập')).not.toBeInTheDocument();
+  });
+  it('menu tài khoản có Đổi mật khẩu', async () => {
+    render(<WithAuth initial={fakeUser('ADMIN', { fullName: 'Quản trị viên' })} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Tài khoản Quản trị viên' }));
+    expect(await screen.findByText('Đổi mật khẩu')).toBeInTheDocument();
+  });
   it('bấm Đăng xuất thì về trang đăng nhập, không bị trang trắng', async () => {
     render(<WithAuth initial={fakeUser('ADMIN')} />);
     expect(await screen.findByText('Danh sách bác sĩ')).toBeInTheDocument();

@@ -21,6 +21,8 @@ export interface User {
   email: string | null;
   role: Role;
   isActive: boolean;
+  /** Đang dùng mật khẩu tạm (admin tạo hoặc đặt lại): phải đổi trước khi dùng hệ thống */
+  mustChangePassword?: boolean;
 }
 
 export interface Specialty {

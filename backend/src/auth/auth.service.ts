@@ -1,14 +1,21 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
-import { LoginDto, RegisterDto } from './auth.dto.js';
+import { ChangePasswordDto, LoginDto, RegisterDto } from './auth.dto.js';
 import { AuthUser } from './decorators.js';
-import { hashPassword, verifyPassword } from './password.js';
+import { hashPassword, passwordProblem, verifyPassword } from './password.js';
+
+/** Nhập sai bấy nhiêu lần liên tiếp thì tạm khóa tài khoản */
+export const MAX_FAILED_LOGINS = 5;
+export const LOCK_MINUTES = 15;
+/** Mỗi địa chỉ IP được nhập sai tối đa bấy nhiêu lần trong LOCK_MINUTES (chống thử mật khẩu trên nhiều tài khoản) */
+export const MAX_FAILED_PER_IP = 30;
+const BAD_LOGIN = 'Sai số điện thoại hoặc mật khẩu';
 
 /** Thông tin tài khoản trả về cho client (không bao giờ kèm passwordHash). */
 export function publicUser(u: User) {
-  return { id: u.id, fullName: u.fullName, phone: u.phone, email: u.email, role: u.role, isActive: u.isActive };
+  return { id: u.id, fullName: u.fullName, phone: u.phone, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword };
 }
 
 @Injectable()
@@ -23,6 +30,8 @@ export class AuthService {
    * thì gắn tài khoản mới vào hồ sơ đó để bệnh nhân thấy lịch sử khám cũ.
    */
   async register(dto: RegisterDto) {
+    const weak = passwordProblem(dto.password, dto.phone);
+    if (weak) throw new BadRequestException(weak);
     if (await this.prisma.user.findUnique({ where: { phone: dto.phone } })) {
       throw new ConflictException('Số điện thoại đã được đăng ký');
     }
@@ -53,13 +62,78 @@ export class AuthService {
     return this.issueToken(user);
   }
 
-  async login(dto: LoginDto) {
+  /** Lần nhập sai gần đây theo địa chỉ IP (trong bộ nhớ; khởi động lại máy chủ thì xóa) */
+  private readonly failedByIp = new Map<string, number[]>();
+
+  private ipBlocked(ip: string, now: number) {
+    const recent = (this.failedByIp.get(ip) ?? []).filter((t) => now - t < LOCK_MINUTES * 60_000);
+    this.failedByIp.set(ip, recent);
+    return recent.length >= MAX_FAILED_PER_IP;
+  }
+
+  /**
+   * Đăng nhập. Chống dò mật khẩu: sai 5 lần liên tiếp thì tài khoản tạm khóa 15 phút (kể cả nhập đúng
+   * trong lúc khóa); một địa chỉ IP sai quá 30 lần trong 15 phút thì bị chặn.
+   */
+  async login(dto: LoginDto, ip = 'unknown', now = new Date()) {
+    const tooMany = (minutes: number) =>
+      new HttpException(`Nhập sai quá nhiều lần. Vui lòng thử lại sau ${minutes} phút.`, HttpStatus.TOO_MANY_REQUESTS);
+    if (this.ipBlocked(ip, now.getTime())) throw tooMany(LOCK_MINUTES);
+
     const user = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    if (user?.lockedUntil && user.lockedUntil > now) {
+      throw tooMany(Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 60_000));
+    }
     if (!user || !(await verifyPassword(dto.password, user.passwordHash))) {
-      throw new UnauthorizedException('Sai số điện thoại hoặc mật khẩu');
+      this.failedByIp.get(ip)!.push(now.getTime());
+      if (user) {
+        const failed = user.failedLogins + 1;
+        const lock = failed >= MAX_FAILED_LOGINS;
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: lock ? { failedLogins: 0, lockedUntil: new Date(now.getTime() + LOCK_MINUTES * 60_000) } : { failedLogins: failed },
+        });
+        if (lock) {
+          throw new HttpException(
+            `Nhập sai mật khẩu ${MAX_FAILED_LOGINS} lần. Tài khoản tạm khóa ${LOCK_MINUTES} phút; quên mật khẩu hãy liên hệ quản trị viên.`,
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
+      }
+      throw new UnauthorizedException(BAD_LOGIN);
     }
     if (!user.isActive) throw new UnauthorizedException('Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên');
-    return this.issueToken(user);
+    const updated = await this.prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null, lastLoginAt: now } });
+    return this.issueToken(updated);
+  }
+
+  /**
+   * Đổi mật khẩu (mọi vai trò, kể cả khi đang dùng mật khẩu tạm). Các máy khác đang đăng nhập bị đăng xuất;
+   * máy đang dùng nhận token mới để tiếp tục.
+   */
+  async changePassword(auth: AuthUser, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: auth.sub } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+    if (!(await verifyPassword(dto.currentPassword, user.passwordHash))) throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    if (dto.newPassword === dto.currentPassword) throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
+    const weak = passwordProblem(dto.newPassword, user.phone);
+    if (weak) throw new BadRequestException(weak);
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await hashPassword(dto.newPassword),
+        mustChangePassword: false,
+        passwordChangedAt: new Date(),
+        tokenVersion: { increment: 1 },
+      },
+    });
+    return this.issueToken(updated);
+  }
+
+  /** Đăng xuất khỏi mọi thiết bị (kể cả máy đang dùng). */
+  async logoutAll(auth: AuthUser) {
+    await this.prisma.user.update({ where: { id: auth.sub }, data: { tokenVersion: { increment: 1 } } });
+    return { ok: true };
   }
 
   async me(auth: AuthUser) {
@@ -72,7 +146,7 @@ export class AuthService {
   }
 
   private async issueToken(user: User) {
-    const payload: AuthUser = { sub: user.id, role: user.role };
+    const payload: AuthUser = { sub: user.id, role: user.role, ver: user.tokenVersion };
     return { accessToken: await this.jwt.signAsync(payload), user: publicUser(user) };
   }
 }

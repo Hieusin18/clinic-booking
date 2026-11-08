@@ -24,6 +24,11 @@ describe('RequireRole', () => {
     renderPage(routes, { path: '/admin/specialties', user: fakeUser('RECEPTIONIST') });
     expect(await screen.findByText('Trang lễ tân')).toBeInTheDocument();
   });
+  it('đang dùng mật khẩu tạm thì chỉ vào được trang đổi mật khẩu', async () => {
+    const { router } = renderPage(appRoutes, { path: '/admin/doctors', user: { ...fakeUser('ADMIN'), mustChangePassword: true } });
+    expect(await screen.findByText('Bạn đang dùng mật khẩu tạm')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/account/password');
+  });
   it('bệnh nhân được hướng dẫn dùng app', async () => {
     renderPage(routes, { path: '/admin/specialties', user: fakeUser('PATIENT') });
     expect(await screen.findByText(/dùng ứng dụng trên điện thoại/)).toBeInTheDocument();

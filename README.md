@@ -123,6 +123,19 @@ docker compose run --rm seed              # tài khoản và dữ liệu mẫu
 - Windows chặn cổng 80 từ máy khác thì mở bằng CMD quyền Administrator:
   `netsh advfirewall firewall add rule name="Clinic demo" dir=in action=allow protocol=TCP localport=80`
 
+## Tài khoản và bảo mật đăng nhập
+
+- **Mật khẩu**: tối thiểu 8 ký tự, có cả chữ và số, không phải mật khẩu phổ biến, không chứa số điện thoại (tài khoản demo vẫn dùng `123456` vì được tạo bằng seed).
+- **Chống dò mật khẩu**: sai 5 lần liên tiếp thì tài khoản tạm khóa 15 phút; một địa chỉ IP sai quá 30 lần trong 15 phút thì bị chặn.
+- **Khóa tài khoản, đổi / đặt lại mật khẩu** có hiệu lực ngay: mọi phiên đăng nhập cũ (cả WebSocket) bị từ chối, không chờ token hết hạn.
+- **Nhân viên quên mật khẩu**: admin vào Bác sĩ / Lễ tân → **Đặt lại mật khẩu** → hệ thống tạo mật khẩu tạm (hiện một lần) để đưa tận tay; lần đăng nhập đầu bắt đổi. Tài khoản admin tạo mới cũng phải đổi mật khẩu ở lần đăng nhập đầu.
+- **Admin quên mật khẩu**: chạy trên máy chủ
+  ```bash
+  docker compose exec backend npm run reset-password -- 0900000001
+  ```
+  lệnh in ra mật khẩu tạm.
+- Mọi người dùng đổi mật khẩu và **đăng xuất khỏi mọi thiết bị** được: web (bấm tên ở góc phải → Đổi mật khẩu), app (Hồ sơ → Đổi mật khẩu).
+
 ## Thống kê (admin)
 
 Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/stats/stats.ts` (và trong nút ⓘ trên trang).

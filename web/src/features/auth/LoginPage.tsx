@@ -43,20 +43,21 @@ function TicketArt() {
 }
 
 export function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, notice } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (user) return <Navigate to={HOME_BY_ROLE[user.role]} replace />;
+  const from = (location.state as { from?: string } | null)?.from;
+  // Đã đăng nhập (vd. vừa kiểm tra xong token đã lưu): quay lại trang đang mở dở
+  if (user) return <Navigate to={from && from !== '/login' ? from : HOME_BY_ROLE[user.role]} replace />;
 
   async function onFinish(values: LoginForm) {
     setSubmitting(true);
     setError(null);
     try {
       const u = await login(values.phone.trim(), values.password);
-      const from = (location.state as { from?: string } | null)?.from;
       navigate(from && from !== '/login' ? from : HOME_BY_ROLE[u.role], { replace: true });
     } catch (err) {
       setError(errorMessage(err));
@@ -93,6 +94,7 @@ export function LoginPage() {
             Dành cho bác sĩ, lễ tân và quản trị viên
           </Typography.Paragraph>
           {error && <Alert type="error" title={error} showIcon style={{ marginBottom: 16 }} />}
+          {!error && notice && <Alert type="warning" title={notice} showIcon style={{ marginBottom: 16 }} />}
           <Form<LoginForm> layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
             <Form.Item
               label="Số điện thoại"

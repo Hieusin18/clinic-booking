@@ -9,6 +9,10 @@ interface AuthState {
   loading: boolean;
   login: (phone: string, password: string) => Promise<User>;
   logout: () => void;
+  /** Sau khi đổi mật khẩu: lưu token mới (các máy khác đã bị đăng xuất) */
+  updateSession: (accessToken: string, user: User) => void;
+  /** Lý do bị đăng xuất tự động (hiện ở trang đăng nhập), vd. tài khoản bị khóa */
+  notice: string | null;
 }
 
 export const AuthContext = createContext<AuthState | null>(null);
@@ -17,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(() => tokenStore.get() !== null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const logout = useCallback(() => {
     tokenStore.set(null);
@@ -25,7 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   useEffect(() => {
-    setUnauthorizedHandler(logout);
+    setUnauthorizedHandler((reason) => {
+      if (tokenStore.get()) setNotice(reason);
+      logout();
+    });
     return () => {
       setUnauthorizedHandler(null);
     };
@@ -44,11 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (phone: string, password: string) => {
     const res = await api.post<{ accessToken: string; user: User }>('/auth/login', { phone, password });
     tokenStore.set(res.data.accessToken);
+    setNotice(null);
     setUser(res.data.user);
     return res.data.user;
   }, []);
 
-  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);
+  const updateSession = useCallback((accessToken: string, next: User) => {
+    tokenStore.set(accessToken);
+    setUser(next);
+  }, []);
+
+  const value = useMemo(() => ({ user, loading, login, logout, updateSession, notice }), [user, loading, login, logout, updateSession, notice]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

@@ -11,9 +11,10 @@ import {
   ApartmentOutlined,
   BarChartOutlined,
   IdcardOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Avatar, Button, Flex, Layout, Menu, Typography } from 'antd';
+import { Avatar, Button, Dropdown, Flex, Layout, Menu, Spin, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
@@ -22,7 +23,7 @@ import { api } from '../lib/api';
 import { ROLE_LABEL, useAuth } from '../lib/auth';
 import type { Doctor, Role } from '../lib/types';
 import { C } from '../lib/theme';
-import { PatientOnly } from './guards';
+import { CHANGE_PASSWORD_PATH, PatientOnly } from './guards';
 import { Logo } from './Logo';
 
 type Item = Required<MenuProps>['items'][number] & { key: string };
@@ -51,7 +52,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
 };
 
 export function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   // Bác sĩ có ảnh đại diện thì hiện ảnh ở góc phải; dùng chung cache với trang "Hồ sơ của tôi"
@@ -62,11 +63,14 @@ export function AppLayout() {
     queryFn: async () => (await api.get<Doctor>('/doctors/me')).data,
     staleTime: 5 * 60_000,
   });
+  // Mở lại trang (F5): chờ kiểm tra token đã lưu, không đẩy về trang đăng nhập rồi về trang chủ
+  if (loading) return <Spin size="large" fullscreen />;
   // Đăng xuất hoặc token hết hạn (401) → về trang đăng nhập, không để trang trắng
   if (!user) return <Navigate to="/login" replace state={{ from: pathname }} />;
   if (user.role === 'PATIENT') return <PatientOnly />;
 
-  const items = MENU_BY_ROLE[user.role];
+  // Đang dùng mật khẩu tạm: ẩn menu, chỉ còn trang đổi mật khẩu
+  const items = user.mustChangePassword ? [] : MENU_BY_ROLE[user.role];
   // Mục đang chọn = mục có đường dẫn dài nhất khớp với trang hiện tại
   const selected = items.filter((i) => pathname === i.key || pathname.startsWith(`${i.key}/`)).sort((a, b) => b.key.length - a.key.length)[0]?.key;
 
@@ -91,10 +95,19 @@ export function AppLayout() {
       <Layout>
         <Layout.Header style={{ background: '#fff', padding: '0 24px', borderBottom: `1px solid ${C.line}` }}>
           <Flex justify="flex-end" align="center" gap={12} style={{ height: '100%' }}>
-            <Avatar src={me.data ? avatarUrl(me.data) : undefined} alt={me.data ? `Ảnh ${user.fullName}` : undefined} style={{ background: C.ink }}>
-              {user.fullName.trim().split(' ').pop()?.[0]?.toUpperCase()}
-            </Avatar>
-            <Typography.Text>{user.fullName}</Typography.Text>
+            <Dropdown
+              trigger={['click']}
+              menu={{ items: [{ key: CHANGE_PASSWORD_PATH, icon: <KeyOutlined />, label: 'Đổi mật khẩu' }], onClick: ({ key }) => navigate(key) }}
+            >
+              <Button type="text" aria-label={`Tài khoản ${user.fullName}`} style={{ height: 44, paddingInline: 6 }}>
+                <Flex align="center" gap={10}>
+                  <Avatar src={me.data ? avatarUrl(me.data) : undefined} alt={me.data ? `Ảnh ${user.fullName}` : undefined} style={{ background: C.ink }}>
+                    {user.fullName.trim().split(' ').pop()?.[0]?.toUpperCase()}
+                  </Avatar>
+                  <Typography.Text>{user.fullName}</Typography.Text>
+                </Flex>
+              </Button>
+            </Dropdown>
             <Button icon={<LogoutOutlined />} onClick={logout}>Đăng xuất</Button>
           </Flex>
         </Layout.Header>

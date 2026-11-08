@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { router } from 'expo-router';
 import { NotificationBell } from '@/components/NotificationBell';
 import { usePushMode } from '@/lib/notifications';
 import type { PushMode } from '@/lib/notify';
@@ -236,6 +237,7 @@ export default function Profile() {
           <Muted>{PUSH_MODE[pushMode].hint}</Muted>
         </Card>
       ) : null}
+      <Button title="Đổi mật khẩu" variant="secondary" onPress={() => router.push('/change-password')} />
       <Pressable accessibilityRole="button" onPress={() => void logout()} style={{ alignSelf: 'center', padding: 12 }}>
         <Text style={{ fontSize: 15, fontWeight: '600', color: colors.danger }}>Đăng xuất</Text>
       </Pressable>

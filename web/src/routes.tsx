@@ -5,6 +5,7 @@ import { MedicinesPage } from './features/admin/MedicinesPage';
 import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
 import { StatsPage } from './features/admin/stats/StatsPage';
+import { ChangePasswordPage } from './features/account/ChangePasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { ExamPage } from './features/exam/ExamPage';
 import { RecordsPage } from './features/exam/RecordsPage';
@@ -13,7 +14,7 @@ import { QueueBoardPage } from './features/reception/QueueBoardPage';
 import { ReceptionPage } from './features/reception/ReceptionPage';
 import { SchedulePage } from './features/schedule/SchedulePage';
 import { AppLayout } from './layout/AppLayout';
-import { PatientOnlyPage, RequireRole } from './layout/guards';
+import { PatientOnlyPage, RequireRole, CHANGE_PASSWORD_PATH } from './layout/guards';
 import { HOME_BY_ROLE, useAuth } from './lib/auth';
 
 function Home() {
@@ -50,6 +51,10 @@ export const routes: RouteObject[] = [
       {
         path: '/admin',
         element: <RequireRole roles={['ADMIN']}><Navigate to="/admin/stats" replace /></RequireRole>,
+      },
+      {
+        path: CHANGE_PASSWORD_PATH,
+        element: <RequireRole roles={['ADMIN', 'DOCTOR', 'RECEPTIONIST']}><ChangePasswordPage /></RequireRole>,
       },
       { path: '/admin/stats', element: <RequireRole roles={['ADMIN']}><StatsPage /></RequireRole> },
       { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><SpecialtiesPage /></RequireRole> },

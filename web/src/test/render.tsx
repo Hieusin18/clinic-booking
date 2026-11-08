@@ -21,11 +21,19 @@ export const fakeUser = (role: User['role'], extra: Partial<User> = {}): User =>
 /** Render một trang với router ảo, React Query và người dùng giả (không cần backend). */
 export function renderPage(
   routes: RouteObject[],
-  { path = '/', user = null as User | null, login = async () => fakeUser('ADMIN'), logout = () => {}, socket = null as FakeSocket | null } = {},
+  {
+    path = '/',
+    user = null as User | null,
+    login = async () => fakeUser('ADMIN'),
+    logout = () => {},
+    socket = null as FakeSocket | null,
+    updateSession = (() => {}) as (token: string, user: User) => void,
+    notice = null as string | null,
+  } = {},
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  const auth = { user, loading: false, login, logout };
+  const auth = { user, loading: false, login, logout, updateSession, notice };
   const ui = (
     <AntApp>
       <QueryClientProvider client={queryClient}>

@@ -219,6 +219,8 @@ export class DoctorsService {
             email: dto.email,
             passwordHash: await hashPassword(dto.password),
             role: 'DOCTOR',
+            // Mật khẩu ban đầu do admin đặt: bác sĩ phải đổi ở lần đăng nhập đầu
+            mustChangePassword: true,
           },
         },
       },

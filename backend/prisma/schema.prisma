@@ -92,6 +92,16 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  /// Tăng lên khi đổi / đặt lại mật khẩu hoặc "đăng xuất mọi thiết bị": mọi token cũ hết hiệu lực
+  tokenVersion       Int       @default(0)
+  /// Đang dùng mật khẩu tạm (admin tạo hoặc đặt lại): phải đổi trước khi dùng hệ thống
+  mustChangePassword Boolean   @default(false)
+  /// Số lần nhập sai liên tiếp; đủ 5 lần thì tạm khóa tới lockedUntil
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  passwordChangedAt  DateTime?
+
   patient       Patient?
   doctor        Doctor?
   notifications Notification[]

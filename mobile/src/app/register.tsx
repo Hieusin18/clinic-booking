@@ -6,6 +6,7 @@ import { Button, Card, Chip, ErrorBox, Field, Muted, Screen, styles } from '@/co
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { GENDER_LABEL, parseVnDate, PHONE_REGEX } from '@/lib/format';
+import { passwordProblem } from '@/lib/password';
 import type { Gender } from '@/lib/types';
 
 export default function Register() {
@@ -22,7 +23,8 @@ export default function Register() {
     if (!PHONE_REGEX.test(form.phone.trim())) return setError('Số điện thoại gồm 10 chữ số, bắt đầu bằng 0');
     if (!dateOfBirth) return setError('Ngày sinh không hợp lệ, nhập theo dạng ngày/tháng/năm, ví dụ 05/03/1998');
     if (!gender) return setError('Chọn giới tính');
-    if (form.password.length < 6) return setError('Mật khẩu tối thiểu 6 ký tự');
+    const weak = passwordProblem(form.password, form.phone.trim());
+    if (weak) return setError(weak);
     if (form.password !== form.confirm) return setError('Mật khẩu nhập lại không khớp');
 
     setSubmitting(true);
@@ -54,6 +56,7 @@ export default function Register() {
           </View>
         </View>
         <Field label="Mật khẩu" value={form.password} onChangeText={set('password')} secureTextEntry />
+        <Muted>Tối thiểu 8 ký tự, có cả chữ và số.</Muted>
         <Field label="Nhập lại mật khẩu" value={form.confirm} onChangeText={set('confirm')} secureTextEntry />
         <ErrorBox message={error} />
         <Button title="Đăng ký" onPress={submit} loading={submitting} />
