@@ -1,24 +1,23 @@
-import { Button, Card, Form, Input, Modal, Switch, Table } from 'antd';
+import { Card, Form, Input, Modal, Switch, Table } from 'antd';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { useAction, usePagedList } from '../../lib/hooks';
 import type { User } from '../../lib/types';
 import { PageHeader } from './PageHeader';
+import { ResetPasswordButton } from './ResetPasswordButton';
 
 type CreateValues = { fullName: string; phone: string; email?: string; password: string };
 
 export function ReceptionistsPage() {
   const list = usePagedList<User>('receptionists', '/staff/receptionists');
   const [creating, setCreating] = useState(false);
-  const [resetting, setResetting] = useState<User | null>(null);
   const [createForm] = Form.useForm<CreateValues>();
-  const [resetForm] = Form.useForm<{ password: string }>();
 
   const create = useAction((v: CreateValues) => api.post('/staff/receptionists', { ...v, email: v.email || undefined }), {
     success: 'Đã tạo tài khoản lễ tân',
     invalidate: ['receptionists'],
   });
-  const update = useAction(({ id, ...body }: { id: string; isActive?: boolean; password?: string }) => api.patch(`/staff/receptionists/${id}`, body), {
+  const update = useAction(({ id, ...body }: { id: string; isActive?: boolean }) => api.patch(`/staff/receptionists/${id}`, body), {
     success: 'Đã cập nhật tài khoản',
     invalidate: ['receptionists'],
   });
@@ -52,18 +51,8 @@ export function ReceptionistsPage() {
           },
           {
             title: '',
-            width: 150,
-            render: (_, u) => (
-              <Button
-                size="small"
-                onClick={() => {
-                  resetForm.resetFields();
-                  setResetting(u);
-                }}
-              >
-                Đặt lại mật khẩu
-              </Button>
-            ),
+            width: 170,
+            render: (_, u) => <ResetPasswordButton userId={u.id} name={u.fullName} />,
           },
         ]}
       />
@@ -87,29 +76,12 @@ export function ReceptionistsPage() {
           <Form.Item label="Email" name="email" rules={[{ type: 'email', message: 'Email không hợp lệ' }]}>
             <Input />
           </Form.Item>
-          <Form.Item label="Mật khẩu ban đầu" name="password" rules={[{ required: true, min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' }]}>
-            <Input.Password />
-          </Form.Item>
-        </Form>
-      </Modal>
-      <Modal
-        title={`Đặt lại mật khẩu cho ${resetting?.fullName ?? ''}`}
-        open={resetting !== null}
-        okText="Lưu"
-        cancelText="Hủy"
-        confirmLoading={update.isPending}
-        onCancel={() => setResetting(null)}
-        onOk={() =>
-          resetForm
-            .validateFields()
-            .then((v) => update.mutateAsync({ id: resetting!.id, password: v.password }))
-            .then(() => setResetting(null))
-            .catch(() => {})
-        }
-        destroyOnHidden
-      >
-        <Form form={resetForm} layout="vertical" requiredMark={false}>
-          <Form.Item label="Mật khẩu mới" name="password" rules={[{ required: true, min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' }]}>
+          <Form.Item
+            label="Mật khẩu ban đầu"
+            name="password"
+            rules={[{ required: true, min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' }]}
+            extra="Lễ tân sẽ phải đổi mật khẩu này ở lần đăng nhập đầu."
+          >
             <Input.Password />
           </Form.Item>
         </Form>

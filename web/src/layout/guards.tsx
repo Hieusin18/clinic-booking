@@ -12,9 +12,13 @@ export function RequireRole({ roles, children }: { roles: Role[]; children: Reac
   if (loading) return <Spin size="large" fullscreen />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (user.role === 'PATIENT') return <PatientOnly />;
+  // Đang dùng mật khẩu tạm: chỉ được vào trang đổi mật khẩu
+  if (user.mustChangePassword && location.pathname !== CHANGE_PASSWORD_PATH) return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
   if (!roles.includes(user.role)) return <Navigate to={HOME_BY_ROLE[user.role]} replace />;
   return <>{children}</>;
 }
+
+export const CHANGE_PASSWORD_PATH = '/account/password';
 
 /** Tài khoản bệnh nhân đăng nhập vào trang quản lý: hướng dẫn dùng app, cho đăng xuất để đổi tài khoản. */
 export function PatientOnly() {

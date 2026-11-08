@@ -15,7 +15,7 @@ import { Global, Injectable, Logger, Module } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import type { AuthUser } from '../auth/decorators.js';
+import { verifySession } from '../auth/auth.guard.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ticketLabel } from '../queue/queue-order.js';
 
@@ -28,13 +28,16 @@ export class RealtimeGateway implements OnGatewayConnection {
   @WebSocketServer() server?: Server;
   private readonly log = new Logger('Realtime');
 
-  constructor(private readonly jwt: JwtService) {}
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async handleConnection(client: Socket) {
     const token = (client.handshake.auth as { token?: unknown } | undefined)?.token;
     try {
       if (typeof token !== 'string' || !token) throw new Error('missing token');
-      const user = await this.jwt.verifyAsync<AuthUser>(token);
+      const { user } = await verifySession(this.jwt, this.prisma, token);
       await client.join(user.role === 'PATIENT' ? userRoom(user.sub) : STAFF_ROOM);
     } catch {
       client.emit('auth:error', { message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' });

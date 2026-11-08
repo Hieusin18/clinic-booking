@@ -7,6 +7,7 @@ import type { Doctor } from '../../lib/types';
 import { AvatarField, ProfileFields } from '../doctor-profile/ProfileFields';
 import { avatarUrl, toProfileForm, toProfilePayload, type ProfileFormValues } from '../doctor-profile/profileForm';
 import { PageHeader } from './PageHeader';
+import { ResetPasswordButton } from './ResetPasswordButton';
 import { useSpecialtyOptions } from './useSpecialtyOptions';
 
 type FormValues = ProfileFormValues & {
@@ -111,7 +112,18 @@ export function DoctorsPage() {
             align: 'center',
             render: (_, d) => <Switch checked={d.user.isActive} loading={toggle.isPending && toggle.variables?.id === d.id} onChange={() => toggle.mutate(d)} />,
           },
-          { title: '', width: 80, render: (_, d) => <Button size="small" onClick={() => void open(d)}>Sửa</Button> },
+          {
+            title: '',
+            width: 230,
+            render: (_, d) => (
+              <Space size={8}>
+                <Button size="small" onClick={() => void open(d)}>
+                  Sửa
+                </Button>
+                <ResetPasswordButton userId={d.user.id} name={d.user.fullName} />
+              </Space>
+            ),
+          },
         ]}
       />
       <Modal
@@ -160,7 +172,12 @@ export function DoctorsPage() {
               <Form.Item label="Email" name="email" rules={[{ type: 'email', message: 'Email không hợp lệ' }]}>
                 <Input />
               </Form.Item>
-              <Form.Item label="Mật khẩu ban đầu" name="password" rules={[{ required: true, min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' }]}>
+              <Form.Item
+                label="Mật khẩu ban đầu"
+                name="password"
+                rules={[{ required: true, min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' }]}
+                extra="Bác sĩ sẽ phải đổi mật khẩu này ở lần đăng nhập đầu."
+              >
                 <Input.Password />
               </Form.Item>
             </>

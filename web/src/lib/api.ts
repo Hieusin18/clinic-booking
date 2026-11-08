@@ -32,15 +32,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let onUnauthorized: (() => void) | null = null;
-/** AuthProvider đăng ký hàm này để tự đăng xuất khi token hết hạn. */
-export const setUnauthorizedHandler = (fn: (() => void) | null) => (onUnauthorized = fn);
+let onUnauthorized: ((reason: string) => void) | null = null;
+/** AuthProvider đăng ký hàm này để tự đăng xuất khi token hết hạn, bị khóa hoặc đã đổi mật khẩu ở máy khác. */
+export const setUnauthorizedHandler = (fn: ((reason: string) => void) | null) => (onUnauthorized = fn);
 
 api.interceptors.response.use(
   (res) => res,
   (err: AxiosError) => {
     const isLogin = err.config?.url?.includes('/auth/login');
-    if (err.response?.status === 401 && !isLogin) onUnauthorized?.();
+    if (err.response?.status === 401 && !isLogin) onUnauthorized?.(errorMessage(err));
     return Promise.reject(err);
   },
 );

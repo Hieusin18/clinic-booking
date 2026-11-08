@@ -98,13 +98,12 @@ describe('Quản trị: chuyên khoa, bác sĩ, lễ tân, thuốc', () => {
         .set(admin)
         .send({ fullName: 'Lễ tân Lan', phone, password: '123456' })
         .expect(201);
-      expect(created.body).toMatchObject({ role: 'RECEPTIONIST', isActive: true });
-
-      await api(app).patch(`/api/staff/receptionists/${created.body.id}`).set(admin).send({ password: 'moi-123' }).expect(200);
-      await api(app).post('/api/auth/login').send({ phone, password: 'moi-123' }).expect(200);
+      // Mật khẩu ban đầu do admin đặt: phải đổi ở lần đăng nhập đầu
+      expect(created.body).toMatchObject({ role: 'RECEPTIONIST', isActive: true, mustChangePassword: true });
+      await api(app).post('/api/auth/login').send({ phone, password: '123456' }).expect(200);
 
       await api(app).patch(`/api/staff/receptionists/${created.body.id}`).set(admin).send({ isActive: false }).expect(200);
-      await api(app).post('/api/auth/login').send({ phone, password: 'moi-123' }).expect(401);
+      await api(app).post('/api/auth/login').send({ phone, password: '123456' }).expect(401);
 
       const list = await api(app).get('/api/staff/receptionists').set(admin).expect(200);
       expect(list.body.total).toBe(1);

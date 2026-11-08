@@ -62,6 +62,7 @@ export default function RootLayout() {
             <Stack.Screen name="visit/[id]" options={{ title: 'Chi tiết lần khám' }} />
             <Stack.Screen name="preview/[id]" options={{ title: 'Xem trước bản điện tử' }} />
             <Stack.Screen name="notifications" options={{ title: 'Thông báo' }} />
+            <Stack.Screen name="change-password" options={{ title: 'Đổi mật khẩu' }} />
           </Stack>
           </NotificationsProvider>
           </RealtimeProvider>

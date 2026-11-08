@@ -10,6 +10,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
     "seed:history": "tsx prisma/seed-history.ts",
+    "reset-password": "node dist/cli/reset-password.js",
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"

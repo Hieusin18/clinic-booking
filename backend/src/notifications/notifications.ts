@@ -29,7 +29,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { CurrentUser, Roles, type AuthUser } from '../auth/decorators.js';
+import { AllowPendingPassword, CurrentUser, Roles, type AuthUser } from '../auth/decorators.js';
 import { vnDateString, vnTime } from '../common/time.js';
 import type { NotificationType } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -388,6 +388,7 @@ export class NotificationsController {
     return this.service.registerToken(user, dto);
   }
 
+  @AllowPendingPassword()
   @Post('push-token/remove')
   @HttpCode(200)
   remove(@CurrentUser() user: AuthUser, @Body() dto: RemoveTokenDto) {

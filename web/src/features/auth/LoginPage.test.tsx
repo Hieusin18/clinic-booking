@@ -8,6 +8,11 @@ import { LoginPage } from './LoginPage';
 const routes = [page('/login', <LoginPage />), page('/admin/stats', <p>Trang admin</p>), page('/doctor/queue', <p>Trang bác sĩ</p>)];
 
 describe('Trang đăng nhập', () => {
+  it('bị đăng xuất tự động thì hiện lý do (vd. tài khoản bị khóa)', async () => {
+    renderPage(routes, { path: '/login', notice: 'Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên' });
+    expect(await screen.findByText('Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên')).toBeInTheDocument();
+  });
+
   it('kiểm tra định dạng SĐT trước khi gửi', async () => {
     const login = vi.fn();
     renderPage(routes, { path: '/login', login });

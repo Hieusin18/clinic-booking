@@ -19,8 +19,7 @@ export class CreateReceptionistDto {
 export class UpdateReceptionistDto {
   @IsOptional() @IsString() @MinLength(2) fullName?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
-  /** Đặt lại mật khẩu khi lễ tân quên */
-  @IsOptional() @IsString() @MinLength(6, { message: 'Mật khẩu tối thiểu 6 ký tự' }) password?: string;
+  // Quên mật khẩu: POST /users/:id/reset-password (src/auth/accounts.ts) tạo mật khẩu tạm
 }
 
 /** Admin quản lý tài khoản lễ tân */
@@ -51,6 +50,8 @@ export class StaffService {
         email: dto.email,
         passwordHash: await hashPassword(dto.password),
         role: 'RECEPTIONIST',
+        // Mật khẩu ban đầu do admin đặt: người dùng phải đổi ở lần đăng nhập đầu
+        mustChangePassword: true,
       },
     });
     return publicUser(user);
@@ -64,7 +65,6 @@ export class StaffService {
       data: {
         fullName: dto.fullName,
         isActive: dto.isActive,
-        ...(dto.password ? { passwordHash: await hashPassword(dto.password) } : {}),
       },
     });
     return publicUser(updated);

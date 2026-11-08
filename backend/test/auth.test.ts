@@ -7,7 +7,7 @@ import { api, createTestApp, resetDb } from './helpers.js';
 const register = {
   fullName: 'Nguyễn Thị Hoa',
   phone: '0987654321',
-  password: 'matkhau1',
+  password: 'xuanhoa2026',
   dateOfBirth: '1998-03-20',
   gender: 'FEMALE',
 };
@@ -52,14 +52,24 @@ describe('Tài khoản và phân quyền', () => {
       expect(await prisma.patient.count()).toBe(1);
     });
 
-    it('trả 400 với SĐT sai định dạng và mật khẩu quá ngắn', async () => {
-      const res = await api(app)
-        .post('/api/auth/register')
-        .send({ ...register, phone: '12345', password: '1' })
-        .expect(400);
-      expect(res.body.message).toEqual(
-        expect.arrayContaining(['Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0', 'Mật khẩu tối thiểu 6 ký tự']),
-      );
+    it('trả 400 với SĐT sai định dạng', async () => {
+      const res = await api(app).post('/api/auth/register').send({ ...register, phone: '12345' }).expect(400);
+      expect(res.body.message).toEqual(expect.arrayContaining(['Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0']));
+    });
+
+    it('từ chối mật khẩu yếu: ngắn, chỉ có chữ hoặc chỉ có số, quá phổ biến, chứa số điện thoại', async () => {
+      const cases: [string, string][] = [
+        ['ab12', 'Mật khẩu tối thiểu 8 ký tự'],
+        ['abcdefgh', 'Mật khẩu cần có cả chữ và số'],
+        ['12345678', 'Mật khẩu cần có cả chữ và số'],
+        ['Password1', 'Mật khẩu này quá phổ biến, hãy chọn mật khẩu khác'],
+        [`a${register.phone}`, 'Mật khẩu không được chứa số điện thoại'],
+      ];
+      for (const [password, message] of cases) {
+        const res = await api(app).post('/api/auth/register').send({ ...register, password }).expect(400);
+        expect(res.body.message).toBe(message);
+      }
+      expect(await prisma.user.count()).toBe(0);
     });
   });
 
