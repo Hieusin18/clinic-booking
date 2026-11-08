@@ -252,6 +252,8 @@ model Visit {
   sentForTestsAt DateTime?
   /// Lúc có kết quả và bệnh nhân vào lại hàng chờ (chế độ quay lại)
   resultsReadyAt DateTime?
+  /// Lúc bác sĩ hoàn tất lượt khám (thống kê thời gian khám)
+  completedAt    DateTime?
   createdAt     DateTime      @default(now())
 
   patient       Patient        @relation(fields: [patientId], references: [id])

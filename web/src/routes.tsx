@@ -4,6 +4,7 @@ import { MyProfilePage } from './features/doctor-profile/MyProfilePage';
 import { MedicinesPage } from './features/admin/MedicinesPage';
 import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
+import { StatsPage } from './features/admin/stats/StatsPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { ExamPage } from './features/exam/ExamPage';
 import { RecordsPage } from './features/exam/RecordsPage';
@@ -48,8 +49,9 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: '/admin',
-        element: <RequireRole roles={['ADMIN']}><Navigate to="/admin/specialties" replace /></RequireRole>,
+        element: <RequireRole roles={['ADMIN']}><Navigate to="/admin/stats" replace /></RequireRole>,
       },
+      { path: '/admin/stats', element: <RequireRole roles={['ADMIN']}><StatsPage /></RequireRole> },
       { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><SpecialtiesPage /></RequireRole> },
       { path: '/admin/doctors', element: <RequireRole roles={['ADMIN']}><DoctorsPage /></RequireRole> },
       { path: '/admin/receptionists', element: <RequireRole roles={['ADMIN']}><ReceptionistsPage /></RequireRole> },

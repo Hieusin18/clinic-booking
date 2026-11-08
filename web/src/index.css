@@ -23,3 +23,9 @@ body { margin: 0; background: #F4F6F7; color: #1E2638; -webkit-font-smoothing: a
 @keyframes counter-flash { 0%, 100% { box-shadow: 0 0 0 0 rgba(142, 146, 232, 0); } 50% { box-shadow: 0 0 0 12px rgba(142, 146, 232, .55); } }
 .counter-flash { animation: counter-flash 1s ease-in-out 4; }
 @media (prefers-reduced-motion: reduce) { .counter-flash { animation: none; } }
+
+/* Trang thống kê: 6 ô chỉ số chia đều 6 / 3 / 2 / 1 cột theo bề rộng */
+.kpi-grid { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 1700px) { .kpi-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .kpi-grid { grid-template-columns: minmax(0, 1fr); } }

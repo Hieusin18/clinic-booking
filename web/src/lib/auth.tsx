@@ -60,7 +60,7 @@ export function useAuth() {
 
 /** Trang chủ của từng vai trò sau khi đăng nhập. */
 export const HOME_BY_ROLE: Record<Role, string> = {
-  ADMIN: '/admin/specialties',
+  ADMIN: '/admin/stats',
   DOCTOR: '/doctor/queue',
   RECEPTIONIST: '/reception',
   PATIENT: '/patient-only',

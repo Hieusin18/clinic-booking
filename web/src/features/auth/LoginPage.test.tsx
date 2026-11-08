@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fakeUser, page, renderPage } from '../../test/render';
 import { LoginPage } from './LoginPage';
 
-const routes = [page('/login', <LoginPage />), page('/admin/specialties', <p>Trang admin</p>), page('/doctor/queue', <p>Trang bác sĩ</p>)];
+const routes = [page('/login', <LoginPage />), page('/admin/stats', <p>Trang admin</p>), page('/doctor/queue', <p>Trang bác sĩ</p>)];
 
 describe('Trang đăng nhập', () => {
   it('kiểm tra định dạng SĐT trước khi gửi', async () => {
