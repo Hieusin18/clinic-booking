@@ -6,7 +6,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: kiểm tra chữ ký HMAC của cổng SMS Android trên đúng thân yêu cầu gốc (sms/phone-verify.ts)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   // Chạy sau Caddy (mạng nội bộ Docker): lấy IP thật của người dùng từ X-Forwarded-For để chặn dò mật khẩu theo IP
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   app.setGlobalPrefix('api');

@@ -143,6 +143,22 @@ Bệnh nhân từng khám vãng lai (lễ tân tạo hồ sơ) rồi mới đăn
 - nhập **mã liên kết** (6 ký tự) in trên phiếu số lễ tân in và trên bệnh án bác sĩ in, ở tab Lịch sử khám của app; sai 5 lần thì khóa nhập mã 60 phút;
 - hoặc ra quầy: lễ tân chọn bệnh nhân, đối chiếu CCCD rồi bấm **Xác minh chính chủ**. Nếu người khác đã đăng ký trước bằng số của bệnh nhân, bấm **Không phải chính chủ** để gỡ tài khoản đó; chính chủ đăng ký lại được.
 
+### Xác minh số điện thoại bằng tin nhắn (đăng ký, quên mật khẩu)
+
+Giống Zalo: **người dùng nhắn tin tới phòng khám** chứ phòng khám không nhắn OTP đi. Phòng khám không tốn tiền SMS (kẻ xấu bấm "gửi mã" liên tục cũng không làm ai mất tiền), và tin phải gửi **từ chính SIM** của số khai báo nên không ai xác minh được số của người khác.
+
+1. App tạo phiên → hiện "Nhắn **PKXM 482913** tới **09xx…**" và mở sẵn màn soạn tin.
+2. Máy cổng của phòng khám nhận tin, chuyển về `POST /api/sms/inbound`.
+3. Mã đúng **và** số người gửi trùng số khai báo → xác minh xong; app tự chuyển sang tạo tài khoản / đặt mật khẩu mới. Hồ sơ có sẵn của số đó thấy ngay lịch sử khám (đã chứng minh giữ số).
+
+Nguồn nhận tin (xem tình trạng ở trang admin **Tin nhắn xác minh**):
+
+- **Giả lập** (mặc định, để demo): trang **Tin nhắn xác minh** liệt kê phiên đang chờ, bấm **Giả lập tin nhắn**. Tắt khi chạy thật: `SMS_SIMULATOR=false`.
+- **iPhone Phím tắt** (iOS 17+): đặt `SMS_GATEWAY_TOKEN` (chuỗi ngẫu nhiên dài) trong `.env`, `SMS_VERIFY_NUMBER` là số của iPhone. Trên iPhone: Phím tắt → Tự động hóa → Tin nhắn → *Tin nhắn chứa* `PKXM` → *Chạy ngay lập tức* → hành động **Lấy nội dung URL**: `http://<IP công khai>:8088/api/sms/inbound`, phương thức POST, header `X-Gateway-Token: <mã bí mật>`, thân JSON `from` = *Người gửi*, `body` = *Nội dung*. Nếu người gửi đã lưu danh bạ mà ra tên thay vì số, thêm bước lấy số điện thoại của danh bạ. HTTP thường không mã hóa: chỉ dùng để demo, đổi mã bí mật sau đó.
+- **Android SMS Gateway** ([capcom6/android-sms-gateway](https://github.com/capcom6/android-sms-gateway)): đăng ký webhook `sms:received` tới địa chỉ **HTTPS** `…/api/sms/inbound`; đặt khóa ký (Settings → Webhooks → Signing Key) vào `SMS_GATEWAY_SIGNING_KEY`. Máy chủ kiểm tra chữ ký HMAC-SHA256.
+
+Tắt bước xác minh khi đăng ký (máy chưa có cổng và không muốn dùng giả lập): `REQUIRE_PHONE_VERIFICATION=false`.
+
 ## Thống kê (admin)
 
 Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/stats/stats.ts` (và trong nút ⓘ trên trang).

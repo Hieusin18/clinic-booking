@@ -48,6 +48,11 @@ services:
       NO_SHOW_LOCK_DAYS: ${NO_SHOW_LOCK_DAYS:-}
       REMINDER_SWEEP_SECONDS: ${REMINDER_SWEEP_SECONDS:-}
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      REQUIRE_PHONE_VERIFICATION: ${REQUIRE_PHONE_VERIFICATION:-}
+      SMS_VERIFY_NUMBER: ${SMS_VERIFY_NUMBER:-}
+      SMS_SIMULATOR: ${SMS_SIMULATOR:-}
+      SMS_GATEWAY_TOKEN: ${SMS_GATEWAY_TOKEN:-}
+      SMS_GATEWAY_SIGNING_KEY: ${SMS_GATEWAY_SIGNING_KEY:-}
 
   # Dữ liệu mẫu, chỉ chạy khi gọi: docker compose -f docker-compose.prod.yml run --rm seed
   seed:

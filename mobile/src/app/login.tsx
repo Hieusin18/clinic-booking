@@ -48,6 +48,11 @@ export default function Login() {
             <Field label="Mật khẩu" icon="lock" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" onSubmitEditing={submit} />
             <ErrorBox message={error} />
             <Button title="Đăng nhập" onPress={submit} loading={submitting} />
+            <View style={{ alignItems: 'center' }}>
+              <Link href="/forgot-password">
+                <Text style={{ color: colors.stamp, fontWeight: '600', fontSize: 15 }}>Quên mật khẩu?</Text>
+              </Link>
+            </View>
             <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
               <Text style={{ color: colors.muted, fontSize: 15 }}>Chưa có tài khoản?</Text>
               <Link href="/register">

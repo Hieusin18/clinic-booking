@@ -1,6 +1,7 @@
 import { Stack, router } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View } from 'react-native';
+import { PhoneVerify, type VerifiedPhone } from '@/components/PhoneVerify';
 import { Text } from '@/components/Text';
 import { Button, Card, Chip, ErrorBox, Field, Muted, Screen, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -15,9 +16,12 @@ export default function Register() {
   const [gender, setGender] = useState<Gender | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  /** Bước 2: nhắn tin xác minh số điện thoại */
+  const [verifying, setVerifying] = useState(false);
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  async function submit() {
+  /** Bước 1: kiểm tra thông tin rồi chuyển sang nhắn tin xác minh */
+  function next() {
     const dateOfBirth = parseVnDate(form.dob);
     if (form.fullName.trim().length < 2) return setError('Nhập họ tên');
     if (!PHONE_REGEX.test(form.phone.trim())) return setError('Số điện thoại gồm 10 chữ số, bắt đầu bằng 0');
@@ -26,17 +30,44 @@ export default function Register() {
     const weak = passwordProblem(form.password, form.phone.trim());
     if (weak) return setError(weak);
     if (form.password !== form.confirm) return setError('Mật khẩu nhập lại không khớp');
-
-    setSubmitting(true);
     setError(null);
-    try {
-      await register({ fullName: form.fullName.trim(), phone: form.phone.trim(), password: form.password, dateOfBirth, gender });
-      router.replace('/(tabs)');
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSubmitting(false);
-    }
+    setVerifying(true);
+  }
+
+  /** Bước 3: số đã xác minh → tạo tài khoản */
+  const finish = useCallback(
+    async (v: VerifiedPhone) => {
+      setSubmitting(true);
+      setError(null);
+      try {
+        await register({
+          fullName: form.fullName.trim(),
+          phone: form.phone.trim(),
+          password: form.password,
+          dateOfBirth: parseVnDate(form.dob)!,
+          gender: gender!,
+          ...v,
+        });
+        router.replace('/(tabs)');
+      } catch (err) {
+        setError(errorMessage(err));
+        setVerifying(false);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [form, gender, register],
+  );
+
+  if (verifying) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: 'Xác minh số điện thoại' }} />
+        <PhoneVerify phone={form.phone.trim()} purpose="REGISTER" onVerified={finish} />
+        {submitting ? <Muted>Đang tạo tài khoản…</Muted> : null}
+        <Button title="Quay lại sửa thông tin" variant="secondary" onPress={() => setVerifying(false)} />
+      </Screen>
+    );
   }
 
   return (
@@ -59,7 +90,7 @@ export default function Register() {
         <Muted>Tối thiểu 8 ký tự, có cả chữ và số.</Muted>
         <Field label="Nhập lại mật khẩu" value={form.confirm} onChangeText={set('confirm')} secureTextEntry />
         <ErrorBox message={error} />
-        <Button title="Đăng ký" onPress={submit} loading={submitting} />
+        <Button title="Tiếp tục: xác minh số điện thoại" onPress={next} />
       </Card>
     </Screen>
   );
