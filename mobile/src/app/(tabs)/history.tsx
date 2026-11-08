@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { NotificationBell } from '@/components/NotificationBell';
+import { VerifyHistoryCard } from '@/components/VerifyHistoryCard';
 import { Text } from '@/components/Text';
 import { Badge, Empty, ErrorBox, Loading, Muted, Screen, colors } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -20,6 +21,7 @@ export default function History() {
   return (
     <Screen title="Lịch sử khám" refreshing={list.isRefetching} onRefresh={list.refetch} action={<NotificationBell />}>
       <ErrorBox message={list.error ? errorMessage(list.error) : null} />
+      <VerifyHistoryCard />
       {list.isLoading ? (
         <Loading />
       ) : list.data?.length === 0 ? (

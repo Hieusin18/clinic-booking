@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, ConflictException, Controller, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, OmitType, PartialType } from '@nestjs/swagger';
 import { IsDateString, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { PHONE_MESSAGE, PHONE_REGEX } from '../auth/auth.dto.js';
@@ -7,6 +7,7 @@ import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { Gender } from '../generated/prisma/enums.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AccountLinkController, AccountLinkService, PRIVATE_FIELDS } from './account-link.js';
 
 export class CreatePatientDto {
   @IsString() @MinLength(2) fullName: string;
@@ -114,14 +115,22 @@ export class PatientsService {
     });
   }
 
+  /**
+   * Hồ sơ của bệnh nhân đang đăng nhập. Hồ sơ có sẵn mà tài khoản chưa xác minh (xem account-link.ts)
+   * thì che các thông tin lễ tân đã nhập.
+   */
   async mine(user: AuthUser) {
-    const p = await this.prisma.patient.findUnique({ where: { userId: user.sub }, select: patientView });
+    const p = await this.prisma.patient.findUnique({ where: { userId: user.sub }, select: { ...patientView, historyLockedBefore: true } });
     if (!p) throw new NotFoundException('Tài khoản chưa có hồ sơ bệnh nhân');
-    return p;
+    const { historyLockedBefore, ...rest } = p;
+    if (!historyLockedBefore) return { ...rest, verified: true };
+    return { ...rest, ...Object.fromEntries(PRIVATE_FIELDS.map((f) => [f, null])), verified: false };
   }
 
   async updateMine(user: AuthUser, dto: UpdateMyProfileDto) {
     const p = await this.mine(user);
+    // Chưa xác minh: không cho sửa hồ sơ có sẵn (tránh người lạ ghi đè dị ứng, BHYT… của chính chủ)
+    if (!p.verified) throw new ForbiddenException('Hãy xác minh hồ sơ (nhập mã liên kết hoặc nhờ lễ tân) trước khi sửa thông tin');
     return this.update(p.id, dto);
   }
 
@@ -181,5 +190,5 @@ export class PatientsController {
   }
 }
 
-@Module({ controllers: [PatientsController], providers: [PatientsService] })
+@Module({ controllers: [PatientsController, AccountLinkController], providers: [PatientsService, AccountLinkService] })
 export class PatientsModule {}

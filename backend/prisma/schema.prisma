@@ -231,6 +231,16 @@ model Patient {
   relativePhone String?
   createdAt   DateTime @default(now())
 
+  /// Mã liên kết in trên phiếu khám / bệnh án: bệnh nhân nhập trên app để xem lịch sử khám cũ
+  linkCode            String?   @unique
+  /// Tài khoản app vừa gắn vào hồ sơ có sẵn mà chưa xác minh: lượt khám tạo trước mốc này bị ẩn,
+  /// thông tin cá nhân lễ tân đã nhập bị che. Xác minh (mã liên kết hoặc lễ tân xem CCCD) thì xóa mốc.
+  historyLockedBefore DateTime?
+  verifiedAt          DateTime?
+  /// Nhập sai mã liên kết liên tiếp; đủ 5 lần thì khóa nhập mã tới verifyLockedUntil
+  verifyFailures      Int       @default(0)
+  verifyLockedUntil   DateTime?
+
   user         User?         @relation(fields: [userId], references: [id])
   appointments Appointment[]
   visits       Visit[]
