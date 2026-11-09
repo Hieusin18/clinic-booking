@@ -4,7 +4,7 @@ import { Platform, Vibration } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { API_URL, getApiToken } from './api';
 import { useAuth } from './auth';
-import { PATIENT_LIVE_KEYS, socketTarget, type VisitCalledEvent } from './socket';
+import { PATIENT_LIVE_KEYS, reconnectWithNewToken, socketTarget, type VisitCalledEvent } from './socket';
 
 interface RealtimeState {
   connected: boolean;
@@ -39,6 +39,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       refresh();
     });
     socket.on('disconnect', () => setState((s) => ({ ...s, connected: false })));
+    reconnectWithNewToken(socket, token, getApiToken);
     socket.on('visit:changed', refresh);
     socket.on('visit:called', (e: VisitCalledEvent) => {
       if (Platform.OS !== 'web') Vibration.vibrate([0, 400, 200, 400]);

@@ -52,6 +52,7 @@ services:
       SMS_VERIFY_NUMBER: ${SMS_VERIFY_NUMBER:-}
       SMS_GATEWAY_TOKEN: ${SMS_GATEWAY_TOKEN:-}
       SMS_GATEWAY_SIGNING_KEY: ${SMS_GATEWAY_SIGNING_KEY:-}
+      API_DOCS: ${API_DOCS:-}
 
   # Dữ liệu mẫu, chỉ chạy khi gọi: docker compose -f docker-compose.prod.yml run --rm seed
   seed:

@@ -13,6 +13,14 @@ export function errorMessage(err: unknown): string {
   return 'Đã có lỗi xảy ra, vui lòng thử lại';
 }
 
+/**
+ * Máy chủ đã trả lời và từ chối phiên (token hết hạn, bị khóa, tài khoản không còn…) thì mới đăng xuất.
+ * Mất mạng hay máy chủ đang khởi động lại thì giữ đăng nhập.
+ */
+export function sessionRejected(err: unknown) {
+  return err instanceof AxiosError && !!err.response && err.response.status < 500;
+}
+
 /** Lỗi có thông báo tiếng Việt sẵn để hiện cho người dùng. */
 export class AppError extends Error {
   name = 'AppError';

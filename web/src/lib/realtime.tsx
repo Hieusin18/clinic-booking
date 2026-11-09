@@ -33,6 +33,26 @@ export function socketTarget(baseURL = api.defaults.baseURL ?? '/api', origin = 
 export const LIVE_KEYS = [['queue'], ['appointments'], ['visit'], ['examined']] as const;
 
 /**
+ * Máy chủ ngắt kết nối khi token đang dùng hết hiệu lực (đổi mật khẩu, đăng xuất mọi máy, bị khóa). Socket.IO không tự
+ * nối lại trong trường hợp này; nếu máy này vừa nhận token mới (vd. chính nó vừa đổi mật khẩu) thì nối lại bằng token đó.
+ */
+export function reconnectWithNewToken(
+  socket: { on(event: 'disconnect', fn: (reason: string) => void): unknown; connect(): unknown; auth: unknown },
+  used: string,
+  current: () => string | null,
+) {
+  let last = used;
+  socket.on('disconnect', (reason) => {
+    if (reason !== 'io server disconnect') return;
+    const token = current();
+    if (!token || token === last) return;
+    last = token;
+    socket.auth = { token };
+    socket.connect();
+  });
+}
+
+/**
  * Kết nối WebSocket cho nhân viên đã đăng nhập. Mỗi khi hàng đợi hoặc lịch hẹn đổi (ở bất kỳ máy nào),
  * các trang đang mở tải lại ngay thay vì chờ tới lần hỏi lại định kỳ. Mất kết nối thì Socket.IO tự nối lại;
  * nối lại xong cũng tải lại một lượt để không sót thay đổi.
@@ -54,6 +74,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       refresh();
     });
     socket.on('disconnect', () => setState({ connected: false, socket }));
+    reconnectWithNewToken(socket, token, () => tokenStore.get());
     socket.on('queue:changed', refresh);
     return () => {
       socket.disconnect();

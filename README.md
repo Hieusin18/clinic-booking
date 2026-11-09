@@ -13,7 +13,7 @@ clinic-booking/
 │   ├── prisma/schema.prisma Toàn bộ CSDL: 4 vai trò, lịch hẹn, hàng đợi, bệnh án, đơn thuốc
 │   ├── prisma.config.ts     Cấu hình Prisma 7 (đọc DATABASE_URL)
 │   └── src/
-│       ├── main.ts          Prefix /api, Swagger ở /api/docs
+│       ├── main.ts          Prefix /api, Swagger ở /api/docs (chỉ khi dev)
 │       ├── prisma/          PrismaService dùng chung
 │       ├── health/          GET /api/health
 │       ├── qr/              Ký và kiểm tra token QR động (HMAC, hết hạn sau 60 giây)
@@ -66,7 +66,7 @@ npx prisma db seed
 npm run start:dev
 ```
 
-Mở http://localhost:3000/api/docs để xem Swagger. Bấm **Authorize** và dán `accessToken` lấy từ `POST /api/auth/login` để thử các API cần đăng nhập.
+Mở http://localhost:3000/api/docs để xem Swagger (chỉ có khi chạy dev; bản Docker tắt mặc định, bật bằng `API_DOCS=true` trong `.env`). Bấm **Authorize** và dán `accessToken` lấy từ `POST /api/auth/login` để thử các API cần đăng nhập.
 
 Tài khoản mẫu (mật khẩu đều là `123456`):
 

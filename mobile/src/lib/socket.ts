@@ -8,6 +8,26 @@ export function socketTarget(apiUrl: string, origin?: string) {
   return { url: u.origin, path: `${u.pathname.replace(/\/$/, '')}/socket.io` };
 }
 
+/**
+ * Máy chủ ngắt kết nối khi token đang dùng hết hiệu lực (đổi mật khẩu, đăng xuất mọi máy, bị khóa). Socket.IO không tự
+ * nối lại trong trường hợp này; nếu máy này vừa nhận token mới (vd. chính nó vừa đổi mật khẩu) thì nối lại bằng token đó.
+ */
+export function reconnectWithNewToken(
+  socket: { on(event: 'disconnect', fn: (reason: string) => void): unknown; connect(): unknown; auth: unknown },
+  used: string,
+  current: () => string | null,
+) {
+  let last = used;
+  socket.on('disconnect', (reason) => {
+    if (reason !== 'io server disconnect') return;
+    const token = current();
+    if (!token || token === last) return;
+    last = token;
+    socket.auth = { token };
+    socket.connect();
+  });
+}
+
 /** Dữ liệu của bệnh nhân mà sự kiện "phiếu đổi trạng thái" làm cũ: gọi lại API để lấy bản mới. */
 export const PATIENT_LIVE_KEYS = [['queue', 'mine'], ['position'], ['visits', 'mine'], ['visit'], ['appointments']] as const;
 

@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, setApiToken, setUnauthorizedHandler } from './api';
-import { AppError } from './errors';
-import { takePushToken } from './pushToken';
-import { tokenStorage } from './storage';
+import { AppError, sessionRejected } from './errors';
+import { currentPushToken, takePushToken } from './pushToken';
+import { tokenStorage, userCache } from './storage';
 import type { Gender, User } from './types';
 
 export interface RegisterInput {
@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (push) await api.post('/notifications/push-token/remove', { token: push }).catch(() => undefined);
     setApiToken(null);
     await tokenStorage.set(null);
+    await userCache.set(null);
     setUser(null);
     queryClient.clear();
   }, [queryClient]);
@@ -62,11 +63,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = await tokenStorage.get();
       if (!token) return;
       setApiToken(token);
-      const res = await api.get<User>('/auth/me');
-      if (res.data.role === 'PATIENT') setUser(res.data);
-      else await logout();
+      try {
+        const res = await api.get<User>('/auth/me');
+        if (res.data.role !== 'PATIENT') return await logout();
+        setUser(res.data);
+        await userCache.set(res.data);
+      } catch (err) {
+        if (sessionRejected(err)) return await logout();
+        // Mất mạng / máy chủ đang khởi động lại: vào bằng thông tin đã lưu, không bắt đăng nhập lại
+        const cached = await userCache.get<User>();
+        if (cached) setUser(cached);
+      }
     })()
-      .catch(() => logout())
+      .catch(() => undefined)
       .finally(() => setLoading(false));
   }, [logout]);
 
@@ -76,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setApiToken(data.accessToken);
     await tokenStorage.set(data.accessToken);
+    await userCache.set(data.user);
     setUser(data.user);
   }, []);
 
@@ -97,7 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const changePassword = useCallback(
     async (currentPassword: string, newPassword: string) => {
-      const res = await api.post('/auth/change-password', { currentPassword, newPassword });
+      // Gửi kèm token thông báo của máy này để vẫn nhận thông báo; các máy khác thì thôi
+      const pushToken = currentPushToken() ?? undefined;
+      const res = await api.post('/auth/change-password', { currentPassword, newPassword, pushToken });
       await accept(res.data);
     },
     [accept],
@@ -109,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     takePushToken();
     setApiToken(null);
     await tokenStorage.set(null);
+    await userCache.set(null);
     setUser(null);
     queryClient.clear();
   }, [queryClient]);

@@ -39,10 +39,11 @@ import {
 } from 'class-validator';
 import { PHONE_MESSAGE, PHONE_REGEX } from '../auth/auth.dto.js';
 import { AuthUser, CurrentUser, Public, Roles } from '../auth/decorators.js';
-import { hashPassword } from '../auth/password.js';
+import { hashPassword, passwordProblem } from '../auth/password.js';
 import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { todayVN } from '../common/time.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { SessionsService } from '../auth/sessions.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   AVATAR_MAX_BYTES,
@@ -82,7 +83,8 @@ export class CreateDoctorDto {
   @IsString() @MinLength(2) fullName: string;
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE }) phone: string;
   @IsOptional() @IsEmail() email?: string;
-  @IsString() @MinLength(6, { message: 'Mật khẩu tối thiểu 6 ký tự' }) password: string;
+  /** Mật khẩu ban đầu: cùng quy tắc với mật khẩu người dùng tự đặt (auth/password.ts) */
+  @IsString() @MaxLength(72) password: string;
   @IsString() specialtyId: string;
   /** Học hàm, học vị: "ThS.BS", "BSCKII"… */
   @IsOptional() @IsString() title?: string;
@@ -147,7 +149,10 @@ function withHistory<T extends Row & { history: HistoryRow[] }>({ history, ...d 
 
 @Injectable()
 export class DoctorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
+  ) {}
 
   /** Bệnh nhân chỉ thấy bác sĩ đang hoạt động; admin thấy tất cả và cả tài khoản đăng nhập. */
   async list(q: DoctorQuery, forAdmin = false) {
@@ -202,6 +207,8 @@ export class DoctorsService {
   }
 
   async create(dto: CreateDoctorDto) {
+    const weak = passwordProblem(dto.password, dto.phone);
+    if (weak) throw new BadRequestException(weak);
     await this.ensureSpecialty(dto.specialtyId);
     if (await this.prisma.user.findUnique({ where: { phone: dto.phone } })) {
       throw new ConflictException('Số điện thoại đã được dùng cho tài khoản khác');
@@ -231,7 +238,8 @@ export class DoctorsService {
 
   /** Admin sửa tài khoản và hồ sơ. */
   async update(id: string, dto: UpdateDoctorDto) {
-    if (!(await this.prisma.doctor.findUnique({ where: { id } }))) throw new NotFoundException('Không tìm thấy bác sĩ');
+    const doctor = await this.prisma.doctor.findUnique({ where: { id }, select: { userId: true } });
+    if (!doctor) throw new NotFoundException('Không tìm thấy bác sĩ');
     if (dto.specialtyId) await this.ensureSpecialty(dto.specialtyId);
     await this.saveProfile(id, dto, {
       title: dto.title,
@@ -239,6 +247,8 @@ export class DoctorsService {
       ...(dto.specialtyId ? { specialty: { connect: { id: dto.specialtyId } } } : {}),
       user: { update: { fullName: dto.fullName, isActive: dto.isActive } },
     });
+    // Khóa tài khoản: máy đang mở không còn nhận cập nhật realtime
+    if (dto.isActive === false) await this.sessions.revoke(doctor.userId);
     return this.full(id);
   }
 

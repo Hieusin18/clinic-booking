@@ -30,6 +30,7 @@ import { IsString, Length } from 'class-validator';
 import { randomInt } from 'node:crypto';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
+import { SessionsService } from '../auth/sessions.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Bỏ các ký tự dễ nhầm (0/O, 1/I/L) vì bệnh nhân gõ lại từ giấy */
@@ -90,13 +91,28 @@ export const PRIVATE_FIELDS = [
   'relativePhone',
 ] as const;
 
+/**
+ * Hồ sơ trả cho chính bệnh nhân: bỏ mã liên kết và các cột nội bộ; hồ sơ có sẵn chưa xác minh thì che thông tin
+ * cá nhân lễ tân đã nhập. Không có mã liên kết ở đây là điều kiện để kẻ chiếm số không tự xác minh được.
+ */
+export function selfPatientView<
+  P extends { historyLockedBefore: Date | null; linkCode?: string | null; verifyFailures?: number; verifyLockedUntil?: Date | null },
+>(p: P) {
+  const { historyLockedBefore, linkCode: _code, verifyFailures: _f, verifyLockedUntil: _l, ...rest } = p;
+  if (!historyLockedBefore) return { ...rest, verified: true };
+  return { ...rest, ...Object.fromEntries(PRIVATE_FIELDS.map((f) => [f, null])), verified: false };
+}
+
 class VerifyDto {
   @IsString() @Length(4, 20) code: string;
 }
 
 @Injectable()
 export class AccountLinkService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
+  ) {}
 
   /** Bệnh nhân: tình trạng liên kết (số lượt khám đang bị ẩn) */
   async myStatus(user: AuthUser) {
@@ -176,6 +192,7 @@ export class AccountLinkService {
       }),
       this.prisma.pushToken.deleteMany({ where: { userId } }),
     ]);
+    await this.sessions.revoke(userId);
     return this.accountOf(patientId);
   }
 }

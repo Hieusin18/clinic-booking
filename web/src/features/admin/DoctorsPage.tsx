@@ -9,6 +9,7 @@ import { avatarUrl, toProfileForm, toProfilePayload, type ProfileFormValues } fr
 import { PageHeader } from './PageHeader';
 import { ResetPasswordButton } from './ResetPasswordButton';
 import { useSpecialtyOptions } from './useSpecialtyOptions';
+import { initialPasswordRules } from '../../lib/password';
 
 type FormValues = ProfileFormValues & {
   fullName: string;
@@ -175,8 +176,9 @@ export function DoctorsPage() {
               <Form.Item
                 label="Mật khẩu ban đầu"
                 name="password"
-                rules={[{ required: true, min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' }]}
-                extra="Bác sĩ sẽ phải đổi mật khẩu này ở lần đăng nhập đầu."
+                rules={initialPasswordRules}
+                dependencies={['phone']}
+                extra="Ít nhất 8 ký tự, có cả chữ và số. Bác sĩ sẽ phải đổi mật khẩu này ở lần đăng nhập đầu."
               >
                 <Input.Password />
               </Form.Item>

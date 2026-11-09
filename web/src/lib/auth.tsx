@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, setUnauthorizedHandler, tokenStore } from './api';
+import { api, sessionRejected, setUnauthorizedHandler, tokenStore, userCache } from './api';
 import type { Role, User } from './types';
 
 interface AuthState {
@@ -25,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     tokenStore.set(null);
+    userCache.set(null);
     setUser(null);
     queryClient.clear();
   }, [queryClient]);
@@ -44,14 +45,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!tokenStore.get()) return;
     api
       .get<User>('/auth/me')
-      .then((res) => setUser(res.data))
-      .catch(() => tokenStore.set(null))
+      .then((res) => {
+        setUser(res.data);
+        userCache.set(res.data);
+      })
+      .catch((err) => {
+        if (sessionRejected(err)) {
+          tokenStore.set(null);
+          userCache.set(null);
+          return;
+        }
+        // Mất mạng / máy chủ đang khởi động lại: vào bằng thông tin đã lưu, các trang tự tải lại khi có mạng
+        const cached = userCache.get<User>();
+        if (cached) setUser(cached);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (phone: string, password: string) => {
     const res = await api.post<{ accessToken: string; user: User }>('/auth/login', { phone, password });
     tokenStore.set(res.data.accessToken);
+    userCache.set(res.data.user);
     setNotice(null);
     setUser(res.data.user);
     return res.data.user;
@@ -59,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateSession = useCallback((accessToken: string, next: User) => {
     tokenStore.set(accessToken);
+    userCache.set(next);
     setUser(next);
   }, []);
 

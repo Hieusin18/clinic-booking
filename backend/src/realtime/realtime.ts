@@ -1,8 +1,8 @@
 /**
  * Cập nhật tức thì qua WebSocket (Socket.IO, đường dẫn /api/socket.io để đi chung Caddy và proxy với API).
  *
- * Kết nối phải kèm token đăng nhập (`auth: { token }`). Nhân viên (bác sĩ, lễ tân, admin) vào phòng "staff",
- * bệnh nhân vào phòng riêng của tài khoản mình. Sự kiện chỉ báo "có gì đổi", không mang dữ liệu bệnh án:
+ * Kết nối phải kèm token đăng nhập (`auth: { token }`). Ai cũng vào phòng riêng của tài khoản mình (để cắt kết nối
+ * khi phiên bị thu hồi); nhân viên (bác sĩ, lễ tân, admin) vào thêm phòng "staff". Sự kiện chỉ báo "có gì đổi", không mang dữ liệu bệnh án:
  * máy khách nhận xong thì gọi lại API như cũ (API vẫn kiểm tra quyền).
  *
  *  - queue:changed  {doctorId?}            → staff: hàng đợi hoặc lịch hẹn trong ngày vừa đổi
@@ -38,10 +38,21 @@ export class RealtimeGateway implements OnGatewayConnection {
     try {
       if (typeof token !== 'string' || !token) throw new Error('missing token');
       const { user } = await verifySession(this.jwt, this.prisma, token);
-      await client.join(user.role === 'PATIENT' ? userRoom(user.sub) : STAFF_ROOM);
+      // Ghi lại phiên bản token để cắt kết nối khi tài khoản đăng xuất mọi máy / đổi mật khẩu / bị khóa
+      client.data = { userId: user.sub, ver: user.ver };
+      await client.join(user.role === 'PATIENT' ? [userRoom(user.sub)] : [userRoom(user.sub), STAFF_ROOM]);
     } catch {
       client.emit('auth:error', { message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' });
       client.disconnect(true);
+    }
+  }
+
+  /** Ngắt các kết nối của một tài khoản, trừ những kết nối đã dùng token phiên bản `keepVer` (máy vừa đổi mật khẩu). */
+  async disconnectUser(userId: string, keepVer?: number) {
+    if (!this.server) return;
+    const sockets = await this.server.in(userRoom(userId)).fetchSockets();
+    for (const s of sockets) {
+      if (keepVer === undefined || (s.data as { ver?: number }).ver !== keepVer) s.disconnect(true);
     }
   }
 
@@ -61,6 +72,11 @@ export class RealtimeService {
     private readonly gateway: RealtimeGateway,
     private readonly prisma: PrismaService,
   ) {}
+
+  /** Phiên đăng nhập cũ của tài khoản vừa hết hiệu lực: ngắt kết nối realtime tương ứng. */
+  disconnectUser(userId: string, keepVer?: number) {
+    return this.gateway.disconnectUser(userId, keepVer).catch(() => undefined);
+  }
 
   /** Gửi riêng cho một tài khoản (vd. thông báo mới của bệnh nhân). */
   toUser(userId: string, event: string, payload: object) {

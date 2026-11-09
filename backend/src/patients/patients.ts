@@ -7,7 +7,7 @@ import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { Gender } from '../generated/prisma/enums.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { AccountLinkController, AccountLinkService, PRIVATE_FIELDS } from './account-link.js';
+import { AccountLinkController, AccountLinkService, selfPatientView } from './account-link.js';
 
 export class CreatePatientDto {
   @IsString() @MinLength(2) fullName: string;
@@ -122,9 +122,7 @@ export class PatientsService {
   async mine(user: AuthUser) {
     const p = await this.prisma.patient.findUnique({ where: { userId: user.sub }, select: { ...patientView, historyLockedBefore: true } });
     if (!p) throw new NotFoundException('Tài khoản chưa có hồ sơ bệnh nhân');
-    const { historyLockedBefore, ...rest } = p;
-    if (!historyLockedBefore) return { ...rest, verified: true };
-    return { ...rest, ...Object.fromEntries(PRIVATE_FIELDS.map((f) => [f, null])), verified: false };
+    return selfPatientView(p);
   }
 
   async updateMine(user: AuthUser, dto: UpdateMyProfileDto) {

@@ -66,9 +66,19 @@ describe('Liên kết tài khoản app với hồ sơ có sẵn', () => {
 
     expect((await api(app).get('/api/patients/me/link').set(auth).expect(200)).body).toEqual({ verified: false, hiddenVisits: 1 });
 
-    // Lượt khám mới sau khi đăng ký thì thấy
+    // Thông tin tài khoản cũng không để lộ mã liên kết hay thông tin cá nhân của hồ sơ
+    const account = (await api(app).get('/api/auth/me').set(auth).expect(200)).body;
+    expect(account.patient).toMatchObject({ id: patientId, verified: false });
+    for (const f of ['linkCode', 'nationalId', 'address', 'allergies']) expect(account.patient).not.toHaveProperty(f);
+    expect(JSON.stringify(account)).not.toMatch(/001175000111|Penicillin|Láng Hạ/);
+
+    // Lượt khám mới sau khi đăng ký thì thấy, nhưng không kèm dị ứng của hồ sơ
     const v2 = await api(app).post('/api/queue/tickets').set(reception).send({ patientId, doctorId: doctor.doctor.id }).expect(201);
-    expect((await api(app).get('/api/queue/mine').set(auth).expect(200)).body.map((v: { id: string }) => v.id)).toEqual([v2.body.id]);
+    const queue = (await api(app).get('/api/queue/mine').set(auth).expect(200)).body;
+    expect(queue.map((v: { id: string }) => v.id)).toEqual([v2.body.id]);
+    expect(JSON.stringify(queue)).not.toContain('Penicillin');
+    // Nhân viên vẫn thấy dị ứng trên phiếu
+    expect(v2.body.patient.allergies).toBe('Penicillin');
     // Bản tự tải của lượt mới không in thông tin cá nhân của hồ sơ
     await api(app).post('/api/queue/call-next').set(doctor.auth).expect(200);
     await api(app).put(`/api/visits/${v2.body.id}/record`).set(doctor.auth).send({ symptoms: 'Sốt', diagnosis: 'Cảm cúm' }).expect(200);

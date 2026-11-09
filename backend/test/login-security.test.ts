@@ -22,6 +22,21 @@ describe('Bảo mật đăng nhập', () => {
   afterAll(() => app.close());
 
   const login = (phone: string, password: string) => api(app).post('/api/auth/login').send({ phone, password });
+  const url = () => `http://127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}`;
+  /** Mở kết nối realtime như app, trả về promise lý do bị ngắt */
+  async function openSocket(token: string) {
+    const s = io(url(), { path: '/api/socket.io', auth: { token }, transports: ['websocket'], reconnection: false });
+    await new Promise<void>((resolve, reject) => {
+      s.once('connect', () => resolve());
+      s.once('connect_error', reject);
+    });
+    const closed = new Promise<string>((r) => s.once('disconnect', (reason) => r(reason)));
+    return { s, closed };
+  }
+  const pushTokens = (userId: string) =>
+    prisma.pushToken.findMany({ where: { userId }, select: { token: true }, orderBy: { token: 'asc' } }).then((r) => r.map((t) => t.token));
+  const addPush = (auth: Record<string, string>, token: string) =>
+    api(app).post('/api/notifications/push-token').set(auth).send({ token, platform: 'ios' }).expect(200);
 
   it('khóa tài khoản: token đang dùng hết hiệu lực ngay, cả WebSocket', async () => {
     const admin = await createUser(app, prisma, 'ADMIN');
@@ -52,6 +67,14 @@ describe('Bảo mật đăng nhập', () => {
     const after = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
     expect(after).toMatchObject({ failedLogins: 0, lockedUntil: null });
     expect(after.lastLoginAt).toBeInstanceOf(Date);
+  });
+
+  it('bệnh nhân bị tạm khóa được chỉ tới "Quên mật khẩu", nhân viên được chỉ tới quản trị viên', async () => {
+    const patient = await createPatient(app, prisma);
+    for (let i = 1; i < MAX_FAILED_LOGINS; i++) await login(patient.user.phone, 'sai-mat-khau-1').expect(401);
+    const msg = (await login(patient.user.phone, 'sai-mat-khau-1').expect(429)).body.message as string;
+    expect(msg).toMatch(/Quên mật khẩu/);
+    expect(msg).not.toMatch(/quản trị viên/);
   });
 
   it('đăng nhập đúng thì xóa số lần sai trước đó', async () => {
@@ -92,12 +115,53 @@ describe('Bảo mật đăng nhập', () => {
     await login(patient.user.phone, 'hoaxuan2026').expect(200);
   });
 
+  it('đổi mật khẩu: máy khác thôi nhận thông báo đẩy và bị ngắt realtime; máy đang dùng giữ thông báo, kết nối lại bằng token mới', async () => {
+    const patient = await createPatient(app, prisma);
+    const other = (await login(patient.user.phone, PASSWORD).expect(200)).body.accessToken as string;
+    await addPush(patient.auth, 'ExpoPushToken[may-nay]');
+    await addPush(bearer(other), 'ExpoPushToken[may-kia]');
+    const here = await openSocket(patient.token);
+    const there = await openSocket(other);
+
+    const ok = await api(app)
+      .post('/api/auth/change-password')
+      .set(patient.auth)
+      .send({ currentPassword: PASSWORD, newPassword: 'hoaxuan2026', pushToken: 'ExpoPushToken[may-nay]' })
+      .expect(200);
+    expect(await pushTokens(patient.user.id)).toEqual(['ExpoPushToken[may-nay]']);
+    expect(await there.closed).toBe('io server disconnect');
+    // Kết nối của máy này dùng token cũ cũng bị ngắt; kết nối lại bằng token mới thì được
+    expect(await here.closed).toBe('io server disconnect');
+    const again = await openSocket(ok.body.accessToken);
+    expect(again.s.connected).toBe(true);
+    again.s.disconnect();
+  });
+
   it('đăng xuất mọi thiết bị', async () => {
     const doctor = await createDoctor(app, prisma);
     const second = (await login(doctor.user.phone, PASSWORD).expect(200)).body.accessToken as string;
     await api(app).post('/api/auth/logout-all').set(doctor.auth).expect(200);
     await api(app).get('/api/auth/me').set(doctor.auth).expect(401);
     await api(app).get('/api/auth/me').set(bearer(second)).expect(401);
+  });
+
+  it('đăng xuất mọi thiết bị (bệnh nhân): không máy nào còn nhận thông báo đẩy hay realtime', async () => {
+    const patient = await createPatient(app, prisma);
+    const second = (await login(patient.user.phone, PASSWORD).expect(200)).body.accessToken as string;
+    await addPush(patient.auth, 'ExpoPushToken[a]');
+    await addPush(bearer(second), 'ExpoPushToken[b]');
+    const socket = await openSocket(second);
+    await api(app).post('/api/auth/logout-all').set(patient.auth).expect(200);
+    expect(await pushTokens(patient.user.id)).toEqual([]);
+    expect(await socket.closed).toBe('io server disconnect');
+  });
+
+  it('khóa tài khoản nhân viên đang mở: kết nối realtime bị ngắt ngay', async () => {
+    const admin = await createUser(app, prisma, 'ADMIN');
+    const reception = await createUser(app, prisma, 'RECEPTIONIST');
+    const socket = await openSocket(reception.token);
+    await api(app).patch(`/api/staff/receptionists/${reception.user.id}`).set(admin.auth).send({ isActive: false }).expect(200);
+    expect(await socket.closed).toBe('io server disconnect');
   });
 
   it('admin đặt lại mật khẩu bác sĩ: mật khẩu tạm, phải đổi trước khi dùng hệ thống, máy cũ bị đăng xuất', async () => {
@@ -131,9 +195,23 @@ describe('Bảo mật đăng nhập', () => {
     await api(app)
       .post('/api/doctors')
       .set(admin.auth)
-      .send({ fullName: 'Lê Văn C', phone: '0912345678', password: 'tam-123', specialtyId: specialty.id })
+      .send({ fullName: 'Lê Văn C', phone: '0912345678', password: 'tam-12345', specialtyId: specialty.id })
       .expect(201);
-    expect((await login('0912345678', 'tam-123').expect(200)).body.user.mustChangePassword).toBe(true);
+    expect((await login('0912345678', 'tam-12345').expect(200)).body.user.mustChangePassword).toBe(true);
+  });
+
+  it('mật khẩu ban đầu admin đặt cho bác sĩ / lễ tân theo cùng quy tắc (không còn cho 6 ký tự)', async () => {
+    const admin = await createUser(app, prisma, 'ADMIN');
+    const specialty = await prisma.specialty.create({ data: { name: 'Da liễu' } });
+    const doctor = (password: string) =>
+      api(app).post('/api/doctors').set(admin.auth).send({ fullName: 'Lê Văn D', phone: '0912345679', password, specialtyId: specialty.id });
+    expect((await doctor('123456').expect(400)).body.message).toBe('Mật khẩu tối thiểu 8 ký tự');
+    expect((await doctor('abcdefgh').expect(400)).body.message).toBe('Mật khẩu cần có cả chữ và số');
+    expect((await doctor('a0912345679').expect(400)).body.message).toBe('Mật khẩu không được chứa số điện thoại');
+    const reception = (password: string) =>
+      api(app).post('/api/staff/receptionists').set(admin.auth).send({ fullName: 'Lễ Tân E', phone: '0912345670', password });
+    expect((await reception('letan1').expect(400)).body.message).toBe('Mật khẩu tối thiểu 8 ký tự');
+    await reception('quaytiepdon1').expect(201);
   });
 
   it('lệnh trên máy chủ (admin quên mật khẩu) dùng chung cách cấp mật khẩu tạm', async () => {

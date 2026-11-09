@@ -1,7 +1,7 @@
 // Pipeline CI/CD của hệ thống đặt lịch khám (chạy trên Jenkins trong ci/docker-compose.yml).
 //
 // Luồng: lấy code → cài thư viện → test (+ độ phủ) → SonarQube → Quality Gate
-//        → build image → [đẩy Docker Hub] → [deploy laptop] → [deploy VPS qua SSH]
+//        → build image → [đẩy Docker Hub] → [deploy laptop] → [deploy VPS qua SSH] → dọn image cũ
 //
 // Các bước trong [ ] chỉ chạy khi bật bằng biến môi trường toàn cục của Jenkins
 // (Manage Jenkins → System → Global properties → Environment variables):
@@ -191,6 +191,13 @@ pipeline {
             '''
           }
         }
+      }
+    }
+
+    stage('Dọn image cũ') {
+      steps {
+        // Giữ image của 3 lần build gần nhất, xóa phần còn lại để ổ đĩa laptop không đầy dần
+        sh 'sh ci/clean-images.sh "$IMAGE_PREFIX" 3'
       }
     }
   }

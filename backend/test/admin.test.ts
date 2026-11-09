@@ -56,11 +56,11 @@ describe('Quản trị: chuyên khoa, bác sĩ, lễ tân, thuốc', () => {
       const res = await api(app)
         .post('/api/doctors')
         .set(admin)
-        .send({ fullName: 'Lê Văn Bác', phone, password: '123456', specialtyId: s.id, title: 'ThS.BS' })
+        .send({ fullName: 'Lê Văn Bác', phone, password: 'khambenh24', specialtyId: s.id, title: 'ThS.BS' })
         .expect(201);
       expect(res.body).toMatchObject({ title: 'ThS.BS', specialty: { id: s.id }, user: { fullName: 'Lê Văn Bác', phone } });
 
-      const login = await api(app).post('/api/auth/login').send({ phone, password: '123456' }).expect(200);
+      const login = await api(app).post('/api/auth/login').send({ phone, password: 'khambenh24' }).expect(200);
       expect(login.body.user.role).toBe('DOCTOR');
     });
 
@@ -85,7 +85,7 @@ describe('Quản trị: chuyên khoa, bác sĩ, lễ tân, thuốc', () => {
       await api(app)
         .post('/api/doctors')
         .set(admin)
-        .send({ fullName: 'Ai đó', phone: existing.user.phone, password: '123456', specialtyId: s.id })
+        .send({ fullName: 'Ai đó', phone: existing.user.phone, password: 'khambenh24', specialtyId: s.id })
         .expect(409);
     });
   });
@@ -96,14 +96,14 @@ describe('Quản trị: chuyên khoa, bác sĩ, lễ tân, thuốc', () => {
       const created = await api(app)
         .post('/api/staff/receptionists')
         .set(admin)
-        .send({ fullName: 'Lễ tân Lan', phone, password: '123456' })
+        .send({ fullName: 'Lễ tân Lan', phone, password: 'tieptan24' })
         .expect(201);
       // Mật khẩu ban đầu do admin đặt: phải đổi ở lần đăng nhập đầu
       expect(created.body).toMatchObject({ role: 'RECEPTIONIST', isActive: true, mustChangePassword: true });
-      await api(app).post('/api/auth/login').send({ phone, password: '123456' }).expect(200);
+      await api(app).post('/api/auth/login').send({ phone, password: 'tieptan24' }).expect(200);
 
       await api(app).patch(`/api/staff/receptionists/${created.body.id}`).set(admin).send({ isActive: false }).expect(200);
-      await api(app).post('/api/auth/login').send({ phone, password: '123456' }).expect(401);
+      await api(app).post('/api/auth/login').send({ phone, password: 'tieptan24' }).expect(401);
 
       const list = await api(app).get('/api/staff/receptionists').set(admin).expect(200);
       expect(list.body.total).toBe(1);
