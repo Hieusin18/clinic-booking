@@ -1,10 +1,10 @@
-import { Body, ConflictException, Controller, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Get, Injectable, Module, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { PHONE_MESSAGE, PHONE_REGEX } from '../auth/auth.dto.js';
 import { publicUser } from '../auth/auth.service.js';
 import { Roles } from '../auth/decorators.js';
-import { hashPassword } from '../auth/password.js';
+import { hashPassword, passwordProblem } from '../auth/password.js';
 import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { SessionsService } from '../auth/sessions.js';
@@ -14,7 +14,8 @@ export class CreateReceptionistDto {
   @IsString() @MinLength(2) fullName: string;
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE }) phone: string;
   @IsOptional() @IsEmail() email?: string;
-  @IsString() @MinLength(6, { message: 'Mật khẩu tối thiểu 6 ký tự' }) password: string;
+  /** Mật khẩu ban đầu: cùng quy tắc với mật khẩu người dùng tự đặt (auth/password.ts) */
+  @IsString() @MaxLength(72) password: string;
 }
 
 export class UpdateReceptionistDto {
@@ -44,6 +45,8 @@ export class StaffService {
   }
 
   async create(dto: CreateReceptionistDto) {
+    const weak = passwordProblem(dto.password, dto.phone);
+    if (weak) throw new BadRequestException(weak);
     if (await this.prisma.user.findUnique({ where: { phone: dto.phone } })) {
       throw new ConflictException('Số điện thoại đã được dùng cho tài khoản khác');
     }

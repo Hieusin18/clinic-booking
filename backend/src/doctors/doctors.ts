@@ -39,7 +39,7 @@ import {
 } from 'class-validator';
 import { PHONE_MESSAGE, PHONE_REGEX } from '../auth/auth.dto.js';
 import { AuthUser, CurrentUser, Public, Roles } from '../auth/decorators.js';
-import { hashPassword } from '../auth/password.js';
+import { hashPassword, passwordProblem } from '../auth/password.js';
 import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { todayVN } from '../common/time.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -83,7 +83,8 @@ export class CreateDoctorDto {
   @IsString() @MinLength(2) fullName: string;
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE }) phone: string;
   @IsOptional() @IsEmail() email?: string;
-  @IsString() @MinLength(6, { message: 'Mật khẩu tối thiểu 6 ký tự' }) password: string;
+  /** Mật khẩu ban đầu: cùng quy tắc với mật khẩu người dùng tự đặt (auth/password.ts) */
+  @IsString() @MaxLength(72) password: string;
   @IsString() specialtyId: string;
   /** Học hàm, học vị: "ThS.BS", "BSCKII"… */
   @IsOptional() @IsString() title?: string;
@@ -206,6 +207,8 @@ export class DoctorsService {
   }
 
   async create(dto: CreateDoctorDto) {
+    const weak = passwordProblem(dto.password, dto.phone);
+    if (weak) throw new BadRequestException(weak);
     await this.ensureSpecialty(dto.specialtyId);
     if (await this.prisma.user.findUnique({ where: { phone: dto.phone } })) {
       throw new ConflictException('Số điện thoại đã được dùng cho tài khoản khác');

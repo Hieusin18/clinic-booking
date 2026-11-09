@@ -195,9 +195,23 @@ describe('Bảo mật đăng nhập', () => {
     await api(app)
       .post('/api/doctors')
       .set(admin.auth)
-      .send({ fullName: 'Lê Văn C', phone: '0912345678', password: 'tam-123', specialtyId: specialty.id })
+      .send({ fullName: 'Lê Văn C', phone: '0912345678', password: 'tam-12345', specialtyId: specialty.id })
       .expect(201);
-    expect((await login('0912345678', 'tam-123').expect(200)).body.user.mustChangePassword).toBe(true);
+    expect((await login('0912345678', 'tam-12345').expect(200)).body.user.mustChangePassword).toBe(true);
+  });
+
+  it('mật khẩu ban đầu admin đặt cho bác sĩ / lễ tân theo cùng quy tắc (không còn cho 6 ký tự)', async () => {
+    const admin = await createUser(app, prisma, 'ADMIN');
+    const specialty = await prisma.specialty.create({ data: { name: 'Da liễu' } });
+    const doctor = (password: string) =>
+      api(app).post('/api/doctors').set(admin.auth).send({ fullName: 'Lê Văn D', phone: '0912345679', password, specialtyId: specialty.id });
+    expect((await doctor('123456').expect(400)).body.message).toBe('Mật khẩu tối thiểu 8 ký tự');
+    expect((await doctor('abcdefgh').expect(400)).body.message).toBe('Mật khẩu cần có cả chữ và số');
+    expect((await doctor('a0912345679').expect(400)).body.message).toBe('Mật khẩu không được chứa số điện thoại');
+    const reception = (password: string) =>
+      api(app).post('/api/staff/receptionists').set(admin.auth).send({ fullName: 'Lễ Tân E', phone: '0912345670', password });
+    expect((await reception('letan1').expect(400)).body.message).toBe('Mật khẩu tối thiểu 8 ký tự');
+    await reception('quaytiepdon1').expect(201);
   });
 
   it('lệnh trên máy chủ (admin quên mật khẩu) dùng chung cách cấp mật khẩu tạm', async () => {

@@ -50,6 +50,7 @@ services:
       SMS_VERIFY_NUMBER: ${SMS_VERIFY_NUMBER:-}
       SMS_GATEWAY_TOKEN: ${SMS_GATEWAY_TOKEN:-}
       SMS_GATEWAY_SIGNING_KEY: ${SMS_GATEWAY_SIGNING_KEY:-}
+      API_DOCS: ${API_DOCS:-}
 
   # Tạo dữ liệu mẫu (admin, bác sĩ, thuốc…) — chỉ chạy khi gọi tay, sau khi backend đã migrate:
   #   docker compose run --rm seed
