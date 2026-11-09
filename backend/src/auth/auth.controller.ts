@@ -1,8 +1,14 @@
 import { Body, Controller, Get, HttpCode, Ip, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ChangePasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
-import { AllowPendingPassword, AuthUser, CurrentUser, Public } from './decorators.js';
+import { AllowPendingPassword } from './decorators/allow-pending-password.decorator.js';
+import { CurrentUser } from './decorators/current-user.decorator.js';
+import { Public } from './decorators/public.decorator.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
+import { LoginDto } from './dto/login.dto.js';
+import { RegisterDto } from './dto/register.dto.js';
+import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { AuthUser } from './interfaces/auth-user.interface.js';
 
 @ApiTags('auth')
 @Controller('auth')

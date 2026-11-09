@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { AccountLinkService, MAX_VERIFY_FAILURES, newLinkCode, normalizeCode } from '../src/patients/account-link.js';
+import { AccountLinkService, MAX_VERIFY_FAILURES } from '../src/patients/account-link.service.js';
+import { newLinkCode, normalizeCode } from '../src/patients/utils/link-code.util.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
 import { createDoctor, createUser } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';

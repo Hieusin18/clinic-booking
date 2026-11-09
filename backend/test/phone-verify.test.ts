@@ -1,8 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { codeIn, MAX_PER_PHONE_HOUR, normalizePhone, PhoneVerifyService } from '../src/sms/phone-verify.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
+import { MAX_PER_PHONE_HOUR } from '../src/sms/phone-verify.constants.js';
+import { PhoneVerifyService } from '../src/sms/phone-verify.service.js';
+import { codeIn, normalizePhone } from '../src/sms/utils/phone-verify.util.js';
 import { createUser } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';
 

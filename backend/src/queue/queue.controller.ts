@@ -1,42 +1,22 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
-import { patientIdOf } from '../appointments/appointments.js';
-import { AuthUser, CurrentUser, Roles } from '../auth/decorators.js';
-import { todayVN } from '../common/time.js';
-import { patientScopeOf, visibleSince } from '../patients/account-link.js';
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { AuthUser } from '../auth/interfaces/auth-user.interface.js';
+import { todayVN } from '../common/utils/time.util.js';
+import { patientIdOf, patientScopeOf, visibleSince } from '../patients/utils/patient-scope.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { verifyQrToken } from '../qr/qr-token.js';
+import { verifyQrToken } from '../qr/utils/qr-token.util.js';
+import { CheckInDto } from './dto/check-in.dto.js';
+import { ScanQrDto } from './dto/scan-qr.dto.js';
+import { TodayQuery } from './dto/today-query.dto.js';
+import { WalkInDto } from './dto/walk-in.dto.js';
 import { QueueService, visitView } from './queue.service.js';
-import { ticketLabel } from './queue-order.js';
+import { ticketLabel } from './utils/queue-order.util.js';
 
 /** Thông báo khi quét QR mà hôm nay chưa có lịch hẹn còn hiệu lực */
 export const NEEDS_DOCTOR = 'Bạn chưa đặt lịch hôm nay, vui lòng chọn bác sĩ';
-
-class ScanQrDto {
-  /** Chuỗi đọc được từ mã QR ở quầy */
-  @IsString() token: string;
-  /** Bắt buộc khi chưa đặt lịch hôm nay */
-  @IsOptional() @IsString() doctorId?: string;
-  @IsOptional() @IsString() @MaxLength(500) reason?: string;
-}
-
-class WalkInDto {
-  @IsString() patientId: string;
-  @IsString() doctorId: string;
-  @IsOptional() @IsString() @MaxLength(500) reason?: string;
-}
-
-class CheckInDto {
-  @IsString() appointmentId: string;
-  /** Lễ tân check-in ngoài khung giờ (đến quá sớm hoặc quá trễ) */
-  @IsOptional() @IsBoolean() override?: boolean;
-}
-
-class TodayQuery {
-  @IsOptional() @IsString() doctorId?: string;
-}
 
 @ApiTags('queue')
 @ApiBearerAuth()
@@ -62,9 +42,7 @@ export class QueueController {
       ttlSeconds: Number(this.config.get('QR_TTL_SECONDS') ?? 60),
     });
     if (!check.ok) {
-      throw new BadRequestException(
-        check.reason === 'expired' ? 'Mã QR đã hết hạn, vui lòng quét lại mã trên màn hình' : 'Mã QR không hợp lệ',
-      );
+      throw new BadRequestException(check.reason === 'expired' ? 'Mã QR đã hết hạn, vui lòng quét lại mã trên màn hình' : 'Mã QR không hợp lệ');
     }
 
     const now = new Date();

@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { hashPassword } from '../src/auth/password.js';
+import { hashPassword } from '../src/auth/utils/password.util.js';
 import type { Role } from '../src/generated/prisma/enums.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
 import { api } from './helpers.js';

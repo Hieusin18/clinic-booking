@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createQrToken, verifyQrToken } from '../src/qr/qr-token.js';
+import { createQrToken, verifyQrToken } from '../src/qr/utils/qr-token.util.js';
 
 const opts = { secret: 'k', clinicId: 'c1', ttlSeconds: 60 };
 

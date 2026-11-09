@@ -2,9 +2,9 @@ import type { INestApplication } from '@nestjs/common';
 import { unzipSync } from 'fflate';
 import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { cleanFileName, detectLabFile, signedFilePath, verifyFileLink } from '../src/lab-results/utils/lab-files.util.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
-import { cleanFileName, detectLabFile, signedFilePath, verifyFileLink } from '../src/visits/lab-files.js';
-import { imageSize } from '../src/visits/record-export.js';
+import { imageSize } from '../src/visits/utils/record-export.util.js';
 import { createDoctor, createPatient, createUser, nextPhone } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';
 

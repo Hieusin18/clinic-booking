@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { dateOnly, vnDateString } from '../src/common/time.js';
+import { dateOnly, vnDateString } from '../src/common/utils/time.util.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
 import { createDoctor, createPatient, createUser } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';
