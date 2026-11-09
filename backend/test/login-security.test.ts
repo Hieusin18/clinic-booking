@@ -35,7 +35,7 @@ describe('Bảo mật đăng nhập', () => {
   }
   const pushTokens = (userId: string) =>
     prisma.pushToken.findMany({ where: { userId }, select: { token: true }, orderBy: { token: 'asc' } }).then((r) => r.map((t) => t.token));
-  const addPush = (auth: object, token: string) =>
+  const addPush = (auth: Record<string, string>, token: string) =>
     api(app).post('/api/notifications/push-token').set(auth).send({ token, platform: 'ios' }).expect(200);
 
   it('khóa tài khoản: token đang dùng hết hiệu lực ngay, cả WebSocket', async () => {
