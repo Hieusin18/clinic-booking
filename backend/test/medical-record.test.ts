@@ -2,9 +2,9 @@ import type { INestApplication } from '@nestjs/common';
 import { strFromU8, unzipSync } from 'fflate';
 import type { Response } from 'superagent';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { vnDateString } from '../src/common/time.js';
+import { vnDateString } from '../src/common/utils/time.util.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
-import { buildPrintDoc, medicineLabel } from '../src/visits/record-export.js';
+import { buildPrintDoc, medicineLabel } from '../src/visits/utils/record-export.util.js';
 import { createDoctor, createPatient, createUser } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';
 

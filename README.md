@@ -12,12 +12,21 @@ clinic-booking/
 ├── backend/                 NestJS API (đã dựng sẵn)
 │   ├── prisma/schema.prisma Toàn bộ CSDL: 4 vai trò, lịch hẹn, hàng đợi, bệnh án, đơn thuốc
 │   ├── prisma.config.ts     Cấu hình Prisma 7 (đọc DATABASE_URL)
-│   └── src/
+│   └── src/                 Mỗi nghiệp vụ một module (xem "Cấu trúc backend" bên dưới)
 │       ├── main.ts          Prefix /api, Swagger ở /api/docs (chỉ khi dev)
+│       ├── app.module.ts    Gom các module; bộ lọc lỗi và interceptor dùng chung
+│       ├── common/          Dùng chung: dto/, filters/, interceptors/, constants/, utils/
 │       ├── prisma/          PrismaService dùng chung
-│       ├── health/          GET /api/health
-│       ├── qr/              Ký và kiểm tra token QR động (HMAC, hết hạn sau 60 giây)
-│       └── queue/           Cấp số (dãy A đặt lịch, B vãng lai), thứ tự gọi số, khung check-in, tự đóng lịch không đến
+│       ├── auth/            Đăng nhập, phân quyền (guards/, decorators/), đổi / quên mật khẩu
+│       ├── sms/             Xác minh số điện thoại bằng tin nhắn người dùng gửi tới
+│       ├── patients/        Hồ sơ bệnh nhân, liên kết tài khoản app với hồ sơ có sẵn
+│       ├── doctors/ staff/ specialties/ medicines/ icd10/   Danh mục và tài khoản nhân viên
+│       ├── schedules/ appointments/   Khung giờ khám, đặt lịch
+│       ├── qr/ queue/       Mã QR ở quầy; cấp số A/B, thứ tự gọi số, check-in, dọn hàng đợi
+│       ├── visits/ lab-results/   Bệnh án, đơn thuốc, xuất PDF/Word; cận lâm sàng
+│       ├── notifications/ realtime/   Thông báo đẩy, nhắc lịch; WebSocket
+│       ├── stats/ metrics/ health/   Thống kê admin; số liệu Prometheus; kiểm tra sống
+│       └── cli/             Lệnh trên máy chủ (đặt lại mật khẩu admin)
 ├── web/                     React + Vite + Ant Design (admin, bác sĩ, lễ tân)
 ├── mobile/                  Expo + Expo Router (bệnh nhân)
 ├── docker-compose.yml       db + backend + caddy
@@ -25,11 +34,39 @@ clinic-booking/
 └── .github/workflows/       CI kiểm tra mỗi pull request, tự deploy khi vào main
 ```
 
+## Cấu trúc backend
+
+Mỗi nghiệp vụ là một module NestJS trong `backend/src/<tên>/`, xếp theo cùng một khuôn:
+
+```
+patients/
+├── dto/                          Dữ liệu client được gửi lên (mỗi lớp một file *.dto.ts, kiểm tra bằng class-validator)
+│   ├── create-patient.dto.ts
+│   └── update-patient.dto.ts
+├── utils/                        Hàm dùng chung không phải provider (không cần DI), vd. patient-scope.util.ts
+├── patients.controller.ts        Khai báo API: đường dẫn, @Roles, lấy @Body/@Param/@Query, gọi service
+├── patients.service.ts           Logic nghiệp vụ + truy vấn Prisma
+└── patients.module.ts            @Module gom controller + service
+```
+
+| Đuôi file | Chứa gì |
+|---|---|
+| `*.module.ts` | `@Module`: controller, provider, exports |
+| `*.controller.ts` | `@Controller`: chỉ khai báo API và chuyển cho service, không có logic |
+| `*.service.ts` | `@Injectable`: logic nghiệp vụ, truy cập CSDL; cả việc chạy nền (`queue-janitor.service.ts`, `appointment-reminder.service.ts`) |
+| `*.gateway.ts`, `*.client.ts`, `*.middleware.ts` | WebSocket (`realtime.gateway.ts`), gọi dịch vụ ngoài (`expo-push.client.ts`), middleware (`http-metrics.middleware.ts`) |
+| `dto/*.dto.ts` | Lớp DTO; Swagger đọc các file này để sinh tài liệu |
+| `utils/*.util.ts`, `*.constants.ts` | Hàm thuần và hằng số (thuật toán gọi số, quy tắc mật khẩu, ký mã QR…), test riêng được |
+| `guards/`, `decorators/`, `interfaces/` (trong `auth/`) | `AuthGuard`, `@Public`, `@Roles`, `@CurrentUser`, kiểu `AuthUser` |
+| `common/filters/`, `common/interceptors/` | Bộ lọc lỗi trùng dữ liệu (409), che thông tin riêng tư khi bệnh nhân gọi API |
+
+Module chỉ dùng service của module khác khi module đó `exports`; `PrismaModule`, `RealtimeModule`, `NotificationsModule`, `SessionsModule` là `@Global()` nên dùng được ở mọi nơi. Định dạng code theo `backend/.prettierrc` (VS Code: cài Prettier, bật Format on Save).
+
 ## Hàng đợi ngày khám
 
 - **Hai dãy số:** check-in lịch hẹn nhận số **A** (A01, A02…), người đến trực tiếp nhận số **B**.
 - **Khung check-in:** từ giờ hẹn − 30 phút đến giờ hẹn + 15 phút. Đến sớm hơn thì app báo giờ mở check-in; đến trễ hơn thì lịch hẹn thành *không đến* và bệnh nhân lấy số B. Lễ tân check-in ngoài khung giờ được khi cần.
-- **Thứ tự gọi số** (`backend/src/queue/queue-order.ts`), xét lần lượt:
+- **Thứ tự gọi số** (`backend/src/queue/utils/queue-order.util.ts`), xét lần lượt:
   1. đã có 3 lượt liên tiếp gọi người đặt lịch mà còn người vãng lai chờ → gọi người vãng lai đến sớm nhất;
   2. người đặt lịch đã đến giờ hẹn (từ giờ hẹn − 10 phút) → gọi người có giờ hẹn sớm nhất;
   3. còn lại → theo thứ tự đến quầy.
@@ -77,7 +114,7 @@ Tài khoản mẫu (mật khẩu đều là `123456`):
 | Bệnh nhân | 0900000003 |
 | Bác sĩ | 0910000001 → 0910000006 |
 
-Phân quyền: mọi API mặc định cần đăng nhập; API công khai gắn `@Public()`, API giới hạn vai trò gắn `@Roles('ADMIN', …)` (xem `src/auth/decorators.ts`).
+Phân quyền: mọi API mặc định cần đăng nhập; API công khai gắn `@Public()`, API giới hạn vai trò gắn `@Roles('ADMIN', …)` (xem `src/auth/decorators/`).
 
 Lưu ý Prisma 7: `migrate dev` **không** tự chạy `generate`. Khi sửa `schema.prisma`, chạy `npx prisma migrate dev --name <mo-ta>` rồi `npx prisma generate`, và commit thư mục migration mới.
 
@@ -160,7 +197,7 @@ Tắt bước xác minh khi đăng ký (vd. máy cổng hỏng tạm thời): `R
 
 ## Thống kê (admin)
 
-Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/stats/stats.ts` (và trong nút ⓘ trên trang).
+Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/stats/stats.service.ts` (và trong nút ⓘ trên trang).
 
 Máy demo mới cài chưa có lịch sử khám nên trang gần như trống. Muốn có số liệu để trình diễn, tạo **dữ liệu lịch sử mẫu** (bệnh nhân hư cấu, số điện thoại 0989xxxxxx, 60 ngày gần nhất):
 

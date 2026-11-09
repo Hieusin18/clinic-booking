@@ -1,7 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
-import { daysBetween, median, percent, StatsService } from '../src/stats/stats.js';
+import { StatsService } from '../src/stats/stats.service.js';
+import { daysBetween, median, percent } from '../src/stats/utils/stats.util.js';
 import { createDoctor, createPatient, createUser } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';
 

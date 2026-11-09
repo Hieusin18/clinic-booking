@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiDocsEnabled } from '../src/common/api-docs.js';
+import { apiDocsEnabled } from '../src/common/utils/api-docs.util.js';
 
 describe('Trang tài liệu API /api/docs', () => {
   it('dev thì bật, image Docker (NODE_ENV=production) thì tắt', () => {

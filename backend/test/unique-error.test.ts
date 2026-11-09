@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { uniqueMessage } from '../src/common/unique-error.js';
+import { uniqueMessage } from '../src/common/filters/unique-error.filter.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
 import { createUser } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';

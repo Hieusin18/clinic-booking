@@ -1,14 +1,14 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { todayVN, vnTime } from '../common/time.js';
+import { todayVN, vnTime } from '../common/utils/time.util.js';
 import { Prisma } from '../generated/prisma/client.js';
 import type { CheckinMethod, VisitSource } from '../generated/prisma/enums.js';
-import { queueTickets } from '../metrics/metrics.js';
+import { queueTickets } from '../metrics/metrics.registry.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { NotificationsService } from '../notifications/notifications.js';
-import { fireAndForget, RealtimeService } from '../realtime/realtime.js';
-import { currentStreak, isDue, pickNext, predictOrder, ticketLabel, type CallRuleName, type Predicted, type QueueEntry } from './queue-order.js';
-import { queueRules, type QueueRules } from './queue-rules.js';
+import { fireAndForget, RealtimeService } from '../realtime/realtime.service.js';
+import { currentStreak, isDue, pickNext, predictOrder, ticketLabel, type CallRuleName, type Predicted, type QueueEntry } from './utils/queue-order.util.js';
+import { queueRules, type QueueRules } from './utils/queue-rules.util.js';
 
 export interface IssueTicketInput {
   patientId: string;
@@ -142,11 +142,7 @@ export class QueueService {
    * Ngoài khung giờ thì từ chối; đến trễ thì lịch hẹn thành "không đến".
    * Lễ tân được check-in ngoài khung giờ (`override`), kể cả lịch đã bị tính là không đến.
    */
-  async checkIn(
-    appointmentId: string,
-    method: CheckinMethod,
-    opts: { expectedPatientId?: string; override?: boolean; now?: Date } = {},
-  ) {
+  async checkIn(appointmentId: string, method: CheckinMethod, opts: { expectedPatientId?: string; override?: boolean; now?: Date } = {}) {
     const now = opts.now ?? new Date();
     const appt = await this.prisma.appointment.findUnique({
       where: { id: appointmentId },
@@ -204,7 +200,11 @@ export class QueueService {
     });
     const predicted = new Map<string, Predicted<QueueVisit>>();
     for (const id of new Set(visits.map((v) => v.doctor.id))) {
-      for (const p of this.forecast(visits.filter((v) => v.doctor.id === id), now).predicted) predicted.set(p.entry.id, p);
+      for (const p of this.forecast(
+        visits.filter((v) => v.doctor.id === id),
+        now,
+      ).predicted)
+        predicted.set(p.entry.id, p);
     }
     return visits.map((v) => ({
       ...v,
@@ -214,7 +214,7 @@ export class QueueService {
     }));
   }
 
-  /** Bác sĩ gọi số tiếp theo theo thứ tự ưu tiên (xem queue-order.ts). */
+  /** Bác sĩ gọi số tiếp theo theo thứ tự ưu tiên (xem utils/queue-order.util.ts). */
   callNext(doctorId: string, now = new Date()) {
     return this.call(doctorId, now, async (tx, date) => {
       const waiting = await tx.visit.findMany({
@@ -313,13 +313,33 @@ export class QueueService {
 
     const sameDay = await this.prisma.visit.findMany({
       where: { doctorId: visit.doctor.id, date: visit.date, status: { in: ['WAITING', 'IN_PROGRESS'] } },
-      select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true, resultsReadyAt: true, status: true, calledAt: true, callRule: true },
+      select: {
+        id: true,
+        source: true,
+        queueNumber: true,
+        createdAt: true,
+        appointmentAt: true,
+        resultsReadyAt: true,
+        status: true,
+        calledAt: true,
+        callRule: true,
+      },
     });
     const called = await this.prisma.visit.findMany({
       where: { doctorId: visit.doctor.id, date: visit.date, calledAt: { not: null }, status: { notIn: ['WAITING', 'IN_PROGRESS'] } },
       orderBy: { calledAt: 'desc' },
       take: 50,
-      select: { id: true, source: true, queueNumber: true, createdAt: true, appointmentAt: true, resultsReadyAt: true, status: true, calledAt: true, callRule: true },
+      select: {
+        id: true,
+        source: true,
+        queueNumber: true,
+        createdAt: true,
+        appointmentAt: true,
+        resultsReadyAt: true,
+        status: true,
+        calledAt: true,
+        callRule: true,
+      },
     });
     const { predicted, current } = this.forecast([...sameDay, ...called], now);
     const mine = predicted.find((p) => p.entry.id === visit.id);

@@ -1,0 +1,802 @@
+/**
+ * Bản điện tử của bệnh án ngoại trú (trang 1) và đơn thuốc (trang 2), xuất ra PDF và Word.
+ *
+ * Bố cục:
+ *  - Bệnh án theo các mục của mẫu bệnh án ngoại trú Bộ Y tế: I. Hành chính, II. Lý do đến khám,
+ *    III. Hỏi bệnh, IV. Khám bệnh, V. Chẩn đoán (ICD-10), VI. Điều trị, chữ ký bác sĩ.
+ *  - Đơn thuốc theo các trường của mẫu đơn thuốc, Phụ lục I Thông tư 26/2025/TT-BYT.
+ *
+ * Cả hai định dạng dùng chung một "mô hình in" (PrintDoc) để nội dung PDF và Word luôn giống nhau.
+ */
+import {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  Footer,
+  ImageRun,
+  Packer,
+  PageBreak,
+  Paragraph,
+  Tab,
+  Table,
+  TableCell,
+  TableRow,
+  TabStopType,
+  TextRun,
+  WidthType,
+} from 'docx';
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces.js';
+import { clinicInfo } from '../../common/utils/clinic.util.js';
+import { icdName } from '../../icd10/icd10.util.js';
+
+const require = createRequire(import.meta.url);
+// pdfmake chỉ có bản CommonJS
+const pdfmake = require('pdfmake') as {
+  setFonts(fonts: Record<string, Record<string, string>>): void;
+  setUrlAccessPolicy(cb: (url: string) => boolean): void;
+  setLocalAccessPolicy(cb: (path: string) => boolean): void;
+  createPdf(doc: TDocumentDefinitions): { getBuffer(): Promise<Buffer> };
+};
+
+const FONT_DIR = fileURLToPath(new URL('../../../assets/fonts/', import.meta.url));
+// Thiếu font (vd. Dockerfile quên copy assets/) thì dừng ngay lúc khởi động thay vì lỗi khi bệnh nhân tải file
+if (!existsSync(`${FONT_DIR}Tinos-Regular.ttf`)) throw new Error(`Không tìm thấy font tại ${FONT_DIR}`);
+pdfmake.setFonts({
+  Tinos: {
+    normal: `${FONT_DIR}Tinos-Regular.ttf`,
+    bold: `${FONT_DIR}Tinos-Bold.ttf`,
+    italics: `${FONT_DIR}Tinos-Italic.ttf`,
+    bolditalics: `${FONT_DIR}Tinos-BoldItalic.ttf`,
+  },
+});
+// Không cho tài liệu tải ảnh/tệp bên ngoài; chỉ đọc font của chính ứng dụng
+pdfmake.setUrlAccessPolicy(() => false);
+pdfmake.setLocalAccessPolicy((path) => path.startsWith(FONT_DIR));
+
+// ---------- Dữ liệu đầu vào ----------
+
+type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+export type ExportVisit = {
+  id: string;
+  date: Date;
+  queueNumber: number;
+  source: 'ONLINE' | 'WALK_IN';
+  createdAt: Date;
+  patient: {
+    id: string;
+    fullName: string;
+    dateOfBirth: Date;
+    gender: Gender;
+    phone: string;
+    nationalId: string | null;
+    address: string | null;
+    insuranceNo: string | null;
+    insuranceExpiry: Date | null;
+    allergies: string | null;
+    occupation: string | null;
+    ethnicity: string | null;
+    relativeName: string | null;
+    relativePhone: string | null;
+  };
+  doctor: { title: string | null; user: { fullName: string }; specialty: { name: string } | null };
+  medicalRecord: {
+    reason: string | null;
+    symptoms: string;
+    personalHistory: string | null;
+    familyHistory: string | null;
+    pulse: number | null;
+    temperature: number | null;
+    bpSystolic: number | null;
+    bpDiastolic: number | null;
+    respiratoryRate: number | null;
+    spo2: number | null;
+    weight: number | null;
+    height: number | null;
+    generalExam: string | null;
+    organExam: string | null;
+    labSummary: string | null;
+    orders: string | null;
+    diagnosis: string;
+    icdCode: string | null;
+    secondaryDiagnosis: string | null;
+    secondaryIcdCodes: string | null;
+    treatment: string | null;
+    followUpDate: Date | null;
+  };
+  /** Chỉ định cận lâm sàng; kết quả và tệp chỉ có khi được phép xem */
+  labOrders?: {
+    name: string;
+    note: string | null;
+    resultText: string | null;
+    doneAt: Date | null;
+    files: { fileName: string; mimeType: string; data: Uint8Array }[];
+  }[];
+  prescription: {
+    id: string;
+    code: string | null;
+    advice: string | null;
+    finalizedAt: Date | null;
+    items: {
+      quantity: number;
+      dosePerTime: string;
+      timesPerDay: number;
+      days: number;
+      note: string | null;
+      medicine: { name: string; activeIngredient: string | null; strength: string | null; unit: string };
+    }[];
+  } | null;
+};
+
+// ---------- Định dạng ----------
+
+const TZ = 'Asia/Ho_Chi_Minh';
+const BLANK = '……………………';
+const GENDER: Record<Gender, string> = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' };
+
+/** Cột @db.Date lưu nửa đêm UTC: đọc theo UTC để không lệch ngày. */
+const day = (d: Date | null | undefined) => (d ? d.toLocaleDateString('vi-VN', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }) : '');
+const vnParts = (d: Date) => {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  );
+  return { dd: p.day, mm: p.month, yyyy: p.year, hh: p.hour, mi: p.minute };
+};
+
+/** "Ngày 06 tháng 11 năm 2026" như dòng ký tên trên giấy tờ */
+const signDate = (d: Date) => {
+  const p = vnParts(d);
+  return `Ngày ${p.dd} tháng ${p.mm} năm ${p.yyyy}`;
+};
+const dateTime = (d: Date) => {
+  const p = vnParts(d);
+  return `${p.hh} giờ ${p.mi} phút, ngày ${p.dd}/${p.mm}/${p.yyyy}`;
+};
+
+/** Thông tư 26/2025: số lượng dưới 10 ghi thêm số 0 phía trước */
+const qty = (n: number) => (n < 10 ? `0${n}` : String(n));
+const num = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 1 });
+
+function ageOf(dob: Date, at: Date) {
+  const months = (at.getUTCFullYear() - dob.getUTCFullYear()) * 12 + (at.getUTCMonth() - dob.getUTCMonth()) - (at.getUTCDate() < dob.getUTCDate() ? 1 : 0);
+  return { months, years: Math.floor(months / 12) };
+}
+
+/** Tên thuốc theo Thông tư 26/2025: tên chung quốc tế (hoạt chất), tên thương mại trong ngoặc. */
+export function medicineLabel(m: { name: string; activeIngredient: string | null; strength: string | null }) {
+  const inn = m.activeIngredient?.trim();
+  const base = inn && inn.toLowerCase() !== m.name.toLowerCase() ? `${inn} (${m.name})` : m.name;
+  return [base, m.strength].filter(Boolean).join(' ');
+}
+
+const withIcd = (text: string, codes: string | null) => (codes ? `${text} (${codes})` : text);
+
+/** Kích thước ảnh (điểm ảnh) đọc từ phần đầu tệp PNG/JPEG; không đọc được thì trả null. */
+export function imageSize(buf: Uint8Array): { width: number; height: number } | null {
+  const b = Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (b.length >= 24 && b.readUInt32BE(0) === 0x89504e47) return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
+  let i = 2;
+  while (i + 9 < b.length) {
+    if (b[i] !== 0xff) return null;
+    const marker = b[i + 1];
+    const len = b.readUInt16BE(i + 2);
+    // SOF0..SOF15 trừ DHT (C4), JPG (C8), DAC (CC): chứa chiều cao, chiều rộng
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      return { height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7) };
+    }
+    i += 2 + len;
+  }
+  return null;
+}
+
+/** Thu nhỏ vào khung tối đa, giữ tỉ lệ. */
+const fitBox = (w: number, h: number, maxW: number, maxH: number) => {
+  const k = Math.min(1, maxW / w, maxH / h);
+  return { width: Math.round(w * k), height: Math.round(h * k) };
+};
+
+// ---------- Mô hình in dùng chung ----------
+
+/** Một ô "nhãn: giá trị". Giá trị rỗng in thành dòng chấm như mẫu giấy. */
+type Field = { label: string; value?: string | null; bold?: boolean };
+type Block =
+  | { kind: 'heading'; text: string }
+  | { kind: 'fields'; fields: Field[] } // nhiều ô cùng một dòng
+  | { kind: 'text'; text: string; italic?: boolean; bold?: boolean; indent?: boolean }
+  | { kind: 'grid'; cells: Field[]; columns: number } // bảng dấu hiệu sinh tồn
+  | { kind: 'medicine'; index: number; name: string; quantity: string; usage: string }
+  /** Ảnh kết quả cận lâm sàng; width/height là kích thước gốc (điểm ảnh) */
+  | { kind: 'image'; data: Uint8Array; mimeType: 'image/jpeg' | 'image/png'; width: number; height: number; caption: string };
+
+type Page = {
+  headerLeft: string[];
+  headerRight: string[];
+  title: string;
+  subtitle?: string;
+  blocks: Block[];
+  sign: { date: string; role: string; name: string };
+  /** Ghi chú cuối trang nội dung (đơn thuốc) */
+  note?: string;
+};
+
+/**
+ * `linkCode`: mã liên kết hồ sơ (chỉ in trên bản bác sĩ in ra đưa bệnh nhân), để bệnh nhân đăng ký app
+ * bằng số điện thoại của hồ sơ rồi nhập mã này mà xem lại lịch sử khám (xem patients/account-link.service.ts).
+ */
+export function buildPrintDoc(v: ExportVisit, now = new Date(), opts: { linkCode?: string } = {}) {
+  const clinic = clinicInfo();
+  const r = v.medicalRecord;
+  const p = v.patient;
+  const age = ageOf(p.dateOfBirth, v.date);
+  const isYoungChild = age.months < 72;
+  const ageText = isYoungChild ? `${age.months} tháng` : `${age.years}`;
+  const doctorName = [v.doctor.title, v.doctor.user.fullName].filter(Boolean).join(' ');
+  const recordNo = `BA-${day(v.date).split('/').reverse().join('')}-${v.source === 'ONLINE' ? 'A' : 'B'}${String(v.queueNumber).padStart(3, '0')}`;
+  const headerLeft = [clinic.name.toUpperCase(), clinic.address, clinic.phone && `Điện thoại: ${clinic.phone}`].filter(Boolean) as string[];
+  const exported = `Bản điện tử xuất từ hệ thống đặt lịch khám lúc ${dateTime(now)}. Mã tra cứu: ${v.id}`;
+
+  const labDone = (v.labOrders ?? []).filter((o) => o.doneAt);
+  const bmi = r.weight && r.height ? num(r.weight / (r.height / 100) ** 2) : null;
+  const unit = (n: number | null, u: string) => (n == null ? null : `${num(n)} ${u}`);
+  const icdText = (code: string | null) => (code ? `${code}${icdName(code) && icdName(code) !== r.diagnosis ? ` – ${icdName(code)}` : ''}` : null);
+
+  const record: Page = {
+    headerLeft,
+    headerRight: [`Số bệnh án: ${recordNo}`, `Mã người bệnh: ${p.id.slice(0, 8).toUpperCase()}`],
+    title: 'BỆNH ÁN NGOẠI TRÚ',
+    subtitle: v.doctor.specialty ? `Chuyên khoa: ${v.doctor.specialty.name}` : undefined,
+    blocks: [
+      { kind: 'heading', text: 'I. HÀNH CHÍNH' },
+      { kind: 'fields', fields: [{ label: '1. Họ và tên (in hoa)', value: p.fullName.toUpperCase(), bold: true }] },
+      {
+        kind: 'fields',
+        fields: [
+          { label: '2. Ngày sinh', value: day(p.dateOfBirth) },
+          { label: 'Tuổi', value: ageText },
+          { label: '3. Giới tính', value: GENDER[p.gender] },
+        ],
+      },
+      {
+        kind: 'fields',
+        fields: [
+          { label: '4. Nghề nghiệp', value: p.occupation },
+          { label: '5. Dân tộc', value: p.ethnicity },
+        ],
+      },
+      {
+        kind: 'fields',
+        fields: [
+          { label: '6. Số định danh cá nhân/CCCD', value: p.nationalId },
+          { label: 'Điện thoại', value: p.phone },
+        ],
+      },
+      { kind: 'fields', fields: [{ label: '7. Địa chỉ', value: p.address }] },
+      {
+        kind: 'fields',
+        fields: [
+          { label: '8. Đối tượng', value: p.insuranceNo ? 'BHYT' : 'Thu phí' },
+          { label: 'Số thẻ BHYT', value: p.insuranceNo },
+          { label: 'Giá trị đến', value: day(p.insuranceExpiry) },
+        ],
+      },
+      {
+        kind: 'fields',
+        fields: [{ label: '9. Họ tên, điện thoại người nhà khi cần báo tin', value: [p.relativeName, p.relativePhone].filter(Boolean).join(' – ') }],
+      },
+      {
+        kind: 'fields',
+        fields: [
+          { label: '10. Đến khám lúc', value: dateTime(v.createdAt) },
+          { label: 'Hình thức', value: v.source === 'ONLINE' ? 'Đặt lịch trực tuyến' : 'Đến trực tiếp' },
+        ],
+      },
+      { kind: 'fields', fields: [{ label: '11. Tiền sử dị ứng', value: p.allergies ?? 'Chưa ghi nhận' }] },
+
+      { kind: 'heading', text: 'II. LÝ DO ĐẾN KHÁM' },
+      { kind: 'text', text: r.reason || BLANK, indent: true },
+
+      { kind: 'heading', text: 'III. HỎI BỆNH' },
+      { kind: 'fields', fields: [{ label: '1. Quá trình bệnh lý', value: r.symptoms }] },
+      { kind: 'text', text: '2. Tiền sử bệnh:' },
+      { kind: 'fields', fields: [{ label: '   – Bản thân', value: r.personalHistory }] },
+      { kind: 'fields', fields: [{ label: '   – Gia đình', value: r.familyHistory }] },
+
+      { kind: 'heading', text: 'IV. KHÁM BỆNH' },
+      {
+        kind: 'grid',
+        columns: 4,
+        cells: [
+          { label: 'Mạch', value: unit(r.pulse, 'lần/phút') },
+          { label: 'Nhiệt độ', value: unit(r.temperature, '°C') },
+          { label: 'Huyết áp', value: r.bpSystolic != null && r.bpDiastolic != null ? `${r.bpSystolic}/${r.bpDiastolic} mmHg` : null },
+          { label: 'Nhịp thở', value: unit(r.respiratoryRate, 'lần/phút') },
+          { label: 'SpO₂', value: unit(r.spo2, '%') },
+          { label: 'Cân nặng', value: unit(r.weight, 'kg') },
+          { label: 'Chiều cao', value: unit(r.height, 'cm') },
+          { label: 'BMI', value: bmi },
+        ],
+      },
+      { kind: 'fields', fields: [{ label: '1. Toàn thân', value: r.generalExam }] },
+      { kind: 'fields', fields: [{ label: '2. Các bộ phận', value: r.organExam }] },
+      { kind: 'fields', fields: [{ label: '3. Tóm tắt kết quả cận lâm sàng', value: r.labSummary }] },
+      {
+        kind: 'fields',
+        fields: [
+          {
+            label: '4. Chỉ định cận lâm sàng',
+            value: v.labOrders?.length
+              ? `${v.labOrders.map((o) => o.name).join('; ')}${labDone.length ? ' (kết quả ở phiếu kết quả cận lâm sàng)' : ''}`
+              : r.orders,
+          },
+        ],
+      },
+
+      { kind: 'heading', text: 'V. CHẨN ĐOÁN' },
+      {
+        kind: 'fields',
+        fields: [
+          { label: '1. Bệnh chính', value: r.diagnosis, bold: true },
+          { label: 'Mã ICD-10', value: icdText(r.icdCode) },
+        ],
+      },
+      {
+        kind: 'fields',
+        fields: [
+          { label: '2. Bệnh kèm theo', value: r.secondaryDiagnosis },
+          { label: 'Mã ICD-10', value: r.secondaryIcdCodes },
+        ],
+      },
+
+      { kind: 'heading', text: 'VI. ĐIỀU TRỊ' },
+      { kind: 'fields', fields: [{ label: '1. Hướng xử trí, điều trị', value: r.treatment }] },
+      {
+        kind: 'fields',
+        fields: [
+          {
+            label: '2. Đơn thuốc',
+            value: v.prescription
+              ? `Có, ${v.prescription.items.length} loại thuốc${v.prescription.code ? ` – mã đơn ${v.prescription.code}` : ''} (xem trang sau)`
+              : 'Không kê đơn',
+          },
+        ],
+      },
+      { kind: 'fields', fields: [{ label: '3. Hẹn tái khám', value: r.followUpDate ? `ngày ${day(r.followUpDate)}` : 'Khi có dấu hiệu bất thường' }] },
+    ],
+    sign: { date: signDate(v.createdAt), role: 'BÁC SĨ KHÁM BỆNH', name: doctorName },
+    ...(opts.linkCode
+      ? { note: `Xem lại kết quả khám trên ứng dụng: đăng ký bằng số điện thoại ${p.phone}, vào Lịch sử khám và nhập mã liên kết ${opts.linkCode}.` }
+      : {}),
+  };
+
+  const pages = [record];
+  if (labDone.length) pages.push(labPage(v, labDone, { headerLeft, recordNo, doctorName }));
+  const rx = v.prescription;
+  if (rx) {
+    const blocks: Block[] = [
+      { kind: 'fields', fields: [{ label: 'Họ tên', value: p.fullName.toUpperCase(), bold: true }] },
+      {
+        kind: 'fields',
+        fields: [
+          { label: 'Ngày sinh', value: day(p.dateOfBirth) },
+          { label: isYoungChild ? 'Tuổi' : 'Cân nặng', value: isYoungChild ? ageText : unit(r.weight, 'kg') },
+          { label: 'Giới tính', value: GENDER[p.gender] },
+        ],
+      },
+      ...(isYoungChild ? [{ kind: 'fields', fields: [{ label: 'Cân nặng', value: unit(r.weight, 'kg') }] } as Block] : []),
+      { kind: 'fields', fields: [{ label: 'Số định danh cá nhân/CCCD/hộ chiếu (nếu có)', value: p.nationalId }] },
+      { kind: 'fields', fields: [{ label: 'Mã số bảo hiểm y tế (nếu có)', value: p.insuranceNo }] },
+      { kind: 'fields', fields: [{ label: 'Nơi thường trú/tạm trú/ở hiện tại', value: p.address }] },
+      {
+        kind: 'fields',
+        fields: [
+          {
+            label: 'Chẩn đoán',
+            value: [withIcd(r.diagnosis, r.icdCode), r.secondaryDiagnosis && withIcd(r.secondaryDiagnosis, r.secondaryIcdCodes)].filter(Boolean).join('; '),
+          },
+        ],
+      },
+      { kind: 'text', text: 'Thuốc điều trị:', bold: true },
+      ...rx.items.map((i, idx): Block => ({
+        kind: 'medicine',
+        index: idx + 1,
+        name: medicineLabel(i.medicine),
+        quantity: `SL: ${qty(i.quantity)} ${i.medicine.unit}`,
+        usage: `Mỗi lần ${i.dosePerTime}, ngày ${qty(i.timesPerDay)} lần, dùng ${qty(i.days)} ngày.${i.note ? ` ${i.note}` : ''}`,
+      })),
+      { kind: 'fields', fields: [{ label: 'Lời dặn', value: rx.advice }] },
+      ...(r.followUpDate ? [{ kind: 'fields', fields: [{ label: 'Hẹn tái khám', value: `ngày ${day(r.followUpDate)}` }] } as Block] : []),
+      ...(isYoungChild ? [{ kind: 'fields', fields: [{ label: 'Họ tên người đưa trẻ đến khám bệnh, chữa bệnh', value: p.relativeName }] } as Block] : []),
+    ];
+    pages.push({
+      headerLeft,
+      headerRight: [`Mã đơn thuốc: ${rx.code ?? rx.id.slice(0, 12)}`],
+      title: 'ĐƠN THUỐC',
+      blocks,
+      sign: { date: signDate(rx.finalizedAt ?? v.createdAt), role: 'BÁC SĨ/Y SỸ KHÁM BỆNH', name: doctorName },
+      note: `${clinic.phone ? `Số điện thoại liên hệ: ${clinic.phone}. ` : ''}Khám lại xin mang theo đơn này.`,
+    });
+  }
+  return { pages, footer: exported, fileName: `benh-an-${recordNo}` };
+}
+
+/** Phiếu kết quả cận lâm sàng: mỗi chỉ định gồm mô tả, kết luận và ảnh; tệp PDF ghi tên để tra trên hệ thống. */
+function labPage(v: ExportVisit, done: NonNullable<ExportVisit['labOrders']>, ctx: { headerLeft: string[]; recordNo: string; doctorName: string }): Page {
+  const p = v.patient;
+  const blocks: Block[] = [
+    { kind: 'fields', fields: [{ label: 'Họ tên', value: p.fullName.toUpperCase(), bold: true }] },
+    {
+      kind: 'fields',
+      fields: [
+        { label: 'Ngày sinh', value: day(p.dateOfBirth) },
+        { label: 'Giới tính', value: GENDER[p.gender] },
+      ],
+    },
+    { kind: 'fields', fields: [{ label: 'Chẩn đoán', value: withIcd(v.medicalRecord.diagnosis, v.medicalRecord.icdCode) }] },
+  ];
+  done.forEach((o, i) => {
+    blocks.push({ kind: 'heading', text: `${i + 1}. ${o.name.toUpperCase()}` });
+    if (o.note) blocks.push({ kind: 'fields', fields: [{ label: 'Yêu cầu', value: o.note }] });
+    blocks.push({ kind: 'fields', fields: [{ label: 'Kết quả', value: o.resultText }] });
+    const images = o.files.filter((f) => f.mimeType === 'image/jpeg' || f.mimeType === 'image/png');
+    images.forEach((f, k) => {
+      const size = imageSize(f.data);
+      if (size) {
+        blocks.push({
+          kind: 'image',
+          data: f.data,
+          mimeType: f.mimeType as 'image/jpeg' | 'image/png',
+          ...size,
+          caption: `Hình ${i + 1}.${k + 1}: ${f.fileName}`,
+        });
+      }
+    });
+    const others = o.files.filter((f) => !images.includes(f) || !imageSize(f.data));
+    if (others.length) {
+      blocks.push({ kind: 'text', text: `Tệp đính kèm (xem trên hệ thống): ${others.map((f) => f.fileName).join(', ')}`, italic: true });
+    }
+  });
+  const last = done.reduce((m, o) => (o.doneAt! > m ? o.doneAt! : m), done[0].doneAt!);
+  return {
+    headerLeft: ctx.headerLeft,
+    headerRight: [`Số bệnh án: ${ctx.recordNo}`],
+    title: 'PHIẾU KẾT QUẢ CẬN LÂM SÀNG',
+    blocks,
+    sign: { date: signDate(last), role: 'BÁC SĨ ĐỌC KẾT QUẢ', name: ctx.doctorName },
+  };
+}
+
+const dataUrl = (mime: string, data: Uint8Array) => `data:${mime};base64,${Buffer.from(data).toString('base64')}`;
+
+// ---------- PDF ----------
+
+const fieldText = (f: Field) => [
+  { text: `${f.label}: `, bold: false },
+  { text: f.value?.toString().trim() || BLANK, bold: !!f.bold },
+];
+
+function pdfBlock(b: Block): Content {
+  switch (b.kind) {
+    case 'heading':
+      return { text: b.text, bold: true, margin: [0, 6, 0, 2] };
+    case 'text':
+      return { text: b.text, italics: b.italic, bold: b.bold, margin: [b.indent ? 12 : 0, 1, 0, 1] };
+    case 'fields':
+      return b.fields.length === 1
+        ? { text: fieldText(b.fields[0]), margin: [0, 1, 0, 1] }
+        : { columns: b.fields.map((f, i) => ({ text: fieldText(f), width: i === b.fields.length - 1 ? '*' : 'auto' })), columnGap: 28, margin: [0, 1, 0, 1] };
+    case 'grid': {
+      const rows: Content[][] = [];
+      for (let i = 0; i < b.cells.length; i += b.columns) {
+        rows.push(b.cells.slice(i, i + b.columns).map((f) => ({ text: fieldText(f), fontSize: 11 })));
+      }
+      return { table: { widths: Array(b.columns).fill('*'), body: rows }, layout: 'lightHorizontalLines', margin: [0, 2, 0, 4] };
+    }
+    case 'image': {
+      // Vùng nội dung A4 rộng khoảng 497 pt
+      const box = fitBox(b.width, b.height, 420, 300);
+      return {
+        margin: [0, 4, 0, 4],
+        unbreakable: true,
+        stack: [
+          { image: dataUrl(b.mimeType, b.data), width: box.width, height: box.height, alignment: 'center' },
+          { text: b.caption, italics: true, fontSize: 9.5, alignment: 'center', margin: [0, 2, 0, 0] },
+        ],
+      };
+    }
+    case 'medicine':
+      return {
+        margin: [0, 3, 0, 2],
+        stack: [
+          {
+            columns: [
+              { text: `${b.index}. ${b.name}`, bold: true, width: '*' },
+              { text: b.quantity, bold: true, width: 'auto' },
+            ],
+          },
+          { text: b.usage, italics: true, margin: [14, 1, 0, 0] },
+        ],
+      };
+  }
+}
+
+function pdfPage(page: Page, first: boolean): Content[] {
+  return [
+    {
+      ...(first ? {} : { pageBreak: 'before' as const }),
+      columns: [
+        { stack: page.headerLeft.map((t, i) => ({ text: t, bold: i === 0, fontSize: i === 0 ? 12 : 11 })), width: '*' },
+        { stack: page.headerRight.map((t) => ({ text: t, alignment: 'right', fontSize: 11 })), width: 'auto' },
+      ],
+    },
+    { text: page.title, alignment: 'center', bold: true, fontSize: 17, margin: [0, 10, 0, 2] },
+    ...(page.subtitle
+      ? [{ text: page.subtitle, alignment: 'center', italics: true, margin: [0, 0, 0, 6] } as Content]
+      : [{ text: '', margin: [0, 0, 0, 6] } as Content]),
+    ...page.blocks.map(pdfBlock),
+    {
+      columns: [
+        { text: '', width: '*' },
+        {
+          width: 230,
+          stack: [
+            { text: page.sign.date, italics: true, alignment: 'center' },
+            { text: page.sign.role, bold: true, alignment: 'center' },
+            { text: '(Ký, ghi rõ họ tên)', italics: true, alignment: 'center', fontSize: 10 },
+            { text: page.sign.name, bold: true, alignment: 'center', margin: [0, 34, 0, 0] },
+          ],
+        },
+      ],
+      margin: [0, 8, 0, 0],
+      unbreakable: true,
+    },
+    ...(page.note ? [{ text: page.note, italics: true, fontSize: 10, margin: [0, 8, 0, 0] } as Content] : []),
+  ];
+}
+
+export async function renderPdf(doc: ReturnType<typeof buildPrintDoc>): Promise<Buffer> {
+  const definition: TDocumentDefinitions = {
+    pageSize: 'A4',
+    pageMargins: [56, 36, 42, 40],
+    defaultStyle: { font: 'Tinos', fontSize: 11.5, lineHeight: 1.1 },
+    info: { title: doc.pages.map((p) => p.title).join(' – '), creator: 'Hệ thống đặt lịch khám' },
+    content: doc.pages.flatMap((p, i) => pdfPage(p, i === 0)),
+    footer: (current, total) => ({
+      columns: [
+        { text: doc.footer, width: '*' },
+        { text: `Trang ${current}/${total}`, width: 'auto' },
+      ],
+      columnGap: 12,
+      fontSize: 8,
+      italics: true,
+      color: '#666666',
+      margin: [56, 8, 42, 0],
+    }),
+  };
+  return pdfmake.createPdf(definition).getBuffer();
+}
+
+// ---------- Word (.docx) ----------
+
+const FONT = 'Times New Roman';
+const SIZE = 11.5;
+const run = (text: string, opts: { bold?: boolean; italics?: boolean; size?: number } = {}) =>
+  new TextRun({ text, font: FONT, size: Math.round((opts.size ?? SIZE) * 2), bold: opts.bold, italics: opts.italics });
+const tab = () => new TextRun({ children: [new Tab()] });
+type ParaOpts = {
+  align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+  before?: number;
+  after?: number;
+  indent?: number;
+  rightTab?: boolean;
+  keepNext?: boolean;
+};
+const para = (children: TextRun[], opts: ParaOpts = {}) =>
+  new Paragraph({
+    children,
+    alignment: opts.align,
+    spacing: { before: opts.before ?? 0, after: opts.after ?? 20, line: 264 },
+    indent: opts.indent ? { left: opts.indent } : undefined,
+    tabStops: opts.rightTab ? [{ type: TabStopType.RIGHT, position: 9900 }] : undefined,
+    keepNext: opts.keepNext,
+  });
+const fieldRuns = (f: Field) => [run(`${f.label}: `), run(f.value?.toString().trim() || BLANK, { bold: f.bold })];
+
+const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+const NO_BORDERS = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideHorizontal: NO_BORDER, insideVertical: NO_BORDER };
+const CELL_MARGINS = { top: 30, bottom: 30, left: 80, right: 80 };
+const cell = (children: Paragraph[], width: number) => new TableCell({ children, width: { size: width, type: WidthType.PERCENTAGE }, margins: CELL_MARGINS });
+
+function docxBlock(b: Block): (Paragraph | Table)[] {
+  switch (b.kind) {
+    case 'heading':
+      return [para([run(b.text, { bold: true })], { before: 120, after: 40, keepNext: true })];
+    case 'text':
+      return [para([run(b.text, { italics: b.italic, bold: b.bold })], { indent: b.indent ? 240 : undefined, keepNext: b.bold })];
+    case 'fields':
+      // Nhiều ô trên một dòng: cách nhau bằng tab để người dùng Word dễ sửa
+      return [para(b.fields.flatMap((f, i) => [...(i ? [tab(), tab()] : []), ...fieldRuns(f)]))];
+    case 'grid': {
+      const rows: TableRow[] = [];
+      for (let i = 0; i < b.cells.length; i += b.columns) {
+        rows.push(new TableRow({ children: b.cells.slice(i, i + b.columns).map((f) => cell([para(fieldRuns(f), { after: 0 })], 100 / b.columns)) }));
+      }
+      return [new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }), para([], { after: 40 })];
+    }
+    case 'image': {
+      const box = fitBox(b.width, b.height, 520, 380);
+      return [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          keepNext: true,
+          spacing: { before: 80, after: 20 },
+          children: [
+            new ImageRun({
+              type: b.mimeType === 'image/png' ? 'png' : 'jpg',
+              data: b.data,
+              transformation: box,
+              altText: { name: b.caption, description: b.caption, title: b.caption },
+            }),
+          ],
+        }),
+        para([run(b.caption, { italics: true, size: 9.5 })], { align: AlignmentType.CENTER, after: 80 }),
+      ];
+    }
+    case 'medicine':
+      return [
+        para([run(`${b.index}. ${b.name}`, { bold: true }), tab(), run(b.quantity, { bold: true })], { before: 60, rightTab: true, keepNext: true }),
+        para([run(b.usage, { italics: true })], { indent: 280 }),
+      ];
+  }
+}
+
+function docxPage(page: Page, last: boolean): (Paragraph | Table)[] {
+  const header = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NO_BORDERS,
+    rows: [
+      new TableRow({
+        children: [
+          cell(
+            page.headerLeft.map((t, i) => para([run(t, { bold: i === 0, size: 11 })], { before: 0, after: 0 })),
+            60,
+          ),
+          cell(
+            page.headerRight.map((t) => para([run(t, { size: 11 })], { align: AlignmentType.RIGHT, before: 0, after: 0 })),
+            40,
+          ),
+        ],
+      }),
+    ],
+  });
+  const sign = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: NO_BORDERS,
+    rows: [
+      new TableRow({
+        cantSplit: true,
+        children: [
+          cell([para([])], 50),
+          cell(
+            [
+              para([run(page.sign.date, { italics: true })], { align: AlignmentType.CENTER, before: 120 }),
+              para([run(page.sign.role, { bold: true })], { align: AlignmentType.CENTER }),
+              para([run('(Ký, ghi rõ họ tên)', { italics: true, size: 10 })], { align: AlignmentType.CENTER }),
+              para([run(page.sign.name, { bold: true })], { align: AlignmentType.CENTER, before: 760 }),
+            ],
+            50,
+          ),
+        ],
+      }),
+    ],
+  });
+  return [
+    header,
+    para([run(page.title, { bold: true, size: 17 })], { align: AlignmentType.CENTER, before: 200, after: 20 }),
+    ...(page.subtitle ? [para([run(page.subtitle, { italics: true })], { align: AlignmentType.CENTER, after: 120 })] : []),
+    ...page.blocks.flatMap(docxBlock),
+    sign,
+    ...(page.note ? [para([run(page.note, { italics: true, size: 10 })], { before: 200 })] : []),
+    ...(last ? [] : [new Paragraph({ children: [new PageBreak()] })]),
+  ];
+}
+
+export async function renderDocx(doc: ReturnType<typeof buildPrintDoc>): Promise<Buffer> {
+  const document = new Document({
+    creator: 'Hệ thống đặt lịch khám',
+    title: doc.pages.map((p) => p.title).join(' – '),
+    styles: { default: { document: { run: { font: FONT, size: SIZE * 2 } } } },
+    sections: [
+      {
+        properties: { page: { margin: { top: 720, bottom: 720, left: 1130, right: 840, footer: 360 } } },
+        footers: { default: new Footer({ children: [para([run(doc.footer, { italics: true, size: 8 })])] }) },
+        children: doc.pages.flatMap((p, i) => docxPage(p, i === doc.pages.length - 1)),
+      },
+    ],
+  });
+  return Packer.toBuffer(document);
+}
+
+// ---------- HTML (xem trước trên web và app) ----------
+
+/** Thoát ký tự HTML: dữ liệu người dùng nhập (địa chỉ, lời dặn…) không bao giờ thành thẻ HTML. */
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const fieldHtml = (f: Field) => `<span>${esc(f.label)}: </span><span class="${f.bold ? 'b' : ''}">${esc(f.value?.toString().trim() || BLANK)}</span>`;
+
+function htmlBlock(b: Block): string {
+  switch (b.kind) {
+    case 'heading':
+      return `<h3>${esc(b.text)}</h3>`;
+    case 'text':
+      return `<p class="${[b.italic && 'i', b.bold && 'b', b.indent && 'ind'].filter(Boolean).join(' ')}">${esc(b.text)}</p>`;
+    case 'fields':
+      return `<div class="row">${b.fields.map((f) => `<div>${fieldHtml(f)}</div>`).join('')}</div>`;
+    case 'grid': {
+      const rows: string[] = [];
+      for (let i = 0; i < b.cells.length; i += b.columns) {
+        rows.push(
+          `<tr>${b.cells
+            .slice(i, i + b.columns)
+            .map((f) => `<td>${fieldHtml(f)}</td>`)
+            .join('')}</tr>`,
+        );
+      }
+      return `<table class="grid">${rows.join('')}</table>`;
+    }
+    case 'image':
+      return `<figure><img src="${dataUrl(b.mimeType, b.data)}" alt="${esc(b.caption)}"><figcaption>${esc(b.caption)}</figcaption></figure>`;
+    case 'medicine':
+      return `<div class="med"><div class="row b"><div>${b.index}. ${esc(b.name)}</div><div class="r">${esc(b.quantity)}</div></div><p class="i ind">${esc(b.usage)}</p></div>`;
+  }
+}
+
+/**
+ * Trang HTML giống bản in (khổ A4), để xem trước trước khi tải PDF/Word.
+ * Không có JavaScript; CSP chặn mọi tài nguyên ngoài.
+ */
+export function renderHtml(doc: ReturnType<typeof buildPrintDoc>): string {
+  const pages = doc.pages
+    .map(
+      (p) => `<section class="page">
+  <div class="head"><div>${p.headerLeft.map((t, i) => `<div class="${i === 0 ? 'b' : ''}">${esc(t)}</div>`).join('')}</div>
+  <div class="r">${p.headerRight.map((t) => `<div>${esc(t)}</div>`).join('')}</div></div>
+  <h1>${esc(p.title)}</h1>${p.subtitle ? `<p class="sub">${esc(p.subtitle)}</p>` : ''}
+  ${p.blocks.map(htmlBlock).join('\n  ')}
+  <div class="sign"><div class="i">${esc(p.sign.date)}</div><div class="b">${esc(p.sign.role)}</div><div class="i small">(Ký, ghi rõ họ tên)</div><div class="b name">${esc(p.sign.name)}</div></div>
+  ${p.note ? `<p class="i small">${esc(p.note)}</p>` : ''}
+</section>`,
+    )
+    .join('\n');
+  return `<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(doc.pages.map((p) => p.title).join(' – '))}</title>
+<style>
+  /* Kích thước tính theo em; cỡ chữ gốc co theo bề rộng màn hình nên cả trang A4 luôn vừa khung (như xem PDF), tối đa 15px */
+  :root { color-scheme: light; }
+  body { margin: 0; padding: 1em 0; background: #e5e7eb; color: #111; line-height: 1.35;
+    font-family: 'Times New Roman', Tinos, 'Noto Serif', serif; font-size: min(15px, calc((100vw - 16px) / 52.933)); }
+  .page { box-sizing: border-box; width: 52.933em; min-height: 74.867em; margin: 0 auto 1em; padding: 3.2em 3.733em 2.667em 5em; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .head { display: flex; justify-content: space-between; gap: 1em; font-size: .933em; }
+  h1 { text-align: center; font-size: 1.467em; margin: .8em 0 .1em; }
+  h3 { font-size: 1em; margin: .667em 0 .2em; }
+  p { margin: .133em 0; }
+  .sub { text-align: center; font-style: italic; margin-bottom: .533em; }
+  .row { display: flex; gap: 1.867em; margin: .133em 0; } .row > div:last-child { flex: 1; }
+  .grid { width: 100%; border-collapse: collapse; margin: .267em 0 .4em; font-size: .933em; }
+  .grid td { border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: .2em .267em; }
+  figure { margin: .4em 0; text-align: center; } figure img { max-width: 28em; max-height: 20em; } figcaption { font-style: italic; font-size: .8em; }
+  .med { margin: .267em 0; } .med .row > div:last-child { flex: 0 0 auto; }
+  .sign { width: 20em; margin: .933em 0 0 auto; text-align: center; } .sign .name { margin-top: 3.733em; }
+  .b { font-weight: bold; } .i { font-style: italic; } .r { text-align: right; } .ind { padding-left: 1.067em; } .small { font-size: .867em; }
+  .foot { width: 52.933em; margin: 0 auto; font-size: .8em; font-style: italic; color: #555; }
+</style></head>
+<body>
+${pages}
+<p class="foot">${esc(doc.footer)}</p>
+</body></html>`;
+}

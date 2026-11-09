@@ -1,25 +1,26 @@
 import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
-import { selfPatientView } from '../patients/account-link.js';
-import { phoneVerificationRequired, PhoneVerifyService } from '../sms/phone-verify.js';
-import { ChangePasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto.js';
-import { AuthUser } from './decorators.js';
-import { hashPassword, passwordProblem, verifyPassword } from './password.js';
-import { SessionsService } from './sessions.js';
+import { selfPatientView } from '../patients/utils/patient-scope.util.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { PhoneVerifyService } from '../sms/phone-verify.service.js';
+import { phoneVerificationRequired } from '../sms/utils/phone-verify.util.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
+import { LoginDto } from './dto/login.dto.js';
+import { RegisterDto } from './dto/register.dto.js';
+import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { AuthUser } from './interfaces/auth-user.interface.js';
+import { SessionsService } from './sessions.service.js';
+import { hashPassword, passwordProblem, verifyPassword } from './utils/password.util.js';
+import { publicUser } from './utils/public-user.util.js';
 
 /** Nhập sai bấy nhiêu lần liên tiếp thì tạm khóa tài khoản */
 export const MAX_FAILED_LOGINS = 5;
 export const LOCK_MINUTES = 15;
+
 /** Mỗi địa chỉ IP được nhập sai tối đa bấy nhiêu lần trong LOCK_MINUTES (chống thử mật khẩu trên nhiều tài khoản) */
 export const MAX_FAILED_PER_IP = 30;
 const BAD_LOGIN = 'Sai số điện thoại hoặc mật khẩu';
-
-/** Thông tin tài khoản trả về cho client (không bao giờ kèm passwordHash). */
-export function publicUser(u: User) {
-  return { id: u.id, fullName: u.fullName, phone: u.phone, email: u.email, role: u.role, isActive: u.isActive, mustChangePassword: u.mustChangePassword };
-}
 
 @Injectable()
 export class AuthService {
@@ -45,7 +46,7 @@ export class AuthService {
     const mustVerify = phoneVerificationRequired();
 
     const user = await this.prisma.$transaction(async (tx) => {
-      // Số điện thoại phải được chứng minh bằng tin nhắn gửi từ chính SIM đó (sms/phone-verify.ts)
+      // Số điện thoại phải được chứng minh bằng tin nhắn gửi từ chính SIM đó (sms/phone-verify.service.ts)
       const phoneProven = mustVerify || verification ? (await this.phoneVerify.consume(tx, verification, 'REGISTER', dto.phone), true) : false;
       const created = await tx.user.create({
         data: { fullName: dto.fullName, phone: dto.phone, email: dto.email, passwordHash, role: 'PATIENT' },
@@ -55,7 +56,7 @@ export class AuthService {
         if (existing.userId) throw new ConflictException('Số điện thoại đã được đăng ký');
         // Hồ sơ có sẵn (lễ tân tạo khi khám vãng lai). Đã chứng minh giữ số điện thoại (nhắn tin xác minh) thì
         // thấy ngay lịch sử khám; chưa thì ẩn bệnh án cũ cho tới khi xác minh bằng mã liên kết / tại quầy
-        // (patients/account-link.ts)
+        // (patients/account-link.service.ts)
         await tx.patient.update({
           where: { id: existing.id },
           data: phoneProven
@@ -93,8 +94,7 @@ export class AuthService {
    * trong lúc khóa); một địa chỉ IP sai quá 30 lần trong 15 phút thì bị chặn.
    */
   async login(dto: LoginDto, ip = 'unknown', now = new Date()) {
-    const tooMany = (minutes: number) =>
-      new HttpException(`Nhập sai quá nhiều lần. Vui lòng thử lại sau ${minutes} phút.`, HttpStatus.TOO_MANY_REQUESTS);
+    const tooMany = (minutes: number) => new HttpException(`Nhập sai quá nhiều lần. Vui lòng thử lại sau ${minutes} phút.`, HttpStatus.TOO_MANY_REQUESTS);
     if (this.ipBlocked(ip, now.getTime())) throw tooMany(LOCK_MINUTES);
 
     const user = await this.prisma.user.findUnique({ where: { phone: dto.phone } });

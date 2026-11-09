@@ -1,30 +1,28 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { AppointmentsModule } from './appointments/appointments.js';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { AppointmentsModule } from './appointments/appointments.module.js';
 import { AuthModule } from './auth/auth.module.js';
-import { SessionsModule } from './auth/sessions.js';
-import { PatientPrivacyInterceptor } from './common/patient-privacy.js';
-import { UniqueErrorFilter } from './common/unique-error.js';
-import { DoctorsModule } from './doctors/doctors.js';
-import { HealthController } from './health/health.controller.js';
-import { MedicinesModule } from './medicines/medicines.js';
-import { MetricsModule } from './metrics/metrics.js';
-import { NotificationsModule } from './notifications/notifications.js';
-import { StatsModule } from './stats/stats.js';
-import { PatientsModule } from './patients/patients.js';
+import { SessionsModule } from './auth/sessions.module.js';
+import { UniqueErrorFilter } from './common/filters/unique-error.filter.js';
+import { PatientPrivacyInterceptor } from './common/interceptors/patient-privacy.interceptor.js';
+import { DoctorsModule } from './doctors/doctors.module.js';
+import { HealthModule } from './health/health.module.js';
+import { Icd10Module } from './icd10/icd10.module.js';
+import { LabResultsModule } from './lab-results/lab-results.module.js';
+import { MedicinesModule } from './medicines/medicines.module.js';
+import { MetricsModule } from './metrics/metrics.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
+import { PatientsModule } from './patients/patients.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
-import { QrController } from './qr/qr.controller.js';
-import { QueueController } from './queue/queue.controller.js';
-import { QueueJanitor } from './queue/queue-janitor.js';
-import { QueueService } from './queue/queue.service.js';
-import { SchedulesModule } from './schedules/schedules.js';
-import { SpecialtiesModule } from './specialties/specialties.js';
-import { StaffModule } from './staff/staff.js';
-import { RealtimeModule } from './realtime/realtime.js';
-import { LabModule } from './visits/lab-results.js';
-import { VisitsModule } from './visits/visits.js';
-import { Icd10Module } from './icd10/icd10.js';
+import { QrModule } from './qr/qr.module.js';
+import { QueueModule } from './queue/queue.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
+import { SchedulesModule } from './schedules/schedules.module.js';
+import { SpecialtiesModule } from './specialties/specialties.module.js';
+import { StaffModule } from './staff/staff.module.js';
+import { StatsModule } from './stats/stats.module.js';
+import { VisitsModule } from './visits/visits.module.js';
 
 @Module({
   imports: [
@@ -43,14 +41,14 @@ import { Icd10Module } from './icd10/icd10.js';
     NotificationsModule,
     StatsModule,
     VisitsModule,
-    LabModule,
+    LabResultsModule,
     Icd10Module,
     MetricsModule,
+    HealthModule,
+    QrModule,
+    QueueModule,
   ],
-  controllers: [HealthController, QrController, QueueController],
   providers: [
-    QueueService,
-    QueueJanitor,
     { provide: APP_FILTER, useClass: UniqueErrorFilter },
     { provide: APP_INTERCEPTOR, useClass: PatientPrivacyInterceptor },
   ],

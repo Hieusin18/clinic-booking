@@ -9,7 +9,7 @@
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { issueTemporaryPassword } from '../auth/accounts.js';
+import { issueTemporaryPassword } from '../auth/accounts.service.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 async function main() {

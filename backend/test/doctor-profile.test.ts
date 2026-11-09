@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { todayVN } from '../src/common/time.js';
-import { currentYearVN, detectImage, experienceYears, joinExpertise, newestFirst, splitExpertise } from '../src/doctors/doctor-profile.js';
+import { todayVN } from '../src/common/utils/time.util.js';
+import { currentYearVN, detectImage, experienceYears, joinExpertise, newestFirst, splitExpertise } from '../src/doctors/utils/doctor-profile.util.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
 import { createDoctor, createPatient, createUser } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';

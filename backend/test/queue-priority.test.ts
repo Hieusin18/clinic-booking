@@ -1,9 +1,9 @@
 import type { INestApplication } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { todayVN } from '../src/common/time.js';
+import { todayVN } from '../src/common/utils/time.util.js';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
-import { createQrToken } from '../src/qr/qr-token.js';
-import { QueueJanitor } from '../src/queue/queue-janitor.js';
+import { createQrToken } from '../src/qr/utils/qr-token.util.js';
+import { QueueJanitor } from '../src/queue/queue-janitor.service.js';
 import { createDoctor, createPatient, createUser, nextPhone } from './fixtures.js';
 import { api, createTestApp, resetDb } from './helpers.js';
 

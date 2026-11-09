@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
-import { PhoneVerifyModule } from '../sms/phone-verify.js';
-import { AccountsController, AccountsService } from './accounts.js';
+import { PhoneVerifyModule } from '../sms/phone-verify.module.js';
+import { AccountsController } from './accounts.controller.js';
+import { AccountsService } from './accounts.service.js';
 import { AuthController } from './auth.controller.js';
-import { AuthGuard } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
+import { AuthGuard } from './guards/auth.guard.js';
 
 @Module({
   imports: [

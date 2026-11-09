@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { Public } from '../auth/decorators.js';
+import { Public } from '../auth/decorators/public.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 @Controller('health')

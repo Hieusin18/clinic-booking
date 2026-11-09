@@ -1,8 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../auth/decorators.js';
-import { createQrToken } from './qr-token.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { createQrToken } from './utils/qr-token.util.js';
 
 @ApiTags('queue')
 @ApiBearerAuth()

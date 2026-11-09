@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { currentStreak, nextStreak, pickNext, predictOrder, ticketLabel, type CallRuleName, type QueueEntry } from '../src/queue/queue-order.js';
-import { DEFAULT_RULES, noShowStanding, queueRules } from '../src/queue/queue-rules.js';
+import { currentStreak, nextStreak, pickNext, predictOrder, ticketLabel, type CallRuleName, type QueueEntry } from '../src/queue/utils/queue-order.util.js';
+import { DEFAULT_RULES, noShowStanding, queueRules } from '../src/queue/utils/queue-rules.util.js';
 
 /** Giờ Việt Nam trong một ngày cố định */
 const at = (hhmm: string) => new Date(`2026-11-09T${hhmm}:00+07:00`);
