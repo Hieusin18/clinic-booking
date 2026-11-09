@@ -9,6 +9,7 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthUser, CurrentUser, Roles } from './decorators.js';
 import { hashPassword, temporaryPassword } from './password.js';
+import { SessionsService } from './sessions.js';
 
 type Db = Pick<PrismaClient, 'user'>;
 
@@ -31,14 +32,19 @@ export async function issueTemporaryPassword(db: Db, userId: string) {
 
 @Injectable()
 export class AccountsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
+  ) {}
 
   async resetPassword(admin: AuthUser, userId: string) {
     const target = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (!target) throw new NotFoundException('Không tìm thấy tài khoản');
     if (userId === admin.sub) throw new BadRequestException('Hãy dùng chức năng Đổi mật khẩu cho tài khoản của bạn');
     if (target.role !== 'DOCTOR' && target.role !== 'RECEPTIONIST') throw new BadRequestException('Chỉ đặt lại được mật khẩu của bác sĩ và lễ tân');
-    return issueTemporaryPassword(this.prisma, userId);
+    const result = await issueTemporaryPassword(this.prisma, userId);
+    await this.sessions.revoke(userId);
+    return result;
   }
 }
 

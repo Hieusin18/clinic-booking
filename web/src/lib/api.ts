@@ -61,3 +61,33 @@ export function errorData<T extends object = Record<string, unknown>>(err: unkno
   if (err instanceof AxiosError) return err.response?.data as (T & { code?: string }) | undefined;
   return undefined;
 }
+
+/**
+ * Máy chủ đã trả lời và từ chối phiên (token hết hạn, bị khóa, tài khoản không còn…) thì mới đăng xuất.
+ * Mất mạng hay máy chủ đang khởi động lại (vd. lúc Jenkins triển khai bản mới) thì giữ đăng nhập.
+ */
+export function sessionRejected(err: unknown) {
+  return axios.isAxiosError(err) && !!err.response && err.response.status < 500;
+}
+
+const USER_KEY = 'clinic.user';
+
+/** Thông tin tài khoản lần gần nhất lấy được, để mở lại trang lúc máy chủ chưa sẵn sàng vẫn vào được. */
+export const userCache = {
+  get<T>(): T | null {
+    try {
+      const raw = localStorage.getItem(USER_KEY);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  },
+  set(user: unknown) {
+    try {
+      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+      else localStorage.removeItem(USER_KEY);
+    } catch {
+      /* bỏ qua */
+    }
+  },
+};

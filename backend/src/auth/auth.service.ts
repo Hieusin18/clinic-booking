@@ -2,10 +2,12 @@ import { BadRequestException, ConflictException, HttpException, HttpStatus, Inje
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { User } from '../generated/prisma/client.js';
+import { selfPatientView } from '../patients/account-link.js';
 import { phoneVerificationRequired, PhoneVerifyService } from '../sms/phone-verify.js';
 import { ChangePasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto.js';
 import { AuthUser } from './decorators.js';
 import { hashPassword, passwordProblem, verifyPassword } from './password.js';
+import { SessionsService } from './sessions.js';
 
 /** Nhập sai bấy nhiêu lần liên tiếp thì tạm khóa tài khoản */
 export const MAX_FAILED_LOGINS = 5;
@@ -25,6 +27,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly phoneVerify: PhoneVerifyService,
+    private readonly sessions: SessionsService,
   ) {}
 
   /**
@@ -108,8 +111,10 @@ export class AuthService {
           data: lock ? { failedLogins: 0, lockedUntil: new Date(now.getTime() + LOCK_MINUTES * 60_000) } : { failedLogins: failed },
         });
         if (lock) {
+          // Bệnh nhân tự lấy lại mật khẩu bằng tin nhắn; nhân viên nhờ admin cấp mật khẩu tạm
+          const forgot = user.role === 'PATIENT' ? 'quên mật khẩu hãy chọn "Quên mật khẩu"' : 'quên mật khẩu hãy liên hệ quản trị viên';
           throw new HttpException(
-            `Nhập sai mật khẩu ${MAX_FAILED_LOGINS} lần. Tài khoản tạm khóa ${LOCK_MINUTES} phút; quên mật khẩu hãy liên hệ quản trị viên.`,
+            `Nhập sai mật khẩu ${MAX_FAILED_LOGINS} lần. Tài khoản tạm khóa ${LOCK_MINUTES} phút; ${forgot}.`,
             HttpStatus.TOO_MANY_REQUESTS,
           );
         }
@@ -141,6 +146,7 @@ export class AuthService {
         tokenVersion: { increment: 1 },
       },
     });
+    await this.sessions.revoke(user.id, { keepPushToken: dto.pushToken });
     return this.issueToken(updated);
   }
 
@@ -152,6 +158,8 @@ export class AuthService {
     const v = await this.prisma.phoneVerification.findUnique({ where: { id: dto.verificationId }, select: { phone: true } });
     const user = v && (await this.prisma.user.findUnique({ where: { phone: v.phone } }));
     if (!v || !user || user.role !== 'PATIENT') throw new BadRequestException('Phiên xác minh không hợp lệ, vui lòng xác minh lại');
+    // Tài khoản bị khóa thì không đổi mật khẩu (và giữ phiên xác minh để không phải nhắn tin lại sau khi được mở khóa)
+    if (!user.isActive) throw new UnauthorizedException('Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên');
     const weak = passwordProblem(dto.newPassword, user.phone);
     if (weak) throw new BadRequestException(weak);
     const passwordHash = await hashPassword(dto.newPassword);
@@ -162,13 +170,14 @@ export class AuthService {
         data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date(), failedLogins: 0, lockedUntil: null, tokenVersion: { increment: 1 } },
       });
     });
-    if (!updated.isActive) throw new UnauthorizedException('Tài khoản đã bị khóa, vui lòng liên hệ quản trị viên');
+    await this.sessions.revoke(user.id);
     return this.issueToken(updated);
   }
 
   /** Đăng xuất khỏi mọi thiết bị (kể cả máy đang dùng). */
   async logoutAll(auth: AuthUser) {
     await this.prisma.user.update({ where: { id: auth.sub }, data: { tokenVersion: { increment: 1 } } });
+    await this.sessions.revoke(auth.sub);
     return { ok: true };
   }
 
@@ -178,7 +187,8 @@ export class AuthService {
       include: { patient: true, doctor: { include: { specialty: true } } },
     });
     if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
-    return { ...publicUser(user), patient: user.patient, doctor: user.doctor };
+    // Không trả mã liên kết; hồ sơ có sẵn chưa xác minh thì che thông tin cá nhân (như GET /patients/me)
+    return { ...publicUser(user), patient: user.patient && selfPatientView(user.patient), doctor: user.doctor };
   }
 
   private async issueToken(user: User) {

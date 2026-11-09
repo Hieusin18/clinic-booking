@@ -194,6 +194,32 @@ describe('Xác minh số điện thoại bằng tin nhắn người dùng gửi 
     await api(app).post('/api/auth/reset-password').send({ verificationId: v.id, ticket: v.ticket, newPassword: 'muaha2026x' }).expect(400);
   });
 
+  it('quên mật khẩu: máy cũ thôi nhận thông báo đẩy; tài khoản bị khóa thì không đổi được mật khẩu', async () => {
+    process.env.REQUIRE_PHONE_VERIFICATION = 'false';
+    const old = await api(app).post('/api/auth/register').send(register).expect(201);
+    process.env.REQUIRE_PHONE_VERIFICATION = 'true';
+    await api(app)
+      .post('/api/notifications/push-token')
+      .set({ Authorization: `Bearer ${old.body.accessToken}` })
+      .send({ token: 'ExpoPushToken[may-cu]', platform: 'ios' })
+      .expect(200);
+
+    const v = await start(PHONE, 'RESET_PASSWORD');
+    await fromIphone(PHONE, `PKXM ${v.code}`).expect(200);
+    const userId = old.body.user.id as string;
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    await prisma.user.update({ where: { id: userId }, data: { isActive: false } });
+    expect(
+      (await api(app).post('/api/auth/reset-password').send({ verificationId: v.id, ticket: v.ticket, newPassword: 'muadong2026' }).expect(401)).body.message,
+    ).toMatch(/bị khóa/);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).passwordHash).toBe(before.passwordHash);
+
+    // Được mở khóa: dùng lại phiên xác minh vừa rồi, không phải nhắn tin lại
+    await prisma.user.update({ where: { id: userId }, data: { isActive: true } });
+    await api(app).post('/api/auth/reset-password').send({ verificationId: v.id, ticket: v.ticket, newPassword: 'muadong2026' }).expect(200);
+    expect(await prisma.pushToken.count({ where: { userId } })).toBe(0);
+  });
+
   it('giới hạn số phiên theo số điện thoại; phiên hết hạn', async () => {
     for (let i = 0; i < MAX_PER_PHONE_HOUR; i++) await start();
     await api(app).post('/api/auth/phone-verifications').send({ phone: PHONE, purpose: 'REGISTER' }).expect(429);

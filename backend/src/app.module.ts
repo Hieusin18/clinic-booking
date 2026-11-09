@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppointmentsModule } from './appointments/appointments.js';
 import { AuthModule } from './auth/auth.module.js';
+import { SessionsModule } from './auth/sessions.js';
+import { PatientPrivacyInterceptor } from './common/patient-privacy.js';
+import { UniqueErrorFilter } from './common/unique-error.js';
 import { DoctorsModule } from './doctors/doctors.js';
 import { HealthController } from './health/health.controller.js';
 import { MedicinesModule } from './medicines/medicines.js';
@@ -26,6 +30,7 @@ import { Icd10Module } from './icd10/icd10.js';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    SessionsModule,
     AuthModule,
     SpecialtiesModule,
     DoctorsModule,
@@ -43,6 +48,11 @@ import { Icd10Module } from './icd10/icd10.js';
     MetricsModule,
   ],
   controllers: [HealthController, QrController, QueueController],
-  providers: [QueueService, QueueJanitor],
+  providers: [
+    QueueService,
+    QueueJanitor,
+    { provide: APP_FILTER, useClass: UniqueErrorFilter },
+    { provide: APP_INTERCEPTOR, useClass: PatientPrivacyInterceptor },
+  ],
 })
 export class AppModule {}

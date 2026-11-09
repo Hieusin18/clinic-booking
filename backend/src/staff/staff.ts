@@ -7,6 +7,7 @@ import { Roles } from '../auth/decorators.js';
 import { hashPassword } from '../auth/password.js';
 import { PageQuery, skipTake, toPage } from '../common/pagination.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { SessionsService } from '../auth/sessions.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export class CreateReceptionistDto {
@@ -25,7 +26,10 @@ export class UpdateReceptionistDto {
 /** Admin quản lý tài khoản lễ tân */
 @Injectable()
 export class StaffService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionsService,
+  ) {}
 
   async list(q: PageQuery) {
     const where: Prisma.UserWhereInput = {
@@ -67,6 +71,8 @@ export class StaffService {
         isActive: dto.isActive,
       },
     });
+    // Khóa tài khoản: máy đang mở không còn nhận cập nhật realtime
+    if (dto.isActive === false) await this.sessions.revoke(id);
     return publicUser(updated);
   }
 }
