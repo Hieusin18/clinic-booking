@@ -88,7 +88,7 @@ export function LoginPage() {
       <Flex align="center" justify="center" style={{ padding: 24 }}>
         <div style={{ width: '100%', maxWidth: 380 }}>
           <Typography.Title level={2} style={{ margin: 0 }}>
-            Đăng nhập
+            Login
           </Typography.Title>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 28 }}>
             Dành cho bác sĩ, lễ tân và quản trị viên
