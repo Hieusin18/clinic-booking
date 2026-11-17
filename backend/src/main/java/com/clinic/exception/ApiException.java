@@ -64,6 +64,7 @@ public class ApiException extends RuntimeException {
   public static ApiException conflictWithCode(String code, String message, Map<String, Object> extra) {
     Map<String, Object> b = new LinkedHashMap<>();
     b.put("statusCode", 409);
+    b.put("error", "Conflict");
     b.put("code", code);
     b.put("message", message);
     if (extra != null) b.putAll(extra);

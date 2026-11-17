@@ -42,6 +42,39 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
   long countByScheduleId(String scheduleId);
 
+  /** Lịch hẹn hôm nay của bệnh nhân còn hiệu lực và chưa check-in, theo giờ hẹn. */
+  @Query("select a from Appointment a join a.schedule s where a.patientId = :pid and a.status in :active and s.date = :date "
+      + "and not exists (select 1 from Visit v where v.appointmentId = a.id) order by s.startTime asc")
+  List<Appointment> openToday(@Param("pid") String patientId, @Param("active") Collection<AppointmentStatus> active, @Param("date") LocalDate date);
+
+  /** Lịch hẹn quá giờ hẹn + khung trễ mà chưa check-in → "không đến". */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("update Appointment a set a.status = com.clinic.entity.enums.AppointmentStatus.NO_SHOW where a.status in :active "
+      + "and not exists (select 1 from Visit v where v.appointmentId = a.id) "
+      + "and a.scheduleId in (select s.id from Schedule s where s.startTime < :before)")
+  int markNoShows(@Param("active") Collection<AppointmentStatus> active, @Param("before") Instant before);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("update Appointment a set a.status = :to where a.id in :ids and a.status in :from")
+  int moveStatusAll(@Param("ids") Collection<String> ids, @Param("from") Collection<AppointmentStatus> from, @Param("to") AppointmentStatus to);
+
+  /** Lịch cần nhắc trước một ngày: còn hiệu lực, chưa check-in, chưa nhắc, giờ hẹn trong (after, until]. */
+  @Query("select a from Appointment a join a.schedule s where a.status in :active and a.remindedDayAt is null "
+      + "and not exists (select 1 from Visit v where v.appointmentId = a.id) and s.startTime <= :until and s.startTime > :after")
+  List<Appointment> dueForDayReminder(@Param("active") Collection<AppointmentStatus> active, @Param("until") Instant until, @Param("after") Instant after);
+
+  @Query("select a from Appointment a join a.schedule s where a.status in :active and a.remindedHourAt is null "
+      + "and not exists (select 1 from Visit v where v.appointmentId = a.id) and s.startTime <= :until and s.startTime > :after")
+  List<Appointment> dueForHourReminder(@Param("active") Collection<AppointmentStatus> active, @Param("until") Instant until, @Param("after") Instant after);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("update Appointment a set a.remindedDayAt = :now where a.id = :id and a.remindedDayAt is null")
+  int claimDayReminder(@Param("id") String id, @Param("now") Instant now);
+
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("update Appointment a set a.remindedHourAt = :now where a.id = :id and a.remindedHourAt is null")
+  int claimHourReminder(@Param("id") String id, @Param("now") Instant now);
+
   /** Đổi trạng thái nếu đang ở một trong các trạng thái cho trước; trả số dòng đổi. */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update Appointment a set a.status = :to where a.id = :id and a.status in :from")
