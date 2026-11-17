@@ -46,7 +46,7 @@ class MetricsTest extends IntegrationTest {
   @Test
   @DisplayName("đếm lịch hẹn đặt thành công và phiếu số được cấp")
   void business() {
-    String before = api.get("/api/metrics").text();
+    String before = api.get("/api/metrics").call().text();
     double booked0 = value(before, "^clinic_appointments_booked_total");
     double walkIn0 = value(before, "^clinic_queue_tickets_total\\{.*source=\"WALK_IN\"");
 
@@ -60,7 +60,7 @@ class MetricsTest extends IntegrationTest {
     api.post("/api/queue/tickets").auth(reception.token()).send(Map.of("patientId", patient.patient().getId(), "doctorId", doctor.doctor().getId()))
         .expect(201);
 
-    String after = api.get("/api/metrics").text();
+    String after = api.get("/api/metrics").call().text();
     assertThat(value(after, "^clinic_appointments_booked_total")).isEqualTo(booked0 + 1);
     assertThat(value(after, "^clinic_queue_tickets_total\\{.*source=\"WALK_IN\"")).isEqualTo(walkIn0 + 1);
   }
