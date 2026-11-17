@@ -37,12 +37,14 @@ public class RealtimeGateway {
   static final long AUTH_TIMEOUT_SECONDS = 10;
 
   private final SessionVerifier sessions;
+  private final com.fasterxml.jackson.databind.ObjectMapper mapper;
   private final int port;
   private SocketIOServer server;
   private ScheduledExecutorService timers;
 
-  public RealtimeGateway(SessionVerifier sessions, AppEnv env) {
+  public RealtimeGateway(SessionVerifier sessions, AppEnv env, com.fasterxml.jackson.databind.ObjectMapper mapper) {
     this.sessions = sessions;
+    this.mapper = mapper;
     this.port = env.getInt("SOCKET_PORT", 3002);
   }
 
@@ -127,8 +129,9 @@ public class RealtimeGateway {
 
   public void emit(String room, String event, Object payload) {
     try {
-      if (server != null) server.getRoomOperations(room).sendEvent(event, payload);
-    } catch (RuntimeException e) {
+      // Đổi sang Map/List/chuỗi bằng ObjectMapper của API để ngày giờ có cùng định dạng với JSON trả về
+      if (server != null) server.getRoomOperations(room).sendEvent(event, mapper.readValue(mapper.writeValueAsBytes(payload), Object.class));
+    } catch (RuntimeException | java.io.IOException e) {
       log.warn("Không gửi được {}: {}", event, e.toString());
     }
   }
