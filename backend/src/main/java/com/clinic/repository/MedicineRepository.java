@@ -12,4 +12,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, String> {
   @Query("select m from Medicine m where (m.active = true or :all = true) and (:term = '' "
       + "or lower(m.name) like lower(concat('%', :term, '%')) or lower(m.activeIngredient) like lower(concat('%', :term, '%')))")
   Page<Medicine> search(@Param("term") String term, @Param("all") boolean includeInactive, Pageable page);
+
+  @Query("select count(m) from Medicine m where m.id in :ids and m.active = true")
+  long countActive(@Param("ids") java.util.Collection<String> ids);
 }

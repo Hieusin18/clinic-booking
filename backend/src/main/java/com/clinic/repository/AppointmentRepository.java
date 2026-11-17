@@ -22,14 +22,14 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
   boolean existsSameDay(@Param("pid") String patientId, @Param("statuses") Collection<AppointmentStatus> statuses,
       @Param("doctorId") String doctorId, @Param("date") LocalDate date);
 
-  /** Lịch sắp tới của bệnh nhân (còn hiệu lực, giờ hẹn sau cutoff); lockedBefore null = thấy hết. */
-  @Query("select a from Appointment a join a.schedule s where a.patientId = :pid and (:locked is null or a.createdAt >= :locked) "
+  /** Lịch sắp tới của bệnh nhân (còn hiệu lực, giờ hẹn sau cutoff), tạo từ mốc lockedBefore (Instant.EPOCH = thấy hết). */
+  @Query("select a from Appointment a join a.schedule s where a.patientId = :pid and a.createdAt >= :locked "
       + "and a.status in :active and s.startTime > :cutoff order by s.startTime asc")
   List<Appointment> upcoming(@Param("pid") String patientId, @Param("locked") Instant lockedBefore,
       @Param("active") Collection<AppointmentStatus> active, @Param("cutoff") Instant cutoff);
 
   /** Lịch đã qua hoặc đã hủy / xử lý của bệnh nhân. */
-  @Query("select a from Appointment a join a.schedule s where a.patientId = :pid and (:locked is null or a.createdAt >= :locked) "
+  @Query("select a from Appointment a join a.schedule s where a.patientId = :pid and a.createdAt >= :locked "
       + "and (a.status not in :active or s.startTime <= :cutoff) order by s.startTime desc")
   List<Appointment> past(@Param("pid") String patientId, @Param("locked") Instant lockedBefore,
       @Param("active") Collection<AppointmentStatus> active, @Param("cutoff") Instant cutoff);

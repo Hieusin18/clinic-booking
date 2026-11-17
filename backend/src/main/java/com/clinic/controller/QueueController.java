@@ -118,7 +118,7 @@ public class QueueController {
   @GetMapping("/mine")
   public List<Map<String, Object>> mine(@CurrentUser AuthUser user) {
     PatientScope.Scope s = scope.scopeOf(user);
-    return tx.execute(t -> visits.ofPatientOnDay(s.patientId(), VnTime.today(Instant.now()), s.lockedBefore()).stream().map(queue::view).toList());
+    return tx.execute(t -> visits.ofPatientOnDay(s.patientId(), VnTime.today(Instant.now()), s.visibleFrom()).stream().map(queue::view).toList());
   }
 
   @Roles({Role.PATIENT, Role.RECEPTIONIST, Role.ADMIN, Role.DOCTOR})

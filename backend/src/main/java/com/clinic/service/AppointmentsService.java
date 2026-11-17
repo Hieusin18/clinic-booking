@@ -109,8 +109,8 @@ public class AppointmentsService {
     Instant cutoff = Instant.now().minusSeconds(rules.checkinLateMinutes() * MINUTE);
     boolean upcoming = when == null || "upcoming".equals(when);
     List<Appointment> list = upcoming
-        ? appointments.upcoming(s.patientId(), s.lockedBefore(), ACTIVE, cutoff)
-        : appointments.past(s.patientId(), s.lockedBefore(), ACTIVE, cutoff);
+        ? appointments.upcoming(s.patientId(), s.visibleFrom(), ACTIVE, cutoff)
+        : appointments.past(s.patientId(), s.visibleFrom(), ACTIVE, cutoff);
     // Khung giờ check-in để app nhắc bệnh nhân đến đúng lúc
     return list.stream().map(a -> withWindow(AppointmentViews.view(a), a.getSchedule().getStartTime())).toList();
   }

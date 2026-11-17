@@ -20,7 +20,12 @@ public class PatientScope {
    * Hồ sơ và mốc ẩn dữ liệu cũ (null = thấy hết): chỉ lấy bản ghi tạo từ lúc tài khoản gắn vào hồ sơ khi hồ sơ
    * chưa xác minh.
    */
-  public record Scope(String patientId, Instant lockedBefore) {}
+  public record Scope(String patientId, Instant lockedBefore) {
+    /** Mốc dùng trong truy vấn: không bị ẩn thì lấy từ đầu (Instant.EPOCH). */
+    public Instant visibleFrom() {
+      return lockedBefore == null ? Instant.EPOCH : lockedBefore;
+    }
+  }
 
   public String patientIdOf(AuthUser user) {
     return patients.findByUserId(user.sub()).map(Patient::getId)
