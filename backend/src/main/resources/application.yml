@@ -19,6 +19,9 @@ server:
     max-swallow-size: 20MB
 
 spring:
+  config:
+    # Chạy trên máy (./mvnw spring-boot:run) thì đọc biến từ backend/.env như bản cũ; biến môi trường thật được ưu tiên hơn
+    import: optional:file:.env[.properties]
   application:
     name: clinic-booking-backend
   main:

@@ -36,7 +36,13 @@ jobs:
           java-version: 21
           cache: maven
       - name: Build và test
-        run: mvn -B -ntp verify 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+        run: ./mvnw -B -ntp verify 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+      - name: Độ phủ test
+        if: always()
+        run: |
+          f=target/site/jacoco/jacoco.csv
+          [ -f "$f" ] && awk -F, 'NR>1 { m+=$8; c+=$9 } END { printf "Độ phủ dòng lệnh: %.1f%% (%d/%d dòng)\n", 100*c/(m+c), c, m+c }' "$f" || true
+          [ -f "$f" ] && awk -F, 'NR>1 { m[$2]+=$8; c[$2]+=$9 } END { for (p in m) printf "  %-28s %5.1f%%\n", p, 100*c[p]/(m[p]+c[p]) }' "$f" | sort || true
       - name: Tóm tắt lỗi
         if: failure()
         run: |

@@ -10,21 +10,25 @@ import org.springframework.stereotype.Component;
  * Lệnh quản trị chạy trên máy chủ (không mở API):
  * <pre>
  *   docker compose -f docker-compose.prod.yml run --rm seed                    # dữ liệu mẫu
+ *   docker compose run --rm seed java -jar app.jar seed-history [--days 90]    # lịch sử khám mẫu cho trang Thống kê
+ *   docker compose run --rm seed java -jar app.jar seed-history --reset        # xóa lịch sử khám mẫu
  *   docker compose exec backend java -jar app.jar reset-password 0900000001  # admin quên mật khẩu
  * </pre>
  */
 @Component
 public class CliRunner implements CommandLineRunner {
   /** Các lệnh được hỗ trợ. */
-  public static final java.util.Set<String> COMMANDS = java.util.Set.of("seed", "reset-password");
+  public static final java.util.Set<String> COMMANDS = java.util.Set.of("seed", "seed-history", "reset-password");
 
   private final SeedService seed;
+  private final SeedHistory history;
   private final UserRepository users;
   private final AccountsService accounts;
   private int exitCode;
 
-  public CliRunner(SeedService seed, UserRepository users, AccountsService accounts) {
+  public CliRunner(SeedService seed, SeedHistory history, UserRepository users, AccountsService accounts) {
     this.seed = seed;
+    this.history = history;
     this.users = users;
     this.accounts = accounts;
   }
@@ -41,6 +45,11 @@ public class CliRunner implements CommandLineRunner {
       seed.run();
       System.out.println("Đã tạo dữ liệu mẫu. Tài khoản (mật khẩu 123456):");
       System.out.println("  Admin 0900000001 · Lễ tân 0900000002 · Bệnh nhân 0900000003 · Bác sĩ 0910000001–0910000006");
+      return;
+    }
+    if (args[0].equals("seed-history")) {
+      boolean reset = java.util.Arrays.asList(args).contains("--reset");
+      System.out.println(reset ? history.reset() : history.generate(SeedHistory.days(args), java.time.Instant.now()));
       return;
     }
     // Đặt lại mật khẩu khi không còn admin nào đăng nhập được: in ra mật khẩu tạm, lần đăng nhập sau phải đổi mật khẩu

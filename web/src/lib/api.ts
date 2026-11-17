@@ -45,7 +45,7 @@ api.interceptors.response.use(
   },
 );
 
-/** Lấy thông báo lỗi tiếng Việt từ backend (NestJS trả message là chuỗi hoặc mảng). */
+/** Lấy thông báo lỗi tiếng Việt từ backend (backend trả message là chuỗi hoặc mảng). */
 export function errorMessage(err: unknown): string {
   if (err instanceof AxiosError) {
     const msg = (err.response?.data as { message?: string | string[] } | undefined)?.message;

@@ -1,6 +1,6 @@
 // Pipeline CI/CD của hệ thống đặt lịch khám (chạy trên Jenkins trong ci/docker-compose.yml).
 //
-// Luồng: lấy code → cài thư viện → test (+ độ phủ) → SonarQube → Quality Gate
+// Luồng: lấy code → cài thư viện → test (+ độ phủ JaCoCo/vitest) → SonarQube → Quality Gate
 //        → build image → [đẩy Docker Hub] → [deploy laptop] → [deploy VPS qua SSH] → dọn image cũ
 //
 // Các bước trong [ ] chỉ chạy khi bật bằng biến môi trường toàn cục của Jenkins
@@ -29,6 +29,8 @@ pipeline {
     // Mạng Docker của máy CI (project "clinic-ci"); CSDL test được gắn vào đây để Jenkins gọi tới
     CI_NETWORK = 'clinic-ci_default'
     TEST_DB = "clinic-test-db-${env.BUILD_NUMBER}"
+    // Backend Spring Boot: Maven Wrapper tự tải Maven (Jenkins đã có JDK 21); thư viện để trong jenkins_home cho lần sau
+    MVN = './mvnw -B -ntp -Dmaven.repo.local=/var/jenkins_home/.m2/repository'
   }
 
   stages {
@@ -41,7 +43,7 @@ pipeline {
 
     stage('Cài thư viện') {
       parallel {
-        stage('backend') { steps { dir('backend') { sh 'npm ci --no-audit --no-fund' } } }
+        stage('backend') { steps { dir('backend') { sh '$MVN dependency:resolve dependency:resolve-plugins -q' } } }
         stage('web')     { steps { dir('web')     { sh 'npm ci --no-audit --no-fund' } } }
         stage('mobile')  { steps { dir('mobile')  { sh 'npm ci --no-audit --no-fund' } } }
       }
@@ -63,15 +65,9 @@ pipeline {
             '''
             dir('backend') {
               withEnv(["DATABASE_URL=postgresql://clinic:clinic@${env.TEST_DB}:5432/clinic_test"]) {
-                sh '''
-                  npx prisma validate
-                  npx prisma generate
-                  npx prisma migrate deploy
-                  npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
-                  npm run typecheck
-                  npm run build
-                  npx vitest run --coverage
-                '''
+                // Biên dịch, chạy test JUnit (Flyway áp dụng migration vào CSDL test, Hibernate kiểm tra entity
+                // khớp bảng), đóng gói app.jar và xuất độ phủ target/site/jacoco/jacoco.xml cho SonarQube
+                sh '$MVN verify'
               }
             }
           }
@@ -127,7 +123,6 @@ pipeline {
       steps {
         sh '''
           docker build -t "$IMAGE_PREFIX-backend:$TAG" -t "$IMAGE_PREFIX-backend:latest" backend
-          docker build --target build -t "$IMAGE_PREFIX-backend-tools:$TAG" -t "$IMAGE_PREFIX-backend-tools:latest" backend
           docker build -f web/Dockerfile -t "$IMAGE_PREFIX-web:$TAG" -t "$IMAGE_PREFIX-web:latest" .
           docker image ls "$IMAGE_PREFIX-*"
         '''
@@ -140,7 +135,7 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DH_USER', passwordVariable: 'DH_TOKEN')]) {
           sh '''
             echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin
-            for img in backend backend-tools web; do
+            for img in backend web; do
               docker push "$IMAGE_PREFIX-$img:$TAG"
               docker push "$IMAGE_PREFIX-$img:latest"
             done

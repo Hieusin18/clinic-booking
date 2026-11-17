@@ -7,7 +7,7 @@ Closes #
 ## Ảnh chụp (nếu có giao diện)
 
 ## Checklist
-- [ ] Chạy được trên máy mình, `npm test` xanh
+- [ ] Chạy được trên máy mình, test xanh (`./mvnw verify` cho backend, `npm test` cho web/mobile)
 - [ ] Đã cập nhật Swagger (nếu đổi API)
-- [ ] Đã commit migration (nếu đổi schema.prisma)
+- [ ] Đã thêm migration Flyway mới `backend/src/main/resources/db/migration/V<số>__<mô-tả>.sql` (nếu đổi CSDL)
 - [ ] Không có mật khẩu, khóa bí mật trong code

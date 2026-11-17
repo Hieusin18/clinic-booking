@@ -1,4 +1,4 @@
-/** Quy tắc mật khẩu mới, giống backend (backend/src/auth/password.ts) và web, để báo lỗi ngay khi gõ. */
+/** Quy tắc mật khẩu mới, giống backend (backend: security/Passwords.java) và web, để báo lỗi ngay khi gõ. */
 export const MIN_PASSWORD = 8;
 
 export interface PasswordCheck {
