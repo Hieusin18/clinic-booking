@@ -13,6 +13,9 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -30,9 +33,13 @@ public class RealtimeGateway {
   public static final String STAFF_ROOM = "staff";
   private static final Logger log = LoggerFactory.getLogger("Realtime");
 
+  /** Không gửi token trong thời gian này sau khi mở kết nối thì bị ngắt. */
+  static final long AUTH_TIMEOUT_SECONDS = 10;
+
   private final SessionVerifier sessions;
   private final int port;
   private SocketIOServer server;
+  private ScheduledExecutorService timers;
 
   public RealtimeGateway(SessionVerifier sessions, AppEnv env) {
     this.sessions = sessions;
@@ -58,8 +65,17 @@ public class RealtimeGateway {
     socket.setReuseAddress(true);
     config.setSocketConfig(socket);
     server = new SocketIOServer(config);
-    // Token kiểm tra ở bước connect bên dưới (để gửi được "auth:error" trước khi ngắt như bản cũ)
-    server.getNamespace("").addAuthTokenListener((data, client) -> AuthTokenResult.AuthTokenResultSuccess);
+    timers = Executors.newSingleThreadScheduledExecutor(r -> {
+      Thread t = new Thread(r, "realtime-auth");
+      t.setDaemon(true);
+      return t;
+    });
+    // Socket.IO v4: token nằm trong gói CONNECT của namespace, gửi sau bước bắt tay. Luôn cho kết nối rồi mới báo
+    // "auth:error" và ngắt (như bản cũ) để app nhận lý do "io server disconnect" và không tự nối lại.
+    server.getNamespace("").addAuthTokenListener((data, client) -> {
+      authenticate(client, data);
+      return AuthTokenResult.AuthTokenResultSuccess;
+    });
     server.addConnectListener(this::onConnect);
     server.start();
     log.info("Socket.IO đang chạy ở cổng {} (đường dẫn {})", port, SOCKET_PATH);
@@ -67,11 +83,18 @@ public class RealtimeGateway {
 
   @PreDestroy
   public void stop() {
+    if (timers != null) timers.shutdownNow();
     if (server != null) server.stop();
   }
 
+  /** Mở kết nối: phải gửi token trong {@link #AUTH_TIMEOUT_SECONDS} giây, không thì bị ngắt. */
   private void onConnect(SocketIOClient client) {
-    Object auth = client.getHandshakeData().getAuthToken();
+    timers.schedule(() -> {
+      if (client.isChannelOpen() && client.get("userId") == null && client.get("rejected") == null) reject(client);
+    }, AUTH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+  }
+
+  private void authenticate(SocketIOClient client, Object auth) {
     Object token = auth instanceof Map<?, ?> m ? m.get("token") : null;
     try {
       if (!(token instanceof String t) || t.isEmpty()) throw new IllegalArgumentException("missing token");
@@ -82,9 +105,15 @@ public class RealtimeGateway {
       client.joinRoom(userRoom(user.sub()));
       if (user.role() != Role.PATIENT) client.joinRoom(STAFF_ROOM);
     } catch (RuntimeException e) {
-      client.sendEvent("auth:error", Map.of("message", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn"));
-      client.disconnect();
+      client.set("rejected", Boolean.TRUE);
+      // Chờ máy chủ gửi xong gói CONNECT rồi mới báo lỗi và ngắt
+      timers.schedule(() -> reject(client), 100, TimeUnit.MILLISECONDS);
     }
+  }
+
+  private static void reject(SocketIOClient client) {
+    client.sendEvent("auth:error", Map.of("message", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn"));
+    client.disconnect();
   }
 
   /** Ngắt các kết nối của một tài khoản, trừ những kết nối đã dùng token phiên bản {@code keepVer} (máy vừa đổi mật khẩu). */
