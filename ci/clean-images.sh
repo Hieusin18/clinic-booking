@@ -1,6 +1,7 @@
 #!/bin/sh
-# Dọn image cũ trên máy chạy Jenkins (laptop): mỗi lần build tạo thêm 3 image gắn số build
-# (<prefix>-backend:<số>, <prefix>-backend-tools:<số>, <prefix>-web:<số>), không dọn thì ổ đĩa đầy dần.
+# Dọn image cũ trên máy chạy Jenkins (laptop): mỗi lần build tạo thêm 2 image gắn số build
+# (<prefix>-backend:<số>, <prefix>-web:<số>), không dọn thì ổ đĩa đầy dần. backend-tools là image của bản NestJS cũ,
+# vẫn dọn để không còn sót.
 # Giữ KEEP lần build gần nhất để còn quay lại bản trước; image đang chạy thì Docker từ chối xóa nên tự được giữ.
 #
 #   sh ci/clean-images.sh <IMAGE_PREFIX> [KEEP=3]

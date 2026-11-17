@@ -37,7 +37,7 @@ const Yes = ({ on, label }: { on: boolean; label: string }) => (
 );
 
 /**
- * Tin nhắn xác minh số điện thoại (backend/src/sms/phone-verify.ts): bệnh nhân nhắn "PKXM <mã>" tới số của
+ * Tin nhắn xác minh số điện thoại (backend: service/PhoneVerifyService.java): bệnh nhân nhắn "PKXM <mã>" tới số của
  * phòng khám; cổng SMS (iPhone Phím tắt / Android) chuyển tin về máy chủ. Trang này để kiểm tra cổng có hoạt động.
  */
 export function SmsPage() {
