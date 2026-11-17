@@ -1,0 +1,116 @@
+# TẠM THỜI (không merge): so sánh API Nest cũ với Spring Boot mới, thử cAdvisor trên Docker mới
+name: Kiểm tra tạm
+
+on:
+  push:
+    branches: [tmp/kiem-tra]
+
+jobs:
+  so-sanh-api:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clinic
+          POSTGRES_PASSWORD: clinic
+          POSTGRES_DB: clinic_ts
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U clinic" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      JWT_SECRET: cmp-jwt-secret
+      QR_SECRET: cmp-qr-secret
+      QR_TTL_SECONDS: "60"
+      CLINIC_ID: phong-kham-1
+      CLINIC_NAME: Phòng khám So Sánh
+      CLINIC_CODE: PK001
+      QUEUE_SWEEP_SECONDS: "0"
+      REMINDER_SWEEP_SECONDS: "0"
+      REQUIRE_PHONE_VERIFICATION: "false"
+      SMS_VERIFY_NUMBER: "0988000999"
+      SMS_GATEWAY_TOKEN: cmp-gateway-token
+      EXPO_PUSH_URL: http://127.0.0.1:9/push
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: new }
+      - uses: actions/checkout@v4
+        with: { path: old, ref: a7eb5c2 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: maven, cache-dependency-path: new/backend/pom.xml }
+      - name: Tạo CSDL thứ hai
+        run: PGPASSWORD=clinic psql -h localhost -U clinic -d clinic_ts -c "CREATE DATABASE clinic_java"
+      - name: Backend Nest (cổng 3100)
+        working-directory: old/backend
+        env:
+          DATABASE_URL: postgresql://clinic:clinic@localhost:5432/clinic_ts
+          PORT: "3100"
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma generate
+          npx prisma migrate deploy
+          npx prisma db seed
+          npm run build
+          nohup node dist/main.js > ../../nest.log 2>&1 &
+      - name: Backend Spring Boot (cổng 3200)
+        working-directory: new/backend
+        env:
+          DATABASE_URL: postgresql://clinic:clinic@localhost:5432/clinic_java
+          PORT: "3200"
+          SOCKET_PORT: "3202"
+        run: |
+          ./mvnw -B -ntp -q package -DskipTests
+          java -jar target/app.jar seed
+          nohup java -jar target/app.jar > ../../java.log 2>&1 &
+      - name: Chờ hai backend
+        run: |
+          for p in 3100 3200; do for i in $(seq 1 60); do curl -fsS http://127.0.0.1:$p/api/health && break; sleep 2; done; echo; done
+      - name: So sánh
+        run: |
+          pip install --quiet "python-socketio[client]==5.13.0"
+          python3 new/.github/kiem-tra/compare_api.py http://127.0.0.1:3100 http://127.0.0.1:3200 | tee compare.txt
+      - name: Log backend
+        if: always()
+        run: |
+          echo "== Nest"; tail -n 60 nest.log || true
+          echo "== Java"; grep -E "ERROR|WARN|Exception" java.log | tail -n 60 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: so-sanh
+          path: |
+            compare.txt
+            compare-result.json
+            nest.log
+            java.log
+
+  cadvisor:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Docker
+        run: docker version; docker info | grep -iE "storage driver|driver-type|cgroup|containerd" || true
+      - name: Thử các phiên bản cAdvisor
+        run: |
+          docker run -d --name cmp-web nginx:alpine
+          try() {
+            local name=$1; shift
+            docker rm -f cadv >/dev/null 2>&1 || true
+            docker run -d --name cadv --privileged --device /dev/kmsg -p 8080:8080 \
+              -v /:/rootfs:ro -v /var/run:/var/run:ro -v /sys:/sys:ro -v /var/lib/docker/:/var/lib/docker:ro "$@" >/dev/null
+            sleep 25
+            n=$(curl -s localhost:8080/metrics | grep -c 'container_memory_working_set_bytes{.*name="cmp-web"' || true)
+            echo "### $name: số dòng có name=cmp-web = $n"
+            [ "$n" = 0 ] && docker logs --tail 8 cadv 2>&1 | sed 's/^/    /'
+          }
+          try "v0.49.1 (hiện dùng)" gcr.io/cadvisor/cadvisor:v0.49.1 --docker_only=true --housekeeping_interval=15s
+          try "v0.52.1" gcr.io/cadvisor/cadvisor:v0.52.1 --docker_only=true --housekeeping_interval=15s
+          try "ghcr 0.54.0" ghcr.io/google/cadvisor:0.54.0 --docker_only=true --housekeeping_interval=15s
+          try "ghcr 0.54.1" ghcr.io/google/cadvisor:0.54.1 --docker_only=true --housekeeping_interval=15s
+          try "v0.49.1 + containerd moby" -v /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro gcr.io/cadvisor/cadvisor:v0.49.1 --containerd=/run/containerd/containerd.sock --containerd-namespace=moby --housekeeping_interval=15s
+          try "ghcr 0.54.0 + containerd moby" -v /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro ghcr.io/google/cadvisor:0.54.0 --containerd=/run/containerd/containerd.sock --containerd-namespace=moby --housekeeping_interval=15s
