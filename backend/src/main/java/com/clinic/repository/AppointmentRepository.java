@@ -42,6 +42,15 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
   long countByScheduleId(String scheduleId);
 
+  /** Số lịch hẹn theo trạng thái trong khoảng ngày khám: [trạng thái, số lượng]. */
+  @Query("select a.status, count(a) from Appointment a join a.schedule s where s.date >= :from and s.date <= :to group by a.status")
+  List<Object[]> countByStatus(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+  /** Lịch hẹn đã tới giờ (tính đến now) và không bị hủy, trong khoảng ngày khám. */
+  @Query("select count(a) from Appointment a join a.schedule s where s.date >= :from and s.date <= :to and s.startTime <= :now "
+      + "and a.status <> com.clinic.entity.enums.AppointmentStatus.CANCELLED")
+  long countPastNotCancelled(@Param("from") LocalDate from, @Param("to") LocalDate to, @Param("now") Instant now);
+
   /** Lịch hẹn hôm nay của bệnh nhân còn hiệu lực và chưa check-in, theo giờ hẹn. */
   @Query("select a from Appointment a join a.schedule s where a.patientId = :pid and a.status in :active and s.date = :date "
       + "and not exists (select 1 from Visit v where v.appointmentId = a.id) order by s.startTime asc")

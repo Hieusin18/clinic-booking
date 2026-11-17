@@ -49,6 +49,7 @@ public class RealtimeGateway {
 
   @PostConstruct
   public void start() {
+    if ("true".equals(System.getProperty(com.clinic.ClinicBookingApplication.CLI_PROPERTY))) return;
     Configuration config = new Configuration();
     config.setHostname("0.0.0.0");
     config.setPort(port);

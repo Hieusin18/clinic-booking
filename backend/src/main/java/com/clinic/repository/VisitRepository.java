@@ -71,6 +71,13 @@ public interface VisitRepository extends JpaRepository<Visit, String> {
   @Query("select v from Visit v where v.doctorId = :doctorId and v.status = com.clinic.entity.enums.VisitStatus.AWAITING_RESULTS order by v.sentForTestsAt asc")
   List<Visit> awaiting(@Param("doctorId") String doctorId);
 
+  @Query("select v from Visit v where v.date >= :from and v.date <= :to")
+  List<Visit> inRange(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+  /** Ngày khám đầu tiên của từng bệnh nhân: [patientId, ngày]. */
+  @Query("select v.patientId, min(v.date) from Visit v where v.patientId in :ids group by v.patientId")
+  List<Object[]> firstVisitDates(@Param("ids") Collection<String> patientIds);
+
   /** Số còn đang chờ của các ngày trước {@code before}. */
   @Query("select v from Visit v where v.status = com.clinic.entity.enums.VisitStatus.WAITING and v.date < :before")
   List<Visit> staleWaiting(@Param("before") LocalDate before);

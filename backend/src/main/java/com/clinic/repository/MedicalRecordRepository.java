@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MedicalRecordRepository extends JpaRepository<MedicalRecord, String> {
   Optional<MedicalRecord> findByVisitId(String visitId);
+
+  java.util.List<MedicalRecord> findByVisitIdIn(java.util.Collection<String> visitIds);
 }

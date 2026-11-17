@@ -102,6 +102,8 @@ public class VisitsService {
     this.queue = queue;
     this.env = env;
     this.secret = env.require("JWT_SECRET");
+    // Thiếu font thì dừng ngay lúc khởi động thay vì lỗi khi bệnh nhân tải bệnh án
+    com.clinic.export.Fonts.check();
   }
 
   /** Thông tin phòng khám in trên bệnh án và đơn thuốc, đặt trong .env. */

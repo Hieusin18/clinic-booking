@@ -87,7 +87,7 @@ public class LabResultsController {
   @PatchMapping("/lab-orders/{id}")
   public Map<String, Object> saveResult(@CurrentUser AuthUser user, @PathVariable String id, @RequestBody(required = false) JsonNode raw) {
     BodyReader.Patch<LabResultRequest> p = body.read(raw, LabResultRequest.class);
-    return lab.saveResult(user, id, p.set("resultText"), trim(p.value().resultText()), p.value().done());
+    return lab.saveResult(user, id, p.has("resultText"), trim(p.value().resultText()), p.value().done());
   }
 
   @Roles(Role.DOCTOR)

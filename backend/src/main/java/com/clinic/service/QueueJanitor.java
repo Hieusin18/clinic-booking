@@ -59,6 +59,7 @@ public class QueueJanitor {
 
   @EventListener(ApplicationReadyEvent.class)
   public void start() {
+    if ("true".equals(System.getProperty(com.clinic.ClinicBookingApplication.CLI_PROPERTY))) return;
     int seconds = env.getInt("QUEUE_SWEEP_SECONDS", 300);
     if (seconds <= 0) return;
     timer = Executors.newSingleThreadScheduledExecutor(r -> {
