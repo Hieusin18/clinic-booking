@@ -315,7 +315,22 @@ public class VisitsService {
   }
 
   /** Tệp tải về: nội dung, kiểu và tên tệp. */
-  public record Download(byte[] data, String contentType, String fileName) {}
+  public record Download(byte[] data, String contentType, String fileName) {
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof Download x && java.util.Arrays.equals(data, x.data) && java.util.Objects.equals(contentType, x.contentType) && java.util.Objects.equals(fileName, x.fileName);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * java.util.Arrays.hashCode(data) + java.util.Objects.hashCode(contentType) + java.util.Objects.hashCode(fileName);
+    }
+
+    @Override
+    public String toString() {
+      return "Download[" + (data == null ? 0 : data.length) + " bytes" + ", " + contentType + ", " + fileName + "]";
+    }
+  }
 
   @Transactional
   public Download export(AuthUser user, String visitId, String format) throws IOException {

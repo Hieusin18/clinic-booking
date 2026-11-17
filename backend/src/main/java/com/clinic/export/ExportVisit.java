@@ -32,7 +32,22 @@ public record ExportVisit(
   public record Lab(String name, String note, String resultText, Instant doneAt, List<File> files) {}
 
   /** Tệp kết quả. */
-  public record File(String fileName, String mimeType, byte[] data) {}
+  public record File(String fileName, String mimeType, byte[] data) {
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof File x && java.util.Objects.equals(fileName, x.fileName) && java.util.Objects.equals(mimeType, x.mimeType) && java.util.Arrays.equals(data, x.data);
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hashCode(fileName) + java.util.Objects.hashCode(mimeType) + 31 * java.util.Arrays.hashCode(data);
+    }
+
+    @Override
+    public String toString() {
+      return "File[" + fileName + ", " + mimeType + ", " + (data == null ? 0 : data.length) + " bytes" + "]";
+    }
+  }
 
   /** Đơn thuốc. */
   public record Rx(String id, String code, String advice, Instant finalizedAt, List<Item> items) {}
