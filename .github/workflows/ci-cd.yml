@@ -71,8 +71,10 @@ jobs:
         run: npm ci && npm run typecheck && npm test --if-present
 
   docker:
-    # Dựng toàn bộ hệ thống như hôm demo (DOMAIN=:80) và kiểm tra nó thật sự chạy
-    runs-on: ubuntu-latest
+    # Dựng toàn bộ hệ thống như hôm demo (DOMAIN=:80) và kiểm tra nó thật sự chạy.
+    # Giữ Ubuntu 24.04: trên ubuntu-latest (26.04) cAdvisor v0.49 không đọc được tên container nên biểu đồ
+    # "CPU/RAM từng container" trống
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
