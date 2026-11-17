@@ -79,12 +79,13 @@ public class VisitsService {
   private final NotificationsService notifications;
   private final QueueService queue;
   private final AppEnv env;
+  private final com.clinic.repository.Refresher refresher;
   private final String secret;
 
   public VisitsService(VisitRepository visits, DoctorRepository doctors, PatientRepository patients, MedicalRecordRepository records,
       PrescriptionRepository prescriptions, PrescriptionItemRepository items, MedicineRepository medicines, LabOrderRepository labOrders,
       LabFileRepository labFiles, AppointmentRepository appointments, PatientScope scope, AccountLinkService link, RealtimeService realtime,
-      NotificationsService notifications, QueueService queue, AppEnv env) {
+      NotificationsService notifications, QueueService queue, AppEnv env, com.clinic.repository.Refresher refresher) {
     this.visits = visits;
     this.doctors = doctors;
     this.patients = patients;
@@ -101,6 +102,7 @@ public class VisitsService {
     this.notifications = notifications;
     this.queue = queue;
     this.env = env;
+    this.refresher = refresher;
     this.secret = env.require("JWT_SECRET");
     // Thiếu font thì dừng ngay lúc khởi động thay vì lỗi khi bệnh nhân tải bệnh án
     com.clinic.export.Fonts.check();
@@ -397,6 +399,8 @@ public class VisitsService {
       items.save(it);
     }
     items.flush();
+    // Nạp lại để dòng thuốc vừa thêm có thông tin thuốc (tên, hàm lượng) khi trả về
+    for (PrescriptionItem it : items.findByPrescriptionId(prescriptionId)) refresher.refresh(it);
   }
 
   /**
