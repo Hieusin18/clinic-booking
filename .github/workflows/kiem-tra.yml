@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { path: new }
       - uses: actions/checkout@v4
-        with: { path: old, ref: a7eb5c2 }
+        with: { path: old, ref: a7eb5c2da966f93f4016dedaca3803ab6154e005 }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - uses: actions/setup-java@v4
@@ -102,15 +102,17 @@ jobs:
             local name=$1; shift
             docker rm -f cadv >/dev/null 2>&1 || true
             docker run -d --name cadv --privileged --device /dev/kmsg -p 8080:8080 \
-              -v /:/rootfs:ro -v /var/run:/var/run:ro -v /sys:/sys:ro -v /var/lib/docker/:/var/lib/docker:ro "$@" >/dev/null
-            sleep 25
+              -v /:/rootfs:ro -v /var/run:/var/run:ro -v /sys:/sys:ro -v /var/lib/docker/:/var/lib/docker:ro "$@" >/dev/null || { echo "### $name: không chạy được"; return 0; }
+            sleep 70
             n=$(curl -s localhost:8080/metrics | grep -c 'container_memory_working_set_bytes{.*name="cmp-web"' || true)
-            echo "### $name: số dòng có name=cmp-web = $n"
-            [ "$n" = 0 ] && docker logs --tail 8 cadv 2>&1 | sed 's/^/    /'
+            c=$(curl -s localhost:8080/metrics | grep -c 'container_cpu_usage_seconds_total{.*name="cmp-web"' || true)
+            st=$(docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' cadv)
+            echo "### $name: RAM=$n CPU=$c trạng thái=$st"
+            if [ "$n" = 0 ]; then docker logs --tail 6 cadv 2>&1 | cut -c1-200 | sed 's/^/    /'; fi
+            return 0
           }
           try "v0.49.1 (hiện dùng)" gcr.io/cadvisor/cadvisor:v0.49.1 --docker_only=true --housekeeping_interval=15s
-          try "v0.52.1" gcr.io/cadvisor/cadvisor:v0.52.1 --docker_only=true --housekeeping_interval=15s
           try "ghcr 0.54.0" ghcr.io/google/cadvisor:0.54.0 --docker_only=true --housekeeping_interval=15s
           try "ghcr 0.54.1" ghcr.io/google/cadvisor:0.54.1 --docker_only=true --housekeeping_interval=15s
-          try "v0.49.1 + containerd moby" -v /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro gcr.io/cadvisor/cadvisor:v0.49.1 --containerd=/run/containerd/containerd.sock --containerd-namespace=moby --housekeeping_interval=15s
-          try "ghcr 0.54.0 + containerd moby" -v /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro ghcr.io/google/cadvisor:0.54.0 --containerd=/run/containerd/containerd.sock --containerd-namespace=moby --housekeeping_interval=15s
+          try "ghcr 0.55.0" ghcr.io/google/cadvisor:0.55.0 --docker_only=true --housekeeping_interval=15s
+          docker ps -a --format '{{.Names}} {{.Status}}'

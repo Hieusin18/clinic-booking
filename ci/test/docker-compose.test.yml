@@ -2,7 +2,7 @@
 services:
   jenkins:
     environment:
-      JAVA_OPTS: -Xmx1g -Djenkins.install.runSetupWizard=false
+      JAVA_OPTS: -Xmx1g -Duser.timezone=Asia/Ho_Chi_Minh -Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Ho_Chi_Minh -Djenkins.install.runSetupWizard=false
       CASC_JENKINS_CONFIG: /ci-test/casc.yaml
       SONAR_TOKEN: ${SONAR_TOKEN}
       SCANNER_VERSION: ${SCANNER_VERSION}

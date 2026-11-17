@@ -96,6 +96,10 @@ jobs:
           curl -fsS http://localhost/ | grep -q '<div id="root">'
           curl -fsS -X POST http://localhost/api/auth/login -H 'Content-Type: application/json' \
             -d '{"phone":"0900000001","password":"123456"}' | grep -q accessToken
+      - name: Luồng chính qua Caddy (cấp số, gọi số realtime, bệnh án PDF)
+        run: |
+          pip install --quiet "python-socketio[client]==5.13.0"
+          python3 ci/smoke.py http://localhost
       - name: Giám sát Prometheus + Grafana
         # Dựng bộ giám sát cạnh hệ thống vừa chạy, kiểm tra mọi target up và mọi biểu đồ có dữ liệu
         run: bash monitoring/check.sh
