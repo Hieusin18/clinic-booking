@@ -28,7 +28,7 @@ class PrintDocTest {
   @DisplayName("trẻ dưới 72 tháng: ghi tuổi theo tháng, cân nặng và người đưa trẻ đến khám")
   void youngChild() {
     Patient p = new Patient();
-    p.setId("p1");
+    p.setId("p1234567890abc");
     p.setFullName("Bé An");
     p.setDateOfBirth(LocalDate.parse("2024-02-10"));
     p.setGender(Gender.MALE);
