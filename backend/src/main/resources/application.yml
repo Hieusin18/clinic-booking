@@ -61,3 +61,4 @@ logging:
   level:
     root: INFO
     org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF
+    org.hibernate.orm.incubating: ERROR
