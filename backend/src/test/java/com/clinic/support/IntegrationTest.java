@@ -1,7 +1,16 @@
 package com.clinic.support;
 
+import com.clinic.repository.AppointmentRepository;
+import com.clinic.repository.DoctorRepository;
+import com.clinic.repository.PatientRepository;
+import com.clinic.repository.ScheduleRepository;
+import com.clinic.repository.UserRepository;
+import com.clinic.repository.VisitRepository;
+import com.clinic.service.AuthService;
+import com.clinic.util.VnTime;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +58,27 @@ public abstract class IntegrationTest {
   @Autowired
   protected Fixtures fx;
 
+  @Autowired
+  protected UserRepository users;
+
+  @Autowired
+  protected PatientRepository patients;
+
+  @Autowired
+  protected DoctorRepository doctors;
+
+  @Autowired
+  protected ScheduleRepository schedules;
+
+  @Autowired
+  protected AppointmentRepository appointments;
+
+  @Autowired
+  protected VisitRepository visits;
+
+  @Autowired
+  private AuthService authService;
+
   protected Api api;
 
   @BeforeEach
@@ -56,6 +86,23 @@ public abstract class IntegrationTest {
     api = new Api(port);
     fx.setApi(api);
     resetDb();
+    // Mỗi lớp test của bản cũ chạy một ứng dụng mới; ở đây dùng chung nên xóa bộ đếm nhập sai theo IP
+    authService.clearFailedLogins();
+  }
+
+  /** "YYYY-MM-DD" cách hôm nay n ngày (giờ Việt Nam). */
+  protected static String day(int n) {
+    return VnTime.dateString(Instant.now().plusSeconds(n * 86_400L));
+  }
+
+  /** Đếm số dòng của một bảng (có thể kèm điều kiện SQL). */
+  protected long count(String table, String where, Object... args) {
+    Long n = jdbc.queryForObject("SELECT count(*) FROM \"" + table + "\"" + (where == null ? "" : " WHERE " + where), Long.class, args);
+    return n == null ? 0 : n;
+  }
+
+  protected long count(String table) {
+    return count(table, null);
   }
 
   /** Xóa sạch dữ liệu mọi bảng (giữ cấu trúc). */

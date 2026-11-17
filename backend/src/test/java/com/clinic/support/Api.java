@@ -47,6 +47,20 @@ public class Api {
     return new Req("DELETE", path);
   }
 
+  /** Mã hóa ký tự ngoài ASCII và khoảng trắng trong đường dẫn (tham số tìm kiếm tiếng Việt). */
+  static String encode(String path) {
+    StringBuilder sb = new StringBuilder();
+    for (byte b : path.getBytes(StandardCharsets.UTF_8)) {
+      int c = b & 0xff;
+      if (c > 32 && c < 127 && "\"<>\\^`{|}".indexOf(c) < 0) {
+        sb.append((char) c);
+      } else {
+        sb.append('%').append(String.format("%02X", c));
+      }
+    }
+    return sb.toString();
+  }
+
   /** Một request đang dựng. */
   public class Req {
     private final String method;
@@ -108,7 +122,7 @@ public class Api {
     }
 
     public Res call() {
-      HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base + path)).method(method, body);
+      HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base + encode(path))).method(method, body);
       headers.forEach(b::header);
       try {
         HttpResponse<byte[]> r = HTTP.send(b.build(), HttpResponse.BodyHandlers.ofByteArray());

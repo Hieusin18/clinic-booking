@@ -114,6 +114,11 @@ public class AuthService {
     return issueToken(created);
   }
 
+  /** Xóa bộ đếm nhập sai theo IP (dùng trong test). */
+  public void clearFailedLogins() {
+    failedByIp.clear();
+  }
+
   private boolean ipBlocked(String ip, long now) {
     List<Long> recent = new ArrayList<>(failedByIp.getOrDefault(ip, List.of()).stream().filter(t -> now - t < LOCK_MINUTES * 60_000L).toList());
     failedByIp.put(ip, recent);
