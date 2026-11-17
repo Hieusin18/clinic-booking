@@ -102,7 +102,7 @@ class PhoneVerifyTest extends IntegrationTest {
 
   @Test
   @DisplayName("đăng ký: nhắn mã từ đúng số (qua iPhone Phím tắt) thì xác minh, rồi đăng ký được")
-  void register() {
+  void registerFlow() {
     JsonNode v = start();
     assertThat(v.get("smsTo").asText()).isEqualTo("0988000999");
     assertThat(v.get("smsBody").asText()).isEqualTo("PKXM " + code(v));
