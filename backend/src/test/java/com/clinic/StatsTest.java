@@ -164,11 +164,20 @@ class StatsTest extends IntegrationTest {
     appointments.saveAndFlush(a);
   }
 
+  /** Bác sĩ có tên cố định (bảng theo bác sĩ xếp theo tên khi bằng số lượt). */
+  String doctorNamed(String name) {
+    var d = fx.createDoctor();
+    var u = users.findById(d.user().getId()).orElseThrow();
+    u.setFullName(name);
+    users.saveAndFlush(u);
+    return d.doctor().getId();
+  }
+
   @Test
   @DisplayName("tính đúng số lượt, thời gian chờ, thời gian khám, chẩn đoán, thuốc, lịch hẹn và so với kỳ trước")
   void overview() {
-    String d1 = fx.createDoctor().doctor().getId();
-    String d2 = fx.createDoctor().doctor().getId();
+    String d1 = doctorNamed("Bác sĩ A");
+    String d2 = doctorNamed("Bác sĩ B");
     String p1 = fx.createPatient().patient().getId();
     String p2 = fx.createPatient().patient().getId();
     Medicine m = new Medicine();

@@ -21,11 +21,9 @@ import com.clinic.support.IntegrationTest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
-import io.socket.client.IO;
 import io.socket.client.Socket;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -160,9 +158,7 @@ class NotificationsTest extends IntegrationTest {
   void called() throws Exception {
     api.post("/api/notifications/push-token").auth(patient.token()).send(Map.of("token", "ExponentPushToken[may-1]", "platform", "ios")).expect(200);
     api.post("/api/notifications/push-token").auth(patient.token()).send(Map.of("token", "ExponentPushToken[dead]", "platform", "android")).expect(200);
-    IO.Options opts = IO.Options.builder().setPath("/api/socket.io").setAuth(Map.of("token", patient.token())).setTransports(new String[] {"websocket"})
-        .setReconnection(false).build();
-    Socket socket = IO.socket(URI.create("http://127.0.0.1:" + System.getProperty("SOCKET_PORT")), opts);
+    Socket socket = com.clinic.support.Sockets.create(patient.token());
     List<JSONObject> live = Collections.synchronizedList(new ArrayList<>());
     socket.on("notification:new", args -> live.add((JSONObject) args[0]));
     CountDownLatch connected = new CountDownLatch(1);

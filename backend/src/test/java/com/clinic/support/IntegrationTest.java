@@ -84,6 +84,7 @@ public abstract class IntegrationTest {
   @BeforeEach
   void setUpApi() {
     api = new Api(port);
+    Sockets.port = port;
     fx.setApi(api);
     resetDb();
     // Mỗi lớp test của bản cũ chạy một ứng dụng mới; ở đây dùng chung nên xóa bộ đếm nhập sai theo IP

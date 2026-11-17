@@ -13,14 +13,17 @@ import java.util.concurrent.TimeUnit;
 public final class Sockets {
   private Sockets() {}
 
+  /** Cổng của API (IntegrationTest đặt trước mỗi test): Socket.IO đi chung cổng qua /api/socket.io. */
+  public static volatile int port;
+
   public static String url() {
-    return "http://127.0.0.1:" + System.getProperty("SOCKET_PORT");
+    return "http://127.0.0.1:" + port;
   }
 
-  /** Tạo socket chưa kết nối. */
-  public static Socket create(String token) {
-    IO.Options opts = IO.Options.builder().setPath("/api/socket.io").setAuth(Map.of("token", token)).setTransports(new String[] {"websocket"})
-        .setReconnection(false).build();
+  /** Tạo socket chưa kết nối, mặc định chỉ dùng WebSocket như test của bản cũ. */
+  public static Socket create(String token, String... transports) {
+    IO.Options opts = IO.Options.builder().setPath("/api/socket.io").setAuth(Map.of("token", token))
+        .setTransports(transports.length == 0 ? new String[] {"websocket"} : transports).setReconnection(false).build();
     return IO.socket(URI.create(url()), opts);
   }
 
@@ -41,8 +44,8 @@ public final class Sockets {
   }
 
   /** Mở kết nối, chờ tới khi kết nối xong. */
-  public static Open open(String token) {
-    Socket s = create(token);
+  public static Open open(String token, String... transports) {
+    Socket s = create(token, transports);
     CompletableFuture<Void> connected = new CompletableFuture<>();
     CompletableFuture<String> closed = new CompletableFuture<>();
     s.once(Socket.EVENT_CONNECT, a -> connected.complete(null));

@@ -30,9 +30,9 @@ class RealtimeTest extends IntegrationTest {
   }
 
   /** Kết nối như web/app rồi gom mọi sự kiện socket nhận được. */
-  List<Event> record(String token) {
+  List<Event> record(String token, String... transports) {
     List<Event> got = Collections.synchronizedList(new ArrayList<>());
-    Sockets.Open o = Sockets.open(token);
+    Sockets.Open o = Sockets.open(token, transports);
     o.socket().onAnyIncoming(args -> got.add(new Event((String) args[0], args.length > 1 && args[1] instanceof JSONObject j ? j : new JSONObject())));
     opened.add(o);
     return got;
@@ -113,6 +113,22 @@ class RealtimeTest extends IntegrationTest {
     synchronized (mine) {
       assertThat(mine).noneMatch(e -> e.name().startsWith("queue:"));
     }
+  }
+
+  @Test
+  @DisplayName("trình duyệt chưa mở được WebSocket (long-polling) vẫn nhận sự kiện qua cùng cổng API")
+  void polling() {
+    var doctor = fx.createDoctor();
+    var reception = fx.createUser(Role.RECEPTIONIST);
+    var patient = fx.createPatient();
+    List<Event> staff = record(reception.token(), "polling");
+    api.post("/api/queue/tickets").auth(reception.token()).send(Map.of("patientId", patient.patient().getId(), "doctorId", doctor.doctor().getId()))
+        .expect(201);
+    until(() -> has(staff, "queue:changed"));
+    // Bắt đầu bằng polling rồi nâng lên WebSocket như cấu hình mặc định của socket.io-client
+    List<Event> upgraded = record(reception.token(), "polling", "websocket");
+    api.post("/api/queue/call-next").auth(doctor.token()).expect(200);
+    until(() -> has(upgraded, "queue:called"));
   }
 
   @Test

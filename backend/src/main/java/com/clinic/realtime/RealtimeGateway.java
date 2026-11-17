@@ -21,8 +21,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Máy chủ Socket.IO (đường dẫn /api/socket.io), chạy ở cổng riêng SOCKET_PORT (mặc định 3002); Caddy chuyển
- * /api/socket.io/* tới cổng này nên web và app vẫn kết nối cùng địa chỉ với API.
+ * Máy chủ Socket.IO (đường dẫn /api/socket.io), chạy nội bộ ở 127.0.0.1:SOCKET_PORT (mặc định 3002). Máy khách vẫn
+ * kết nối cùng địa chỉ với API ("&lt;API&gt;/socket.io"): {@link SocketProxyFilter} chuyển tiếp sang cổng này.
  *
  * Kết nối phải kèm token đăng nhập ({@code auth: { token }}). Ai cũng vào phòng riêng của tài khoản mình (để cắt kết
  * nối khi phiên bị thu hồi); nhân viên (bác sĩ, lễ tân, admin) vào thêm phòng "staff".
@@ -60,7 +60,8 @@ public class RealtimeGateway {
   public void start() {
     if ("true".equals(System.getProperty(com.clinic.ClinicBookingApplication.CLI_PROPERTY))) return;
     Configuration config = new Configuration();
-    config.setHostname("0.0.0.0");
+    // Chỉ nghe trong máy: máy khách vào qua /api/socket.io của cổng API (SocketProxyFilter chuyển tiếp)
+    config.setHostname("127.0.0.1");
     config.setPort(port);
     config.setContext(SOCKET_PATH);
     SocketConfig socket = new SocketConfig();
