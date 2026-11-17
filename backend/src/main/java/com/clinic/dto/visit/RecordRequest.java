@@ -40,7 +40,7 @@ public record RecordRequest(
     @Size(max = 1000) String secondaryDiagnosis,
     @Pattern(regexp = "^[A-Z]\\d{2}(\\.\\d{1,2})?(\\s*,\\s*[A-Z]\\d{2}(\\.\\d{1,2})?)*$", message = RecordRequest.ICD_MESSAGE) String secondaryIcdCodes,
     @Size(max = 2000) String treatment,
-    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "Ngày tái khám dạng YYYY-MM-DD") String followUpDate) {
+    @com.clinic.dto.validation.IsoDate(message = "Ngày tái khám dạng YYYY-MM-DD") @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "Ngày tái khám dạng YYYY-MM-DD") String followUpDate) {
   public static final String ICD_MESSAGE = "Mã ICD-10 không hợp lệ (ví dụ J02.9)";
 
   /** Chuẩn hóa trước khi kiểm tra: mã ICD bỏ khoảng trắng thừa, viết hoa; ô trống ("" / null) coi như không nhập. */
