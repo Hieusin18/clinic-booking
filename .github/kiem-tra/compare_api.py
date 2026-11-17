@@ -85,6 +85,14 @@ class Client:
                 pass
 
 
+def idof(x):
+    return x.get("id", "x") if isinstance(x, dict) else "x"
+
+
+def first(lst):
+    return lst[0] if isinstance(lst, list) and lst else {}
+
+
 def scenario(c: Client):
     now = datetime.datetime.now(VN)
     today = now.date().isoformat()
@@ -97,7 +105,7 @@ def scenario(c: Client):
     c.call("auth.login.thieu", "POST", "/auth/login", {"phone": "123"})
     c.call("auth.me.khong-token", "GET", "/auth/me")
     reg = c.call("auth.register", "POST", "/auth/register", {"fullName": "Bệnh Nhân Mới", "phone": "0987650001", "password": "xuanhoa2026", "dateOfBirth": "1992-03-04", "gender": "FEMALE", "email": "moi@example.com"})
-    c.tokens["newpatient"] = reg.get("accessToken", "")
+    c.tokens["newpatient"] = reg.get("accessToken", "") if isinstance(reg, dict) else ""
     c.call("auth.register.trung", "POST", "/auth/register", {"fullName": "Bệnh Nhân Mới", "phone": "0987650001", "password": "xuanhoa2026", "dateOfBirth": "1992-03-04", "gender": "FEMALE"})
     c.call("auth.register.yeu", "POST", "/auth/register", {"fullName": "Yếu", "phone": "0987650002", "password": "123", "dateOfBirth": "1992-03-04", "gender": "MALE"})
 
@@ -108,24 +116,24 @@ def scenario(c: Client):
     c.call("specialties.list", "GET", "/specialties")
     sp = c.call("specialties.create", "POST", "/specialties", {"name": "Khoa So Sánh", "description": "mô tả"}, who="admin")
     c.call("specialties.create.trung", "POST", "/specialties", {"name": "Khoa So Sánh"}, who="admin")
-    c.call("specialties.patch", "PATCH", f"/specialties/{sp['id']}", {"description": "mới"}, who="admin")
+    c.call("specialties.patch", "PATCH", f"/specialties/{idof(sp)}", {"description": "mới"}, who="admin")
     c.call("specialties.create.cam", "POST", "/specialties", {"name": "Khoa Cấm"}, who="doctor")
     meds = c.call("medicines.list", "GET", "/medicines", who="doctor")
     med = c.call("medicines.create", "POST", "/medicines", {"name": "Thuốc So Sánh", "activeIngredient": "Paracetamol", "strength": "500mg", "unit": "viên"}, who="admin")
-    c.call("medicines.patch", "PATCH", f"/medicines/{med['id']}", {"strength": "650mg"}, who="admin")
+    c.call("medicines.patch", "PATCH", f"/medicines/{idof(med)}", {"strength": "650mg"}, who="admin")
     c.call("medicines.search", "GET", "/medicines?q=para", who="doctor")
     docs = c.call("doctors.list", "GET", "/doctors")
-    c.call("doctors.list.specialty", "GET", f"/doctors?specialtyId={docs['items'][0]['specialtyId']}&page=1&pageSize=5")
+    c.call("doctors.list.specialty", "GET", f"/doctors?specialtyId={(first(docs.get('items')).get('specialty') or {}).get('id', 'x')}&page=1&pageSize=5")
     c.call("doctors.all", "GET", "/doctors/all", who="admin")
     me = c.call("doctors.me", "GET", "/doctors/me", who="doctor")
-    did = me["id"]
+    did = idof(me)
     c.call("doctors.one", "GET", f"/doctors/{did}")
     c.call("doctors.full", "GET", f"/doctors/{did}/full", who="admin")
     c.call("doctors.availability", "GET", f"/doctors/{did}/availability")
     c.call("doctors.patch.me", "PATCH", "/doctors/me", {"bio": "Giới thiệu", "practiceSince": 2012, "expertise": ["Tim mạch"], "career": [{"fromYear": 2012, "title": "Bác sĩ", "place": "Bệnh viện A"}], "education": [{"fromYear": 2006, "toYear": 2012, "title": "Bác sĩ đa khoa", "place": "Đại học Y"}]}, who="doctor")
     c.call("doctors.patch.admin", "PATCH", f"/doctors/{did}", {"room": "Phòng 3", "title": "ThS.BS"}, who="admin")
     c.call("doctors.patch.sai", "PATCH", f"/doctors/{did}", {"practiceSince": 2999}, who="admin")
-    nd = c.call("doctors.create", "POST", "/doctors", {"fullName": "Bác Sĩ Mới", "phone": "0987650003", "password": "batdau2026", "specialtyId": sp["id"], "email": "bsmoi@example.com"}, who="admin")
+    nd = c.call("doctors.create", "POST", "/doctors", {"fullName": "Bác Sĩ Mới", "phone": "0987650003", "password": "batdau2026", "specialtyId": idof(sp), "email": "bsmoi@example.com"}, who="admin")
     c.multipart("doctors.avatar.me", "/doctors/me/avatar", "file", "a.png", png(), "image/png", "doctor")
     c.call("doctors.avatar.get", "GET", f"/doctors/{did}/avatar")
     c.multipart("doctors.avatar.admin", f"/doctors/{nd.get('id', 'x')}/avatar", "file", "a.png", png(), "image/png", "admin")
@@ -149,21 +157,21 @@ def scenario(c: Client):
     mine = c.call("schedules.mine", "GET", f"/schedules/mine?from={today}&to={tomorrow}", who="doctor")
     c.call("schedules.doctor.day", "GET", f"/doctors/{did}/schedules?date={tomorrow}")
     c.call("schedules.doctor.all", "GET", f"/doctors/{did}/schedules?date={tomorrow}&all=true", who="doctor")
-    tomorrow_slots = [s for s in mine if s["date"].startswith(tomorrow)]
-    c.call("schedules.delete", "DELETE", f"/schedules/{tomorrow_slots[-1]['id']}", who="doctor")
+    tomorrow_slots = [s for s in (mine if isinstance(mine, list) else []) if s["date"].startswith(tomorrow)] or [{}]
+    c.call("schedules.delete", "DELETE", f"/schedules/{tomorrow_slots[-1].get('id', 'x')}", who="doctor")
 
     # Đặt lịch
     c.call("appointments.standing", "GET", "/appointments/standing", who="patient")
-    ap = c.call("appointments.book", "POST", "/appointments", {"scheduleId": tomorrow_slots[0]["id"], "reason": "Khám tổng quát"}, who="patient")
-    c.call("appointments.book.trung", "POST", "/appointments", {"scheduleId": tomorrow_slots[0]["id"]}, who="patient")
+    ap = c.call("appointments.book", "POST", "/appointments", {"scheduleId": tomorrow_slots[0].get("id", "x"), "reason": "Khám tổng quát"}, who="patient")
+    c.call("appointments.book.trung", "POST", "/appointments", {"scheduleId": tomorrow_slots[0].get("id", "x")}, who="patient")
     c.call("appointments.mine", "GET", "/appointments/mine", who="patient")
     c.call("appointments.mine.past", "GET", "/appointments/mine?when=past", who="patient")
-    c.call("appointments.cancel", "PATCH", f"/appointments/{ap['id']}/cancel", who="patient")
-    c.call("appointments.cancel.lai", "PATCH", f"/appointments/{ap['id']}/cancel", who="patient")
+    c.call("appointments.cancel", "PATCH", f"/appointments/{idof(ap)}/cancel", who="patient")
+    c.call("appointments.cancel.lai", "PATCH", f"/appointments/{idof(ap)}/cancel", who="patient")
     today_ap = None
     if same_day:
-        today_slots = [s for s in mine if s["date"].startswith(today)]
-        today_ap = c.call("appointments.book.today", "POST", "/appointments", {"scheduleId": today_slots[0]["id"], "reason": "Đau đầu"}, who="patient")
+        today_slots = [s for s in (mine if isinstance(mine, list) else []) if s["date"].startswith(today)] or [{}]
+        today_ap = c.call("appointments.book.today", "POST", "/appointments", {"scheduleId": today_slots[0].get("id", "x"), "reason": "Đau đầu"}, who="patient")
     c.call("appointments.byday", "GET", f"/appointments?date={tomorrow}", who="reception")
     c.call("appointments.byday.today", "GET", f"/appointments?date={today}", who="reception")
 
@@ -172,34 +180,34 @@ def scenario(c: Client):
     p = c.call("patients.create", "POST", "/patients", {"fullName": "Vãng Lai Một", "phone": "0987650005", "dateOfBirth": "1970-01-02", "gender": "MALE", "nationalId": "001070000111", "address": "Hà Nội", "allergies": "Không"}, who="reception")
     c.call("patients.create.trung", "POST", "/patients", {"fullName": "Vãng Lai Một", "phone": "0987650005", "dateOfBirth": "1970-01-02", "gender": "MALE"}, who="reception")
     c.call("patients.create.sai", "POST", "/patients", {"fullName": "X", "phone": "12", "dateOfBirth": "1970-13-02", "gender": "KHAC"}, who="reception")
-    c.call("patients.one", "GET", f"/patients/{p['id']}", who="reception")
-    c.call("patients.patch", "PATCH", f"/patients/{p['id']}", {"occupation": "Kỹ sư", "insuranceExpiry": "2027-01-01"}, who="reception")
+    c.call("patients.one", "GET", f"/patients/{idof(p)}", who="reception")
+    c.call("patients.patch", "PATCH", f"/patients/{idof(p)}", {"occupation": "Kỹ sư", "insuranceExpiry": "2027-01-01"}, who="reception")
     c.call("patients.me", "GET", "/patients/me", who="patient")
     c.call("patients.me.patch", "PATCH", "/patients/me", {"address": "Cầu Giấy"}, who="patient")
     c.call("patients.me.link", "GET", "/patients/me/link", who="patient")
     c.call("patients.me.verify.sai", "POST", "/patients/me/verify", {"code": "ZZZZZZ"}, who="patient")
-    c.call("patients.account", "GET", f"/patients/{p['id']}/account", who="reception")
+    c.call("patients.account", "GET", f"/patients/{idof(p)}/account", who="reception")
     c.call("patients.uuid.sai", "GET", "/patients/khong-phai-uuid", who="reception")
 
     # QR, cấp số, check-in
     qr = c.call("qr.current", "GET", "/qr/current", who="reception")
     c.call("queue.scan", "POST", "/queue/scan", {"token": qr.get("token", ""), "doctorId": did, "reason": "Ho"}, who="newpatient")
     c.call("queue.scan.sai", "POST", "/queue/scan", {"token": "sai", "doctorId": did}, who="newpatient")
-    t1 = c.call("queue.ticket", "POST", "/queue/tickets", {"patientId": p["id"], "doctorId": did, "reason": "Sốt"}, who="reception")
-    c.call("queue.ticket.trung", "POST", "/queue/tickets", {"patientId": p["id"], "doctorId": did}, who="reception")
+    t1 = c.call("queue.ticket", "POST", "/queue/tickets", {"patientId": idof(p), "doctorId": did, "reason": "Sốt"}, who="reception")
+    c.call("queue.ticket.trung", "POST", "/queue/tickets", {"patientId": idof(p), "doctorId": did}, who="reception")
     if today_ap:
-        c.call("queue.checkin", "POST", "/queue/checkin", {"appointmentId": today_ap["id"]}, who="reception")
+        c.call("queue.checkin", "POST", "/queue/checkin", {"appointmentId": idof(today_ap)}, who="reception")
     c.call("queue.today", "GET", "/queue/today", who="reception")
     c.call("queue.today.doctor", "GET", f"/queue/today?doctorId={did}", who="reception")
     mineq = c.call("queue.mine", "GET", "/queue/mine", who="patient")
     c.call("queue.mine.new", "GET", "/queue/mine", who="newpatient")
     if isinstance(mineq, list) and mineq:
-        c.call("queue.position", "GET", f"/queue/{mineq[0]['id']}/position", who="patient")
+        c.call("queue.position", "GET", f"/queue/{mineq[0].get('id', 'x')}/position", who="patient")
     c.call("queue.doctor", "GET", "/queue/doctor", who="doctor")
     v1 = c.call("queue.callnext", "POST", "/queue/call-next", who="doctor")
-    c.call("queue.recall", "POST", f"/queue/{v1['id']}/recall", who="doctor")
-    c.call("queue.recall.cam", "POST", f"/queue/{v1['id']}/recall", who="reception")
-    vid = v1["id"]
+    c.call("queue.recall", "POST", f"/queue/{idof(v1)}/recall", who="doctor")
+    c.call("queue.recall.cam", "POST", f"/queue/{idof(v1)}/recall", who="reception")
+    vid = idof(v1)
 
     # Khám: bệnh án, cận lâm sàng, đơn thuốc
     c.call("visits.one.empty", "GET", f"/visits/{vid}", who="doctor")
@@ -210,31 +218,31 @@ def scenario(c: Client):
     c.call("visits.record.sai2", "PUT", f"/visits/{vid}/record", {**rec, "icdCode": "abc", "temperature": 50}, who="doctor")
     lo = c.call("lab.order", "POST", f"/visits/{vid}/lab-orders", {"name": "X-quang ngực", "note": "Thẳng"}, who="doctor")
     lo2 = c.call("lab.order2", "POST", f"/visits/{vid}/lab-orders", {"name": "Công thức máu"}, who="doctor")
-    c.call("lab.order.delete", "DELETE", f"/lab-orders/{lo2['id']}", who="doctor")
+    c.call("lab.order.delete", "DELETE", f"/lab-orders/{idof(lo2)}", who="doctor")
     c.call("lab.send", "POST", f"/visits/{vid}/send-for-tests", {"mode": "RETURN"}, who="doctor")
     c.call("lab.awaiting", "GET", "/lab/awaiting-visits", who="doctor")
     c.call("lab.ready.chua", "POST", f"/visits/{vid}/results-ready", who="doctor")
-    up = c.multipart("lab.file", f"/lab-orders/{lo['id']}/files", "file", "phim.png", png(20, 10), "image/png", "doctor")
-    up2 = c.multipart("lab.file.pdf", f"/lab-orders/{lo['id']}/files", "file", "ket-qua.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf", "doctor")
-    c.multipart("lab.file.sai", f"/lab-orders/{lo['id']}/files", "file", "x.exe", b"MZ", "application/octet-stream", "doctor")
-    c.call("lab.result", "PATCH", f"/lab-orders/{lo['id']}", {"resultText": "Bình thường", "done": True}, who="doctor")
+    up = c.multipart("lab.file", f"/lab-orders/{idof(lo)}/files", "file", "phim.png", png(20, 10), "image/png", "doctor")
+    up2 = c.multipart("lab.file.pdf", f"/lab-orders/{idof(lo)}/files", "file", "ket-qua.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf", "doctor")
+    c.multipart("lab.file.sai", f"/lab-orders/{idof(lo)}/files", "file", "x.exe", b"MZ", "application/octet-stream", "doctor")
+    c.call("lab.result", "PATCH", f"/lab-orders/{idof(lo)}", {"resultText": "Bình thường", "done": True}, who="doctor")
     files = (up2 or {}).get("files") or []
     if files:
         c.call("lab.file.get", "GET", files[-1]["url"])
         c.call("lab.file.delete", "DELETE", f"/lab-files/{files[-1]['id']}", who="doctor")
     c.call("lab.ready", "POST", f"/visits/{vid}/results-ready", who="doctor")
     c.call("queue.call.back", "POST", f"/queue/{vid}/call", who="doctor")
-    rx = c.call("rx.create", "POST", f"/visits/{vid}/prescriptions", {"advice": "Uống nhiều nước", "items": [{"medicineId": med["id"], "quantity": 10, "dosePerTime": "1 viên", "timesPerDay": 2, "days": 5, "note": "sau ăn"}]}, who="doctor")
-    c.call("rx.create.trung", "POST", f"/visits/{vid}/prescriptions", {"items": [{"medicineId": med["id"], "quantity": 1, "dosePerTime": "1", "timesPerDay": 1, "days": 1}]}, who="doctor")
-    c.call("rx.patch", "PATCH", f"/prescriptions/{rx['id']}", {"advice": "Nghỉ ngơi", "items": [{"medicineId": med["id"], "quantity": 12, "dosePerTime": "1 viên", "timesPerDay": 2, "days": 6}]}, who="doctor")
-    c.call("rx.finalize", "POST", f"/prescriptions/{rx['id']}/finalize", who="doctor")
-    c.call("rx.patch.da-xong", "PATCH", f"/prescriptions/{rx['id']}", {"items": [{"medicineId": med["id"], "quantity": 1, "dosePerTime": "1", "timesPerDay": 1, "days": 1}]}, who="doctor")
-    rx2 = c.call("rx.replace", "POST", f"/visits/{vid}/prescriptions", {"items": [{"medicineId": meds[0]["id"] if isinstance(meds, list) and meds else med["id"], "quantity": 4, "dosePerTime": "1 gói", "timesPerDay": 2, "days": 2}]}, who="doctor")
-    c.call("rx.delete", "DELETE", f"/prescriptions/{rx2['id']}", who="doctor")
+    rx = c.call("rx.create", "POST", f"/visits/{vid}/prescriptions", {"advice": "Uống nhiều nước", "items": [{"medicineId": idof(med), "quantity": 10, "dosePerTime": "1 viên", "timesPerDay": 2, "days": 5, "note": "sau ăn"}]}, who="doctor")
+    c.call("rx.create.trung", "POST", f"/visits/{vid}/prescriptions", {"items": [{"medicineId": idof(med), "quantity": 1, "dosePerTime": "1", "timesPerDay": 1, "days": 1}]}, who="doctor")
+    c.call("rx.patch", "PATCH", f"/prescriptions/{idof(rx)}", {"advice": "Nghỉ ngơi", "items": [{"medicineId": idof(med), "quantity": 12, "dosePerTime": "1 viên", "timesPerDay": 2, "days": 6}]}, who="doctor")
+    c.call("rx.finalize", "POST", f"/prescriptions/{idof(rx)}/finalize", who="doctor")
+    c.call("rx.patch.da-xong", "PATCH", f"/prescriptions/{idof(rx)}", {"items": [{"medicineId": idof(med), "quantity": 1, "dosePerTime": "1", "timesPerDay": 1, "days": 1}]}, who="doctor")
+    rx2 = c.call("rx.replace", "POST", f"/visits/{vid}/prescriptions", {"items": [{"medicineId": idof(first(meds)) if isinstance(meds, list) and meds else idof(med), "quantity": 4, "dosePerTime": "1 gói", "timesPerDay": 2, "days": 2}]}, who="doctor")
+    c.call("rx.delete", "DELETE", f"/prescriptions/{idof(rx2)}", who="doctor")
     c.call("visits.one", "GET", f"/visits/{vid}", who="doctor")
     c.call("visits.complete", "POST", f"/visits/{vid}/complete", who="doctor")
     c.call("visits.one.reception", "GET", f"/visits/{vid}", who="reception")
-    c.call("visits.history", "GET", f"/visits/history?patientId={p['id']}", who="doctor")
+    c.call("visits.history", "GET", f"/visits/history?patientId={idof(p)}", who="doctor")
     c.call("visits.examined", "GET", "/visits/examined?page=1&pageSize=5", who="doctor")
     c.call("visits.examined.q", "GET", "/visits/examined?q=viem", who="doctor")
     c.call("visits.record.pdf", "GET", f"/visits/{vid}/record.pdf", who="doctor")
@@ -261,8 +269,8 @@ def scenario(c: Client):
     c.call("notif.staff", "GET", "/notifications/mine", who="doctor")
 
     # Liên kết tài khoản (lễ tân)
-    c.call("patients.account.verify", "POST", f"/patients/{p['id']}/account/verify", who="reception")
-    c.call("patients.account.detach", "POST", f"/patients/{p['id']}/account/detach", who="reception")
+    c.call("patients.account.verify", "POST", f"/patients/{idof(p)}/account/verify", who="reception")
+    c.call("patients.account.detach", "POST", f"/patients/{idof(p)}/account/detach", who="reception")
 
     # Thống kê, SMS
     c.call("stats", "GET", f"/stats/overview?from={today}&to={tomorrow}", who="admin")
