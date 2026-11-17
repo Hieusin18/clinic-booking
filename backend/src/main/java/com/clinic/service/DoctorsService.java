@@ -55,7 +55,22 @@ public class DoctorsService {
   }
 
   /** Ảnh đại diện để trả về: dữ liệu và kiểu. */
-  public record Avatar(byte[] data, String mimeType) {}
+  public record Avatar(byte[] data, String mimeType) {
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof Avatar x && java.util.Arrays.equals(data, x.data) && java.util.Objects.equals(mimeType, x.mimeType);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * java.util.Arrays.hashCode(data) + java.util.Objects.hashCode(mimeType);
+    }
+
+    @Override
+    public String toString() {
+      return "Avatar[" + (data == null ? 0 : data.length) + " bytes" + ", " + mimeType + "]";
+    }
+  }
 
   /**
    * Thông tin công khai (không có SĐT, email; API danh sách bác sĩ không cần đăng nhập). Admin thấy thêm tài khoản.

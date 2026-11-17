@@ -201,7 +201,7 @@ public class SeedHistory {
 
     for (int d = totalDays; d >= 1; d--) {
       LocalDate day = today.minusDays(d);
-      if (day.getDayOfWeek() == DayOfWeek.SUNDAY || busyDays.contains(day)) continue;
+      if (DayOfWeek.SUNDAY.equals(day.getDayOfWeek()) || busyDays.contains(day)) continue;
       // Thứ Hai đông nhất, thứ Bảy vắng; tỷ lệ đặt online tăng dần theo thời gian
       double dayLoad = loadByWeekday[day.getDayOfWeek().getValue() - 1];
       double progress = 1 - (double) d / totalDays;

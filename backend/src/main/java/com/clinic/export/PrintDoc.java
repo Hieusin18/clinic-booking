@@ -43,7 +43,22 @@ public record PrintDoc(List<Page> pages, String footer, String fileName) {
   public record Medicine(int index, String name, String quantity, String usage) implements Block {}
 
   /** Ảnh kết quả cận lâm sàng; width/height là kích thước gốc (điểm ảnh). */
-  public record Image(byte[] data, String mimeType, int width, int height, String caption) implements Block {}
+  public record Image(byte[] data, String mimeType, int width, int height, String caption) implements Block {
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof Image x && java.util.Arrays.equals(data, x.data) && java.util.Objects.equals(mimeType, x.mimeType) && java.util.Objects.equals(width, x.width) && java.util.Objects.equals(height, x.height) && java.util.Objects.equals(caption, x.caption);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * java.util.Arrays.hashCode(data) + java.util.Objects.hashCode(mimeType) + java.util.Objects.hashCode(width) + java.util.Objects.hashCode(height) + java.util.Objects.hashCode(caption);
+    }
+
+    @Override
+    public String toString() {
+      return "Image[" + (data == null ? 0 : data.length) + " bytes" + ", " + mimeType + ", " + width + ", " + height + ", " + caption + "]";
+    }
+  }
 
   /** Chữ ký cuối trang. */
   public record Sign(String date, String role, String name) {}
