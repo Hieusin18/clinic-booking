@@ -79,6 +79,10 @@ public abstract class IntegrationTest {
   @Autowired
   private AuthService authService;
 
+  @Autowired
+  @org.springframework.beans.factory.annotation.Qualifier("notificationExecutor")
+  private org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor notificationExecutor;
+
   protected Api api;
 
   @BeforeEach
@@ -106,12 +110,42 @@ public abstract class IntegrationTest {
     return count(table, null);
   }
 
-  /** Xóa sạch dữ liệu mọi bảng (giữ cấu trúc). */
+  /**
+   * Xóa sạch dữ liệu mọi bảng (giữ cấu trúc). Chờ việc chạy nền của test trước (gửi thông báo) xong trước, và thử lại
+   * nếu TRUNCATE đụng khóa với một giao dịch còn dở.
+   */
   protected void resetDb() {
+    waitForBackgroundWork();
     var tables = jdbc.queryForList(
         "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('flyway_schema_history', '_prisma_migrations')",
         String.class);
     if (tables.isEmpty()) return;
-    jdbc.execute("TRUNCATE TABLE " + String.join(", ", tables.stream().map(t -> "\"public\".\"" + t + "\"").toList()) + " RESTART IDENTITY CASCADE");
+    String sql = "TRUNCATE TABLE " + String.join(", ", tables.stream().map(t -> "\"public\".\"" + t + "\"").toList()) + " RESTART IDENTITY CASCADE";
+    for (int attempt = 1; ; attempt++) {
+      try {
+        jdbc.execute(sql);
+        return;
+      } catch (org.springframework.dao.PessimisticLockingFailureException e) {
+        if (attempt >= 5) throw e;
+        sleep(200);
+        waitForBackgroundWork();
+      }
+    }
+  }
+
+  private void waitForBackgroundWork() {
+    for (int i = 0; i < 100; i++) {
+      var pool = notificationExecutor.getThreadPoolExecutor();
+      if (pool.getActiveCount() == 0 && pool.getQueue().isEmpty()) return;
+      sleep(20);
+    }
+  }
+
+  private static void sleep(long ms) {
+    try {
+      Thread.sleep(ms);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 }

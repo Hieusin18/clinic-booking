@@ -24,6 +24,9 @@ spring:
     import: optional:file:.env[.properties]
   application:
     name: clinic-booking-backend
+  lifecycle:
+    # Khi dừng (docker stop / hết test) chờ request đang chạy tối đa 5 giây; long-polling của Socket.IO không giữ lâu hơn
+    timeout-per-shutdown-phase: 5s
   main:
     banner-mode: off
   jpa:

@@ -87,7 +87,16 @@ public class RealtimeGateway {
   @PreDestroy
   public void stop() {
     if (timers != null) timers.shutdownNow();
-    if (server != null) server.stop();
+    if (server == null) return;
+    // Netty chờ kết nối đóng êm tới 15 giây mỗi nhóm luồng; khi tắt máy chủ chỉ chờ tối đa 3 giây
+    Thread t = new Thread(server::stop, "realtime-stop");
+    t.setDaemon(true);
+    t.start();
+    try {
+      t.join(3000);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   /** Mở kết nối: phải gửi token trong {@link #AUTH_TIMEOUT_SECONDS} giây, không thì bị ngắt. */

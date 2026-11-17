@@ -1,6 +1,6 @@
 // Pipeline CI/CD của hệ thống đặt lịch khám (chạy trên Jenkins trong ci/docker-compose.yml).
 //
-// Luồng: lấy code → cài thư viện → test (+ độ phủ JaCoCo/vitest) → SonarQube → Quality Gate
+// Luồng: lấy code → cài thư viện → test backend → test web, mobile (+ độ phủ JaCoCo/vitest) → SonarQube → Quality Gate
 //        → build image → [đẩy Docker Hub] → [deploy laptop] → [deploy VPS qua SSH] → dọn image cũ
 //
 // Các bước trong [ ] chỉ chạy khi bật bằng biến môi trường toàn cục của Jenkins
@@ -49,32 +49,34 @@ pipeline {
       }
     }
 
-    stage('Test') {
-      parallel {
-        stage('Backend: migration, build, test') {
-          steps {
-            // PostgreSQL riêng cho lần build này, xoá ngay khi xong
-            sh '''
-              docker run -d --name "$TEST_DB" --network "$CI_NETWORK" \
-                -e POSTGRES_USER=clinic -e POSTGRES_PASSWORD=clinic -e POSTGRES_DB=clinic_test \
-                postgres:16-alpine
-              for i in $(seq 1 60); do
-                docker exec "$TEST_DB" pg_isready -h 127.0.0.1 -U clinic -d clinic_test && break
-                sleep 2
-              done
-            '''
-            dir('backend') {
-              withEnv(["DATABASE_URL=postgresql://clinic:clinic@${env.TEST_DB}:5432/clinic_test"]) {
-                // Biên dịch, chạy test JUnit (Flyway áp dụng migration vào CSDL test, Hibernate kiểm tra entity
-                // khớp bảng), đóng gói app.jar và xuất độ phủ target/site/jacoco/jacoco.xml cho SonarQube
-                sh '$MVN verify'
-              }
-            }
-          }
-          post {
-            always { sh 'docker rm -f "$TEST_DB" || true' }
+    // Backend chạy trước, riêng: test Spring Boot nặng CPU, chạy song song làm test giao diện web bị quá giờ
+    stage('Test backend: migration, build, test') {
+      steps {
+        // PostgreSQL riêng cho lần build này, xoá ngay khi xong
+        sh '''
+          docker run -d --name "$TEST_DB" --network "$CI_NETWORK" \
+            -e POSTGRES_USER=clinic -e POSTGRES_PASSWORD=clinic -e POSTGRES_DB=clinic_test \
+            postgres:16-alpine
+          for i in $(seq 1 60); do
+            docker exec "$TEST_DB" pg_isready -h 127.0.0.1 -U clinic -d clinic_test && break
+            sleep 2
+          done
+        '''
+        dir('backend') {
+          withEnv(["DATABASE_URL=postgresql://clinic:clinic@${env.TEST_DB}:5432/clinic_test"]) {
+            // Biên dịch, chạy test JUnit (Flyway áp dụng migration vào CSDL test, Hibernate kiểm tra entity
+            // khớp bảng), đóng gói app.jar và xuất độ phủ target/site/jacoco/jacoco.xml cho SonarQube
+            sh '$MVN verify'
           }
         }
+      }
+      post {
+        always { sh 'docker rm -f "$TEST_DB" || true' }
+      }
+    }
+
+    stage('Test web, mobile') {
+      parallel {
         stage('Web: lint, build, test') {
           steps {
             dir('web') {
