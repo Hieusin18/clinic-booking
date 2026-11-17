@@ -81,3 +81,17 @@ fi
 QG=$(curl -s -u "admin:Ci-Test-Admin-123!" "http://localhost:9000/api/qualitygates/project_status?projectKey=clinic-booking")
 echo "Quality Gate: $QG"
 curl -sf http://localhost/api/health && echo " ← hệ thống vừa deploy đang chạy"
+
+# Tóm tắt chất lượng toàn bộ mã (lần quét đầu chưa có "code mới" nên Quality Gate chưa xét các điều kiện này;
+# máy CI thật của nhóm sẽ xét chúng trên code mới)
+SQ="curl -s -u admin:Ci-Test-Admin-123!"
+echo "::group::SonarQube: chỉ số toàn bộ mã"
+$SQ "http://localhost:9000/api/measures/component?component=clinic-booking&metricKeys=coverage,duplicated_lines_density,bugs,vulnerabilities,code_smells,security_hotspots,reliability_rating,security_rating,sqale_rating" \
+  | python3 -c 'import json,sys; [print(" ", m["metric"], m.get("value")) for m in json.load(sys.stdin)["component"]["measures"]]' || true
+echo "Lỗi (bug) và lỗ hổng:"
+$SQ "http://localhost:9000/api/issues/search?componentKeys=clinic-booking&types=BUG,VULNERABILITY&resolved=false&ps=50" \
+  | python3 -c 'import json,sys; [print(" ", i["severity"], i["component"].split(":",1)[-1], i.get("line"), i["message"]) for i in json.load(sys.stdin)["issues"]]' || true
+echo "Điểm nóng bảo mật (security hotspot):"
+$SQ "http://localhost:9000/api/hotspots/search?projectKey=clinic-booking&ps=50" \
+  | python3 -c 'import json,sys; [print(" ", h["vulnerabilityProbability"], h["component"].split(":",1)[-1], h.get("line"), h["message"]) for h in json.load(sys.stdin)["hotspots"]]' || true
+echo "::endgroup::"
