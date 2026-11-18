@@ -47,8 +47,18 @@ public class GlobalExceptionHandler {
   /** Dữ liệu gửi lên sai: trả danh sách lỗi (message là mảng, như ValidationPipe của NestJS). */
   @ExceptionHandler(BindException.class)
   public ResponseEntity<Map<String, Object>> invalid(BindException e) {
-    List<String> messages = new ArrayList<>();
-    for (ObjectError err : e.getAllErrors()) messages.add(describe(err));
+    List<ConstraintViolation<?>> violations = new ArrayList<>();
+    List<String> others = new ArrayList<>();
+    for (ObjectError err : e.getAllErrors()) {
+      ConstraintViolation<?> v = violation(err);
+      if (v != null) {
+        violations.add(v);
+      } else {
+        others.add(err instanceof FieldError fe && fe.isBindingFailure() ? fe.getField() + " không hợp lệ" : err.getDefaultMessage());
+      }
+    }
+    List<String> messages = new ArrayList<>(ValidationMessages.of(violations));
+    messages.addAll(others);
     return body(HttpStatus.BAD_REQUEST, messages);
   }
 
@@ -57,22 +67,18 @@ public class GlobalExceptionHandler {
     return body(HttpStatus.BAD_REQUEST, e.getMessages());
   }
 
-  static String describe(ObjectError err) {
-    String msg = err.getDefaultMessage();
-    if (err instanceof FieldError fe) {
-      if (fe.isBindingFailure()) return fe.getField() + " không hợp lệ";
-      try {
-        ConstraintViolation<?> v = err.unwrap(ConstraintViolation.class);
-        if (v.getMessageTemplate().startsWith("{")) return fe.getField() + " " + msg;
-      } catch (IllegalArgumentException ignored) {
-        // không phải lỗi từ Bean Validation
-      }
+  private static ConstraintViolation<?> violation(ObjectError err) {
+    try {
+      return err.unwrap(ConstraintViolation.class);
+    } catch (IllegalArgumentException ignored) {
+      return null;
     }
-    return msg;
   }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<Map<String, Object>> unreadable(HttpMessageNotReadableException e) {
+    String field = ValidationMessages.unreadable(e);
+    if (field != null) return body(HttpStatus.BAD_REQUEST, List.of(field));
     return body(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không đúng định dạng");
   }
 

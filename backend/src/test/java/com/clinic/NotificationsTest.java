@@ -182,6 +182,9 @@ class NotificationsTest extends IntegrationTest {
       assertThat(n.get("readAt").isNull()).isTrue();
       assertThat(live.get(0).getString("id")).isEqualTo(n.get("id").asText());
       assertThat(live.get(0).getString("title")).isEqualTo("Đến lượt bạn: số B01");
+      // Trường null vẫn có mặt như JSON của API (bản cũ cũng gửi readAt: null)
+      assertThat(live.get(0).has("readAt")).isTrue();
+      assertThat(live.get(0).isNull("readAt")).isTrue();
       JsonNode first = pushed.stream().filter(m -> m.get("to").asText().equals("ExponentPushToken[may-1]")).findFirst().orElseThrow();
       assertThat(first.get("title").asText()).isEqualTo("Đến lượt bạn: số B01");
       assertThat(first.at("/data/url").asText()).isEqualTo("/ticket");

@@ -42,7 +42,8 @@ public class BodyReader {
     try {
       value = mapper.treeToValue(raw, type);
     } catch (com.fasterxml.jackson.core.JsonProcessingException | IllegalArgumentException e) {
-      throw new ValidationException("Dữ liệu gửi lên không đúng định dạng");
+      String field = com.clinic.exception.ValidationMessages.unreadable(e);
+      throw new ValidationException(field != null ? field : "Dữ liệu gửi lên không đúng định dạng");
     }
     validate(value);
     return new Patch<>(value, raw);
@@ -51,11 +52,6 @@ public class BodyReader {
   public <T> void validate(T value) {
     Set<ConstraintViolation<T>> errors = validator.validate(value);
     if (errors.isEmpty()) return;
-    List<String> messages = new ArrayList<>();
-    for (ConstraintViolation<T> v : errors) {
-      String field = v.getPropertyPath().toString();
-      messages.add(v.getMessageTemplate().startsWith("{") ? field + " " + v.getMessage() : v.getMessage());
-    }
-    throw new ValidationException(messages);
+    throw new ValidationException(com.clinic.exception.ValidationMessages.of(errors));
   }
 }
