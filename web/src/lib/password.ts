@@ -1,6 +1,6 @@
 import type { FormRule } from 'antd';
 
-/** Quy tắc mật khẩu mới, giống backend (backend/src/auth/password.ts) để báo lỗi ngay khi gõ. */
+/** Quy tắc mật khẩu mới, giống backend (backend: security/Passwords.java) để báo lỗi ngay khi gõ. */
 export const MIN_PASSWORD = 8;
 
 export interface PasswordCheck {

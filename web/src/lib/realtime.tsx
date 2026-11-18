@@ -4,7 +4,7 @@ import { io, type Socket } from 'socket.io-client';
 import { api, tokenStore } from './api';
 import { useAuth } from './auth';
 
-/** Sự kiện loa gọi số (backend/src/realtime/realtime.ts) */
+/** Sự kiện loa gọi số (backend: realtime/RealtimeService.java) */
 export interface CalledEvent {
   visitId: string;
   label: string;

@@ -1,0 +1,71 @@
+# Cấu hình chính. Các giá trị bí mật và tùy chỉnh đọc từ biến môi trường (cùng tên như bản NestJS cũ,
+# xem .env.example ở thư mục gốc). DATABASE_URL dạng postgresql://user:pass@host:5432/db được
+# chuyển sang JDBC ở config/DataSourceConfig.java.
+server:
+  port: ${PORT:3000}
+  servlet:
+    # Mọi API nằm dưới /api (giống app.setGlobalPrefix('api') của bản cũ)
+    context-path: /api
+    encoding:
+      charset: UTF-8
+      # Chỉ ép UTF-8 cho request; response tự đặt Content-Type (PDF/Word không kèm charset)
+      force-request: true
+  forward-headers-strategy: framework
+  error:
+    whitelabel:
+      enabled: false
+  tomcat:
+    # Thân request gốc dùng để kiểm tra chữ ký HMAC của cổng SMS
+    max-swallow-size: 20MB
+
+spring:
+  config:
+    # Chạy trên máy (./mvnw spring-boot:run) thì đọc biến từ backend/.env như bản cũ; biến môi trường thật được ưu tiên hơn
+    import: optional:file:.env[.properties]
+  application:
+    name: clinic-booking-backend
+  lifecycle:
+    # Khi dừng (docker stop / hết test) chờ request đang chạy tối đa 5 giây; long-polling của Socket.IO không giữ lâu hơn
+    timeout-per-shutdown-phase: 5s
+  main:
+    banner-mode: off
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+      naming:
+        # Bảng và cột giữ nguyên tên cũ ("Patient", "fullName"), không đổi sang snake_case
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+        jdbc:
+          time_zone: UTC
+        type:
+          # Cột TIMESTAMP(3) không múi giờ, lưu giờ UTC (như Prisma)
+          preferred_instant_jdbc_type: TIMESTAMP
+  flyway:
+    # CSDL đang chạy bản cũ đã có đủ 11 migration (bảng _prisma_migrations): ghi mốc 11 rồi chỉ chạy migration mới
+    baseline-on-migrate: true
+    baseline-version: 11
+    baseline-description: "Tiếp nhận CSDL từ bản NestJS/Prisma"
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 25MB
+  jackson:
+    default-property-inclusion: always
+    deserialization:
+      fail-on-unknown-properties: false
+
+springdoc:
+  api-docs:
+    path: /docs-json
+  swagger-ui:
+    path: /docs
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: OFF
+    org.hibernate.orm.incubating: ERROR

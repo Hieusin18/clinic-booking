@@ -1,6 +1,6 @@
 import dayjs, { type Dayjs } from 'dayjs';
 
-/** Kết quả GET /stats/overview (backend/src/stats/stats.ts) */
+/** Kết quả GET /stats/overview (backend: service/StatsService.java) */
 export interface Kpis {
   visits: number;
   completed: number;

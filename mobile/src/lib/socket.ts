@@ -1,5 +1,5 @@
 /**
- * Địa chỉ Socket.IO đi cùng API (backend/src/realtime/realtime.ts mở ở "<API>/socket.io").
+ * Địa chỉ Socket.IO đi cùng API (backend: realtime/RealtimeGateway.java, mở ở "<API>/socket.io").
  * - "http://192.168.1.5:3000/api" → url "http://192.168.1.5:3000", path "/api/socket.io"
  * - "/api" (bản web khi dev, qua proxy của Metro) → cùng địa chỉ trang, path "/api/socket.io"
  */

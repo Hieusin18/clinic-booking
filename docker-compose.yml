@@ -2,6 +2,36 @@
 # Biến môi trường lấy từ file .env cạnh file này (xem .env.example).
 name: clinic-booking
 
+# Biến môi trường của backend (dùng chung cho lệnh seed)
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  PORT: 3000
+  JWT_SECRET: ${JWT_SECRET}
+  QR_SECRET: ${QR_SECRET}
+  QR_TTL_SECONDS: ${QR_TTL_SECONDS:-60}
+  CLINIC_ID: ${CLINIC_ID}
+  CLINIC_NAME: ${CLINIC_NAME:-}
+  CLINIC_ADDRESS: ${CLINIC_ADDRESS:-}
+  CLINIC_PHONE: ${CLINIC_PHONE:-}
+  CLINIC_CODE: ${CLINIC_CODE:-}
+  CHECKIN_EARLY_MINUTES: ${CHECKIN_EARLY_MINUTES:-}
+  CHECKIN_LATE_MINUTES: ${CHECKIN_LATE_MINUTES:-}
+  QUEUE_PRIORITY_LEAD_MINUTES: ${QUEUE_PRIORITY_LEAD_MINUTES:-}
+  QUEUE_WALK_IN_EVERY: ${QUEUE_WALK_IN_EVERY:-}
+  QUEUE_AVG_EXAM_MINUTES: ${QUEUE_AVG_EXAM_MINUTES:-}
+  QUEUE_DAY_END_HOUR: ${QUEUE_DAY_END_HOUR:-}
+  QUEUE_SWEEP_SECONDS: ${QUEUE_SWEEP_SECONDS:-}
+  NO_SHOW_LIMIT: ${NO_SHOW_LIMIT:-}
+  NO_SHOW_WINDOW_DAYS: ${NO_SHOW_WINDOW_DAYS:-}
+  NO_SHOW_LOCK_DAYS: ${NO_SHOW_LOCK_DAYS:-}
+  REMINDER_SWEEP_SECONDS: ${REMINDER_SWEEP_SECONDS:-}
+  EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+  REQUIRE_PHONE_VERIFICATION: ${REQUIRE_PHONE_VERIFICATION:-}
+  SMS_VERIFY_NUMBER: ${SMS_VERIFY_NUMBER:-}
+  SMS_GATEWAY_TOKEN: ${SMS_GATEWAY_TOKEN:-}
+  SMS_GATEWAY_SIGNING_KEY: ${SMS_GATEWAY_SIGNING_KEY:-}
+  API_DOCS: ${API_DOCS:-}
+
 services:
   db:
     image: postgres:16-alpine
@@ -23,49 +53,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      PORT: 3000
-      JWT_SECRET: ${JWT_SECRET}
-      QR_SECRET: ${QR_SECRET}
-      QR_TTL_SECONDS: ${QR_TTL_SECONDS:-60}
-      CLINIC_ID: ${CLINIC_ID}
-      CLINIC_NAME: ${CLINIC_NAME:-}
-      CLINIC_ADDRESS: ${CLINIC_ADDRESS:-}
-      CLINIC_PHONE: ${CLINIC_PHONE:-}
-      CLINIC_CODE: ${CLINIC_CODE:-}
-      CHECKIN_EARLY_MINUTES: ${CHECKIN_EARLY_MINUTES:-}
-      CHECKIN_LATE_MINUTES: ${CHECKIN_LATE_MINUTES:-}
-      QUEUE_PRIORITY_LEAD_MINUTES: ${QUEUE_PRIORITY_LEAD_MINUTES:-}
-      QUEUE_WALK_IN_EVERY: ${QUEUE_WALK_IN_EVERY:-}
-      QUEUE_AVG_EXAM_MINUTES: ${QUEUE_AVG_EXAM_MINUTES:-}
-      QUEUE_DAY_END_HOUR: ${QUEUE_DAY_END_HOUR:-}
-      QUEUE_SWEEP_SECONDS: ${QUEUE_SWEEP_SECONDS:-}
-      NO_SHOW_LIMIT: ${NO_SHOW_LIMIT:-}
-      NO_SHOW_WINDOW_DAYS: ${NO_SHOW_WINDOW_DAYS:-}
-      NO_SHOW_LOCK_DAYS: ${NO_SHOW_LOCK_DAYS:-}
-      REMINDER_SWEEP_SECONDS: ${REMINDER_SWEEP_SECONDS:-}
-      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
-      REQUIRE_PHONE_VERIFICATION: ${REQUIRE_PHONE_VERIFICATION:-}
-      SMS_VERIFY_NUMBER: ${SMS_VERIFY_NUMBER:-}
-      SMS_GATEWAY_TOKEN: ${SMS_GATEWAY_TOKEN:-}
-      SMS_GATEWAY_SIGNING_KEY: ${SMS_GATEWAY_SIGNING_KEY:-}
-      API_DOCS: ${API_DOCS:-}
+    environment: *backend-env
 
-  # Tạo dữ liệu mẫu (admin, bác sĩ, thuốc…) — chỉ chạy khi gọi tay, sau khi backend đã migrate:
+  # Tạo dữ liệu mẫu (admin, bác sĩ, thuốc…) — chỉ chạy khi gọi tay, sau khi backend đã chạy:
   #   docker compose run --rm seed
-  # Dùng stage "build" của Dockerfile vì seed cần tsx và mã nguồn (image chạy thật không có).
+  # Dùng chung image với backend: app.jar có sẵn lệnh "seed" (và "reset-password <SĐT>" cho admin quên mật khẩu).
   seed:
-    build:
-      context: ./backend
-      target: build
+    build: ./backend
     profiles: ["tools"]
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    command: ["npx", "prisma", "db", "seed"]
+    environment: *backend-env
+    command: ["java", "-jar", "app.jar", "seed"]
 
   caddy:
     image: caddy:2-alpine

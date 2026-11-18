@@ -21,8 +21,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Dựng Jenkins + SonarQube
         run: docker compose -f ci/docker-compose.yml up -d --build
-      - name: Jenkins có Docker CLI, Node 22 và plugin
+      - name: Jenkins có Docker CLI, JDK 21, Node 22 và plugin
         run: |
+          docker compose -f ci/docker-compose.yml exec -T jenkins java -version
           docker compose -f ci/docker-compose.yml exec -T jenkins docker version
           docker compose -f ci/docker-compose.yml exec -T jenkins docker compose version
           docker compose -f ci/docker-compose.yml exec -T jenkins node -v

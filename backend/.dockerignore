@@ -1,4 +1,8 @@
+target
+.env
+*.log
+# Thư mục còn sót trên máy từ bản NestJS cũ (xóa được)
 node_modules
 dist
-.env
+coverage
 src/generated

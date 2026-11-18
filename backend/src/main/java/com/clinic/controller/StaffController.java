@@ -1,0 +1,52 @@
+package com.clinic.controller;
+
+import com.clinic.dto.BodyReader;
+import com.clinic.dto.PageQuery;
+import com.clinic.dto.catalog.ReceptionistPatch;
+import com.clinic.dto.catalog.ReceptionistRequest;
+import com.clinic.entity.enums.Role;
+import com.clinic.security.Roles;
+import com.clinic.service.StaffService;
+import com.fasterxml.jackson.databind.JsonNode;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@Tag(name = "staff")
+@Roles(Role.ADMIN)
+@RestController
+@RequestMapping("/staff/receptionists")
+public class StaffController {
+  private final StaffService service;
+  private final BodyReader body;
+
+  public StaffController(StaffService service, BodyReader body) {
+    this.service = service;
+    this.body = body;
+  }
+
+  @GetMapping
+  public Map<String, Object> list(@Valid PageQuery q) {
+    return service.list(q);
+  }
+
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public Map<String, Object> create(@Valid @RequestBody ReceptionistRequest dto) {
+    return service.create(dto);
+  }
+
+  @PatchMapping("/{id}")
+  public Map<String, Object> update(@PathVariable String id, @RequestBody(required = false) JsonNode dto) {
+    return service.update(id, body.read(dto, ReceptionistPatch.class));
+  }
+}

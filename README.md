@@ -3,30 +3,22 @@ video họp tuần 1: https://drive.google.com/file/d/1-mBF2ICs8vLiGIk_gCy9YN9aD
 
 Đồ án nhóm 5 người, dùng chung cho 3 môn: Phát triển ứng dụng di động, Lập trình web, Triển khai phần mềm.
 
-Công nghệ đã chốt: **NestJS + Prisma + PostgreSQL** (backend), **React + Vite + Ant Design** (web), **React Native / Expo** (mobile), **Docker + Caddy + GitHub Actions** (triển khai). Toàn bộ dùng TypeScript.
+Công nghệ đã chốt: **Java 21 + Spring Boot 3 theo mô hình MVC, Spring Data JPA, Flyway, PostgreSQL** (backend), **React + Vite + Ant Design** (web), **React Native / Expo** (mobile), **Docker + Caddy + Jenkins + SonarQube + GitHub Actions** (triển khai). Web và mobile dùng TypeScript.
 
 ## Cấu trúc thư mục
 
 ```
 clinic-booking/
-├── backend/                 NestJS API (đã dựng sẵn)
-│   ├── prisma/schema.prisma Toàn bộ CSDL: 4 vai trò, lịch hẹn, hàng đợi, bệnh án, đơn thuốc
-│   ├── prisma.config.ts     Cấu hình Prisma 7 (đọc DATABASE_URL)
-│   └── src/                 Mỗi nghiệp vụ một module (xem "Cấu trúc backend" bên dưới)
-│       ├── main.ts          Prefix /api, Swagger ở /api/docs (chỉ khi dev)
-│       ├── app.module.ts    Gom các module; bộ lọc lỗi và interceptor dùng chung
-│       ├── common/          Dùng chung: dto/, filters/, interceptors/, constants/, utils/
-│       ├── prisma/          PrismaService dùng chung
-│       ├── auth/            Đăng nhập, phân quyền (guards/, decorators/), đổi / quên mật khẩu
-│       ├── sms/             Xác minh số điện thoại bằng tin nhắn người dùng gửi tới
-│       ├── patients/        Hồ sơ bệnh nhân, liên kết tài khoản app với hồ sơ có sẵn
-│       ├── doctors/ staff/ specialties/ medicines/ icd10/   Danh mục và tài khoản nhân viên
-│       ├── schedules/ appointments/   Khung giờ khám, đặt lịch
-│       ├── qr/ queue/       Mã QR ở quầy; cấp số A/B, thứ tự gọi số, check-in, dọn hàng đợi
-│       ├── visits/ lab-results/   Bệnh án, đơn thuốc, xuất PDF/Word; cận lâm sàng
-│       ├── notifications/ realtime/   Thông báo đẩy, nhắc lịch; WebSocket
-│       ├── stats/ metrics/ health/   Thống kê admin; số liệu Prometheus; kiểm tra sống
-│       └── cli/             Lệnh trên máy chủ (đặt lại mật khẩu admin)
+├── backend/                 API Spring Boot (Java 21, Maven)
+│   ├── pom.xml              Thư viện và plugin build (JaCoCo đo độ phủ test)
+│   ├── mvnw, mvnw.cmd       Maven Wrapper: chỉ cần cài JDK 21, Maven tự tải
+│   ├── assets/fonts/        Font tiếng Việt để xuất bệnh án PDF
+│   └── src/
+│       ├── main/java/com/clinic/   Mã nguồn theo mô hình MVC (xem "Cấu trúc backend" bên dưới)
+│       ├── main/resources/
+│       │   ├── application.yml     Cấu hình (đọc biến môi trường như .env.example)
+│       │   └── db/migration/       Migration Flyway V1…V11: toàn bộ CSDL, tự áp dụng khi khởi động
+│       └── test/java/com/clinic/   Test JUnit 5 (gọi API thật trên CSDL test)
 ├── web/                     React + Vite + Ant Design (admin, bác sĩ, lễ tân)
 ├── mobile/                  Expo + Expo Router (bệnh nhân)
 ├── docker-compose.yml       db + backend + caddy
@@ -36,37 +28,34 @@ clinic-booking/
 
 ## Cấu trúc backend
 
-Mỗi nghiệp vụ là một module NestJS trong `backend/src/<tên>/`, xếp theo cùng một khuôn:
+Backend theo mô hình **MVC** của Spring: **Controller** nhận request và trả về **View** (JSON), **Model** là entity JPA cùng repository; logic nghiệp vụ nằm ở lớp **Service** giữa hai bên. Mọi mã nằm trong `backend/src/main/java/com/clinic/`:
 
 ```
-patients/
-├── dto/                          Dữ liệu client được gửi lên (mỗi lớp một file *.dto.ts, kiểm tra bằng class-validator)
-│   ├── create-patient.dto.ts
-│   └── update-patient.dto.ts
-├── utils/                        Hàm dùng chung không phải provider (không cần DI), vd. patient-scope.util.ts
-├── patients.controller.ts        Khai báo API: đường dẫn, @Roles, lấy @Body/@Param/@Query, gọi service
-├── patients.service.ts           Logic nghiệp vụ + truy vấn Prisma
-└── patients.module.ts            @Module gom controller + service
+com/clinic/
+├── controller/     Controller: khai báo API (@GetMapping, @PostMapping…), phân quyền @Roles, lấy @RequestBody/@PathVariable, gọi service
+├── service/        Logic nghiệp vụ trong transaction: đặt lịch, hàng đợi, bệnh án, đơn thuốc, thông báo, thống kê; cả việc chạy nền
+│                   (QueueJanitor dọn hàng đợi, AppointmentReminder nhắc lịch)
+├── entity/         Model: entity JPA ánh xạ từng bảng (User, Patient, Doctor, Schedule, Appointment, Visit, MedicalRecord…), enums/
+├── repository/     Model: Spring Data JPA, truy vấn JPQL/SQL (tìm kiếm, khóa khung giờ khi đặt lịch…)
+├── dto/            Dữ liệu client gửi lên (record + Bean Validation, thông báo lỗi tiếng Việt)
+├── view/           View: dựng JSON trả về (cùng cấu trúc với bản NestJS cũ nên web và app không phải sửa)
+├── security/       JWT, AuthInterceptor, @Public, @Roles, @CurrentUser, quy tắc mật khẩu (bcrypt)
+├── exception/      ApiException và GlobalExceptionHandler: lỗi trả về dạng {statusCode, message, error}
+├── realtime/       Socket.IO (gọi số, cập nhật hàng đợi), chuyển tiếp /api/socket.io về cùng cổng API
+├── export/         Bệnh án, đơn thuốc theo mẫu Bộ Y tế: PDF (OpenPDF), Word (Apache POI), HTML
+├── metrics/        Số liệu Prometheus /api/metrics
+├── config/         Cấu hình: CSDL, JSON, CORS, Swagger, luồng chạy nền
+├── util/           Hàm thuần (thuật toán gọi số, mã QR, giờ Việt Nam, bảng ICD-10…), test riêng được
+└── cli/            Lệnh trên máy chủ: seed, seed-history, reset-password
 ```
 
-| Đuôi file | Chứa gì |
-|---|---|
-| `*.module.ts` | `@Module`: controller, provider, exports |
-| `*.controller.ts` | `@Controller`: chỉ khai báo API và chuyển cho service, không có logic |
-| `*.service.ts` | `@Injectable`: logic nghiệp vụ, truy cập CSDL; cả việc chạy nền (`queue-janitor.service.ts`, `appointment-reminder.service.ts`) |
-| `*.gateway.ts`, `*.client.ts`, `*.middleware.ts` | WebSocket (`realtime.gateway.ts`), gọi dịch vụ ngoài (`expo-push.client.ts`), middleware (`http-metrics.middleware.ts`) |
-| `dto/*.dto.ts` | Lớp DTO; Swagger đọc các file này để sinh tài liệu |
-| `utils/*.util.ts`, `*.constants.ts` | Hàm thuần và hằng số (thuật toán gọi số, quy tắc mật khẩu, ký mã QR…), test riêng được |
-| `guards/`, `decorators/`, `interfaces/` (trong `auth/`) | `AuthGuard`, `@Public`, `@Roles`, `@CurrentUser`, kiểu `AuthUser` |
-| `common/filters/`, `common/interceptors/` | Bộ lọc lỗi trùng dữ liệu (409), che thông tin riêng tư khi bệnh nhân gọi API |
-
-Module chỉ dùng service của module khác khi module đó `exports`; `PrismaModule`, `RealtimeModule`, `NotificationsModule`, `SessionsModule` là `@Global()` nên dùng được ở mọi nơi. Định dạng code theo `backend/.prettierrc` (VS Code: cài Prettier, bật Format on Save).
+Ví dụ luồng `POST /api/appointments`: `AppointmentsController.book()` → `AppointmentsService.book()` (kiểm tra khóa đặt lịch, giữ khung giờ bằng `ScheduleRepository.book()` trong transaction) → `AppointmentViews` dựng JSON trả về.
 
 ## Hàng đợi ngày khám
 
 - **Hai dãy số:** check-in lịch hẹn nhận số **A** (A01, A02…), người đến trực tiếp nhận số **B**.
 - **Khung check-in:** từ giờ hẹn − 30 phút đến giờ hẹn + 15 phút. Đến sớm hơn thì app báo giờ mở check-in; đến trễ hơn thì lịch hẹn thành *không đến* và bệnh nhân lấy số B. Lễ tân check-in ngoài khung giờ được khi cần.
-- **Thứ tự gọi số** (`backend/src/queue/utils/queue-order.util.ts`), xét lần lượt:
+- **Thứ tự gọi số** (`backend/src/main/java/com/clinic/util/QueueOrder.java`), xét lần lượt:
   1. đã có 3 lượt liên tiếp gọi người đặt lịch mà còn người vãng lai chờ → gọi người vãng lai đến sớm nhất;
   2. người đặt lịch đã đến giờ hẹn (từ giờ hẹn − 10 phút) → gọi người có giờ hẹn sớm nhất;
   3. còn lại → theo thứ tự đến quầy.
@@ -79,7 +68,7 @@ Các mốc trên đổi được trong `.env` (xem `.env.example`).
 
 ## Chạy backend trên máy
 
-Cần Node 22 và Docker.
+Cần JDK 21 và Docker (không cần cài Maven: dùng `./mvnw`, trên Windows CMD là `mvnw.cmd`).
 
 ```bash
 # 1. Bật PostgreSQL
@@ -87,23 +76,19 @@ docker run -d --name clinic-db -p 5432:5432 \
   -e POSTGRES_USER=clinic -e POSTGRES_PASSWORD=clinic -e POSTGRES_DB=clinic \
   postgres:16-alpine
 
-# 2. Cài đặt và cấu hình
+# 2. Cấu hình
 cd backend
-npm install
 cp .env.example .env
 
-# 3. Tạo bảng và sinh Prisma Client
-npx prisma migrate deploy
-npx prisma generate
+# 3. Chạy: Flyway tự tạo bảng (migration trong src/main/resources/db/migration) rồi mở API ở cổng 3000
+./mvnw spring-boot:run
 
-# 4. Tạo dữ liệu mẫu (chạy lại nhiều lần không bị trùng)
-npx prisma db seed
-
-# 5. Chạy
-npm run start:dev
+# 4. Tạo dữ liệu mẫu (chạy lại nhiều lần không bị trùng), ở cửa sổ khác
+./mvnw -q package -DskipTests
+java -jar target/app.jar seed
 ```
 
-Mở http://localhost:3000/api/docs để xem Swagger (chỉ có khi chạy dev; bản Docker tắt mặc định, bật bằng `API_DOCS=true` trong `.env`). Bấm **Authorize** và dán `accessToken` lấy từ `POST /api/auth/login` để thử các API cần đăng nhập.
+Mở http://localhost:3000/api/docs để xem Swagger (chỉ có khi chạy trên máy; bản Docker tắt mặc định, bật bằng `API_DOCS=true` trong `.env`). Bấm **Authorize** và dán `accessToken` lấy từ `POST /api/auth/login` để thử các API cần đăng nhập.
 
 Tài khoản mẫu (mật khẩu đều là `123456`):
 
@@ -114,23 +99,24 @@ Tài khoản mẫu (mật khẩu đều là `123456`):
 | Bệnh nhân | 0900000003 |
 | Bác sĩ | 0910000001 → 0910000006 |
 
-Phân quyền: mọi API mặc định cần đăng nhập; API công khai gắn `@Public()`, API giới hạn vai trò gắn `@Roles('ADMIN', …)` (xem `src/auth/decorators/`).
+Phân quyền: mọi API mặc định cần đăng nhập; API công khai gắn `@Public`, API giới hạn vai trò gắn `@Roles(Role.ADMIN, …)` (xem `security/`).
 
-Lưu ý Prisma 7: `migrate dev` **không** tự chạy `generate`. Khi sửa `schema.prisma`, chạy `npx prisma migrate dev --name <mo-ta>` rồi `npx prisma generate`, và commit thư mục migration mới.
+Đổi CSDL: thêm file migration mới `src/main/resources/db/migration/V12__<mo-ta>.sql` (không sửa file cũ đã chạy) và sửa entity tương ứng. Khi khởi động, Hibernate kiểm tra entity khớp với bảng (`ddl-auto: validate`), lệch là báo lỗi ngay.
+
+CSDL đang chạy từ bản NestJS cũ dùng tiếp được: lần đầu khởi động, Flyway nhận các bảng sẵn có là phiên bản 11 (`baseline-version`) và chỉ áp dụng migration mới hơn.
 
 ## Chạy test
 
-Test chạy với PostgreSQL thật (CSDL riêng `clinic_test`, bị xóa dữ liệu mỗi lần chạy):
+Test JUnit 5 gọi API thật với PostgreSQL thật (CSDL riêng `clinic_test`, bị xóa dữ liệu trước mỗi test):
 
 ```bash
 docker exec clinic-db psql -U clinic -c "CREATE DATABASE clinic_test"
 cd backend
-DATABASE_URL=postgresql://clinic:clinic@localhost:5432/clinic_test npx prisma migrate deploy
-npm test            # chạy toàn bộ test
-npm run typecheck   # kiểm tra kiểu cả src lẫn test
+./mvnw verify                      # build + toàn bộ test + độ phủ (target/site/jacoco/index.html)
+./mvnw test -Dtest=QueueTest       # chạy một lớp test
 ```
 
-CI chạy đúng các bước này trên mỗi pull request, kèm kiểm tra migration khớp với `schema.prisma`.
+Test dùng `postgresql://clinic:clinic@localhost:5432/clinic_test`, đổi bằng biến `DATABASE_URL`. CI (GitHub Actions và Jenkins) chạy đúng `./mvnw verify` trên mỗi pull request.
 
 ## Chạy web (trang quản lý cho admin, bác sĩ, lễ tân)
 
@@ -168,7 +154,7 @@ docker compose run --rm seed              # tài khoản và dữ liệu mẫu
 - **Nhân viên quên mật khẩu**: admin vào Bác sĩ / Lễ tân → **Đặt lại mật khẩu** → hệ thống tạo mật khẩu tạm (hiện một lần) để đưa tận tay; lần đăng nhập đầu bắt đổi. Tài khoản admin tạo mới cũng phải đổi mật khẩu ở lần đăng nhập đầu.
 - **Admin quên mật khẩu**: chạy trên máy chủ
   ```bash
-  docker compose exec backend npm run reset-password -- 0900000001
+  docker compose exec backend java -jar app.jar reset-password 0900000001
   ```
   lệnh in ra mật khẩu tạm.
 - Mọi người dùng đổi mật khẩu và **đăng xuất khỏi mọi thiết bị** được: web (bấm tên ở góc phải → Đổi mật khẩu), app (Hồ sơ → Đổi mật khẩu).
@@ -197,14 +183,14 @@ Tắt bước xác minh khi đăng ký (vd. máy cổng hỏng tạm thời): `R
 
 ## Thống kê (admin)
 
-Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/stats/stats.service.ts` (và trong nút ⓘ trên trang).
+Trang **Thống kê** (`/admin/stats`, trang đầu tiên của admin) tính trực tiếp từ dữ liệu khám: lượt khám, bệnh nhân mới, tỷ lệ đặt online, thời gian chờ và thời gian khám (trung vị), tỷ lệ lịch hẹn không đến, lượt theo ngày và theo giờ, chẩn đoán và thuốc thường gặp, số liệu theo bác sĩ; so với kỳ trước cùng độ dài; tải CSV để đưa vào báo cáo. Cách tính từng chỉ số ghi ở đầu `backend/src/main/java/com/clinic/service/StatsService.java` (và trong nút ⓘ trên trang).
 
 Máy demo mới cài chưa có lịch sử khám nên trang gần như trống. Muốn có số liệu để trình diễn, tạo **dữ liệu lịch sử mẫu** (bệnh nhân hư cấu, số điện thoại 0989xxxxxx, 60 ngày gần nhất):
 
 ```bash
-docker compose run --rm seed npx tsx prisma/seed-history.ts            # tạo
-docker compose run --rm seed npx tsx prisma/seed-history.ts --reset    # xóa
-# chạy trực tiếp: cd backend && npm run seed:history -- --days 90
+docker compose run --rm seed java -jar app.jar seed-history            # tạo
+docker compose run --rm seed java -jar app.jar seed-history --reset    # xóa
+# chạy trực tiếp: cd backend && java -jar target/app.jar seed-history --days 90
 ```
 
 Số liệu này là **mẫu sinh ngẫu nhiên**: khi đưa lên slide cần ghi rõ "dữ liệu mô phỏng", hoặc xóa đi và dùng số liệu của các buổi chạy thử thật.
@@ -248,8 +234,8 @@ Khóa `QR_SECRET`, `JWT_SECRET` và mật khẩu CSDL chỉ nằm trong `.env` t
 ## Quy ước làm việc
 
 - Nhánh `main` luôn chạy được. Mỗi việc một nhánh `feat/<tên-việc>`, merge qua pull request có ít nhất 1 người review.
-- Đổi CSDL: sửa `schema.prisma`, chạy `migrate dev --name <mô-tả>`, commit cả thư mục migration.
-- Đổi API: cập nhật decorator Swagger để web và mobile thấy ngay.
+- Đổi CSDL: thêm migration Flyway mới `V<số>__<mô-tả>.sql` và sửa entity, commit cả hai.
+- Đổi API: giữ đường dẫn và cấu trúc JSON cũ nếu web/mobile đang dùng; Swagger (`/api/docs`) tự cập nhật từ controller và DTO.
 
 ## Việc tiếp theo cho backend (tuần 1)
 

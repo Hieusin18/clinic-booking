@@ -6,7 +6,7 @@ import { formatDay } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import { NUM } from '../../lib/theme';
 
-/** Tình trạng tài khoản app của một hồ sơ (backend/src/patients/account-link.ts) */
+/** Tình trạng tài khoản app của một hồ sơ (backend: service/AccountLinkService.java) */
 export interface AppAccountInfo {
   status: 'NONE' | 'UNVERIFIED' | 'VERIFIED';
   linkCode: string;

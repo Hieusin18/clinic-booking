@@ -1,5 +1,6 @@
 # Jenkins dùng cho môn Triển khai phần mềm: có sẵn Docker CLI (build image, docker compose),
-# Node.js 22 (chạy npm ci / test / build) và các plugin pipeline cần thiết.
+# JDK 21 của image gốc (backend Spring Boot build bằng Maven Wrapper ./mvnw, không cần cài Maven),
+# Node.js 22 (npm ci / test / build cho web và mobile) và các plugin pipeline cần thiết.
 FROM jenkins/jenkins:lts-jdk21
 
 USER root
