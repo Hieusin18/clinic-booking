@@ -23,6 +23,9 @@ public class ClinicBookingApplication {
   public static final String CLI_PROPERTY = "clinic.cli";
 
   public static void main(String[] args) {
+    // Giờ trong CSDL lưu theo UTC; đặt múi giờ mặc định của JVM là UTC để máy chạy giờ Việt Nam (laptop Windows,
+    // Jenkins đặt TZ) không làm lệch 7 tiếng khi ghi/đọc. Giờ hiển thị vẫn tính theo VnTime (Asia/Ho_Chi_Minh).
+    java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
     boolean docs = ApiDocsConfig.enabled(System.getenv());
     System.setProperty("springdoc.api-docs.enabled", String.valueOf(docs));
     System.setProperty("springdoc.swagger-ui.enabled", String.valueOf(docs));
