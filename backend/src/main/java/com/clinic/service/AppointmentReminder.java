@@ -96,8 +96,8 @@ public class AppointmentReminder {
       long lead = day ? 24 * HOUR : HOUR;
       List<Due> due = tx.execute(s -> {
         List<Appointment> list = day
-            ? appointments.dueForDayReminder(AppointmentsService.ACTIVE, now.plusSeconds(lead), now.plusSeconds(DAY_REMINDER_CUTOFF))
-            : appointments.dueForHourReminder(AppointmentsService.ACTIVE, now.plusSeconds(lead), now);
+            ? appointments.dueForDayReminder(AppointmentsService.CONFIRMED, now.plusSeconds(lead), now.plusSeconds(DAY_REMINDER_CUTOFF))
+            : appointments.dueForHourReminder(AppointmentsService.CONFIRMED, now.plusSeconds(lead), now);
         return list.stream().map(a -> new Due(a.getId(), a.getPatient().getUserId(), a.getSchedule().getStartTime(), a.getCreatedAt(),
             a.getSchedule().getDoctor(), a.getSchedule().getDoctor().getUser().getFullName())).toList();
       });

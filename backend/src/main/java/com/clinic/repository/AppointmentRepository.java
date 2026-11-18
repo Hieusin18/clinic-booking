@@ -63,6 +63,28 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
       + "and a.scheduleId in (select s.id from Schedule s where s.startTime < :before)")
   int markNoShows(@Param("active") Collection<AppointmentStatus> active, @Param("before") Instant before);
 
+  /** Lịch đặt online đang chờ lễ tân duyệt, chưa quá giờ khám; giờ khám sớm nhất trước. */
+  @Query("select a from Appointment a join a.schedule s where a.status = com.clinic.entity.enums.AppointmentStatus.PENDING "
+      + "and s.startTime > :after order by s.startTime asc")
+  List<Appointment> pendingReview(@Param("after") Instant after);
+
+  /** Số lịch chờ duyệt (số trên menu của lễ tân). */
+  @Query("select count(a) from Appointment a join a.schedule s where a.status = com.clinic.entity.enums.AppointmentStatus.PENDING "
+      + "and s.startTime > :after")
+  long countPendingReview(@Param("after") Instant after);
+
+  /** Số lịch của bệnh nhân theo trạng thái (lễ tân xem trước khi duyệt: đã đến bao nhiêu lần, bỏ bao nhiêu lần). */
+  @Query("select a.status, count(a) from Appointment a where a.patientId = :pid group by a.status")
+  List<Object[]> countByStatusOf(@Param("pid") String patientId);
+
+  /** Lịch chờ duyệt đã quá giờ khám + khung trễ mà chưa ai duyệt: tự từ chối (không tính là bệnh nhân không đến). */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("update Appointment a set a.status = com.clinic.entity.enums.AppointmentStatus.REJECTED, a.rejectReason = :reason, a.reviewedAt = :now "
+      + "where a.status = com.clinic.entity.enums.AppointmentStatus.PENDING "
+      + "and not exists (select 1 from Visit v where v.appointmentId = a.id) "
+      + "and a.scheduleId in (select s.id from Schedule s where s.startTime < :before)")
+  int expirePending(@Param("before") Instant before, @Param("now") Instant now, @Param("reason") String reason);
+
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update Appointment a set a.status = :to where a.id in :ids and a.status in :from")
   int moveStatusAll(@Param("ids") Collection<String> ids, @Param("from") Collection<AppointmentStatus> from, @Param("to") AppointmentStatus to);

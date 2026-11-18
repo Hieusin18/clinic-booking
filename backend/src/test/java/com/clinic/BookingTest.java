@@ -131,7 +131,7 @@ class BookingTest extends IntegrationTest {
       String a = slots.get(0).get("id").asText();
       var patient = fx.createPatient();
       var res = api.post("/api/appointments").auth(patient.token()).send(Map.of("scheduleId", a, "reason", "Sốt")).expect(201).body();
-      assertThat(res.get("status").asText()).isEqualTo("CONFIRMED");
+      assertThat(res.get("status").asText()).isEqualTo("PENDING");
       assertThat(res.get("reason").asText()).isEqualTo("Sốt");
       assertThat(res.at("/schedule/id").asText()).isEqualTo(a);
       assertThat(res.at("/schedule/doctor/id").asText()).isEqualTo(doctor.doctor().getId());

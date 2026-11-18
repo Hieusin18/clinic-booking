@@ -4,10 +4,12 @@ import com.clinic.entity.Doctor;
 import com.clinic.entity.Notification;
 import com.clinic.entity.PushToken;
 import com.clinic.entity.Visit;
+import com.clinic.entity.enums.AppointmentStatus;
 import com.clinic.entity.enums.NotificationType;
 import com.clinic.entity.enums.ResultMode;
 import com.clinic.exception.ApiException;
 import com.clinic.realtime.RealtimeService;
+import com.clinic.repository.AppointmentRepository;
 import com.clinic.repository.LabOrderRepository;
 import com.clinic.repository.NotificationRepository;
 import com.clinic.repository.PushTokenRepository;
@@ -15,6 +17,7 @@ import com.clinic.repository.VisitRepository;
 import com.clinic.security.AuthUser;
 import com.clinic.util.AfterCommit;
 import com.clinic.util.QueueOrder;
+import com.clinic.util.VnTime;
 import com.clinic.view.Json;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
@@ -56,10 +59,12 @@ public class NotificationsService {
   private final ExpoPushClient push;
   private final TaskExecutor executor;
   private final TransactionTemplate tx;
+  private final AppointmentRepository appointments;
 
   public NotificationsService(NotificationRepository notifications, PushTokenRepository pushTokens, VisitRepository visits,
       LabOrderRepository labOrders, RealtimeService realtime, ExpoPushClient push, @Qualifier("notificationExecutor") TaskExecutor executor,
-      PlatformTransactionManager txm) {
+      PlatformTransactionManager txm, AppointmentRepository appointments) {
+    this.appointments = appointments;
     this.notifications = notifications;
     this.pushTokens = pushTokens;
     this.visits = visits;
@@ -189,6 +194,30 @@ public class NotificationsService {
           : "Chẩn đoán" + (v.labOrders() > 0 ? ", kết quả cận lâm sàng" : "") + " và đơn thuốc của bạn đã có trong Lịch sử khám.";
       notify(v.userId(), new NewNotification(NotificationType.VISIT_DONE, online ? "Đã có kết quả khám" : "Đã lưu bệnh án lần khám", body,
           "/visit/" + visitId, visitId, null));
+    });
+  }
+
+  // ---- Duyệt lịch đặt online ----
+
+  /** Lễ tân duyệt / từ chối lịch đặt online: báo cho bệnh nhân. */
+  public void appointmentReviewed(String appointmentId) {
+    later(() -> {
+      record Info(String userId, AppointmentStatus status, Instant start, Doctor doctor, String reason) {}
+      Info a = tx.execute(s -> appointments.findById(appointmentId).map(x -> {
+        Doctor d = x.getSchedule().getDoctor();
+        d.getUser().getFullName();
+        return new Info(x.getPatient().getUserId(), x.getStatus(), x.getSchedule().getStartTime(), d, x.getRejectReason());
+      }).orElse(null));
+      if (a == null || a.userId() == null) return;
+      String when = VnTime.time(a.start()) + " ngày " + VnTime.dmy(VnTime.date(a.start()));
+      if (a.status() == AppointmentStatus.CONFIRMED) {
+        notify(a.userId(), new NewNotification(NotificationType.APPOINTMENT_CONFIRMED, "Lịch khám đã được xác nhận",
+            when + " với " + doctorLabel(a.doctor()) + ". Đến quầy quét mã QR để check-in.", "/appointments", null, appointmentId));
+      } else if (a.status() == AppointmentStatus.REJECTED) {
+        notify(a.userId(), new NewNotification(NotificationType.APPOINTMENT_REJECTED, "Lịch khám không được xác nhận",
+            "Lịch " + when + " với " + doctorLabel(a.doctor()) + " đã bị từ chối" + (a.reason() != null ? ": " + a.reason() : ".")
+                + " Bạn có thể đặt giờ khác hoặc liên hệ phòng khám.", "/appointments", null, appointmentId));
+      }
     });
   }
 

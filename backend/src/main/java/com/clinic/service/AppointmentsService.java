@@ -26,7 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 /** Đặt lịch (chống trùng, khóa người không đến), xem / hủy lịch của bệnh nhân, lịch trong ngày cho lễ tân. */
 @Service
 public class AppointmentsService {
+  /** Lịch còn hiệu lực: chờ lễ tân duyệt hoặc đã duyệt. */
   public static final List<AppointmentStatus> ACTIVE = List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED);
+  /** Lịch đã được lễ tân duyệt: mới được tự check-in bằng QR, được nhắc lịch, bỏ hẹn mới tính là không đến. */
+  public static final List<AppointmentStatus> CONFIRMED = List.of(AppointmentStatus.CONFIRMED);
+  static final int REJECT_REASON_MAX = 300;
   private static final long MINUTE = 60;
 
   private final AppointmentRepository appointments;
@@ -36,10 +40,12 @@ public class AppointmentsService {
   private final RealtimeService realtime;
   private final QueueRules rules;
   private final Refresher refresher;
+  private final NotificationsService notifications;
 
   public AppointmentsService(AppointmentRepository appointments, ScheduleRepository schedules, VisitRepository visits, PatientScope scope,
-      RealtimeService realtime, QueueRules rules, Refresher refresher) {
+      RealtimeService realtime, QueueRules rules, Refresher refresher, NotificationsService notifications) {
     this.refresher = refresher;
+    this.notifications = notifications;
     this.appointments = appointments;
     this.schedules = schedules;
     this.visits = visits;
@@ -73,6 +79,7 @@ public class AppointmentsService {
   /**
    * Đặt lịch chống trùng: UPDATE chỉ đánh dấu isBooked khi khung giờ còn trống.
    * PostgreSQL khóa dòng khi cập nhật, nên hai yêu cầu đồng thời chỉ một bên cập nhật được 1 dòng.
+   * Lịch mới ở trạng thái chờ duyệt (PENDING): lễ tân duyệt mới có hiệu lực, chặn việc dùng công cụ đặt lịch hàng loạt.
    */
   @Transactional
   public Map<String, Object> book(AuthUser user, String scheduleId, String reason) {
@@ -94,10 +101,10 @@ public class AppointmentsService {
     a.setPatientId(patientId);
     a.setScheduleId(slot.getId());
     a.setReason(reason);
-    a.setStatus(AppointmentStatus.CONFIRMED);
+    a.setStatus(AppointmentStatus.PENDING);
     appointments.saveAndFlush(a);
     Metrics.APPOINTMENTS_BOOKED.inc();
-    // Lễ tân thấy ngay lịch hẹn mới trong danh sách hôm nay
+    // Lễ tân thấy ngay lịch mới trong danh sách chờ duyệt
     realtime.staffChanged();
     return AppointmentViews.view(refresher.refresh(a));
   }
@@ -144,6 +151,87 @@ public class AppointmentsService {
       m.put("visit", v == null ? null : Json.obj("id", v.getId(), "queueNumber", v.getQueueNumber(), "source", v.getSource(), "status", v.getStatus()));
       return withWindow(m, a.getSchedule().getStartTime());
     }).toList();
+  }
+
+  // ---- Lễ tân duyệt lịch đặt online ----
+
+  /**
+   * Lịch đặt online đang chờ duyệt (chưa quá giờ khám), kèm thông tin để lễ tân đánh giá: tuổi, ngày tạo tài khoản, số lần đã khám / không đến / bị từ chối trước đây, số lịch đang chờ của cùng người.
+   */
+  @Transactional(readOnly = true)
+  public Map<String, Object> pending() {
+    Instant now = Instant.now();
+    List<Appointment> list = appointments.pendingReview(now);
+    Map<String, Long> waitingByPatient = new java.util.HashMap<>();
+    for (Appointment a : list) waitingByPatient.merge(a.getPatientId(), 1L, Long::sum);
+    List<Map<String, Object>> items = list.stream().map(a -> {
+      Map<String, Object> m = withWindow(AppointmentViews.view(a), a.getSchedule().getStartTime());
+      var p = a.getPatient();
+      Map<String, Long> history = new java.util.HashMap<>();
+      for (Object[] row : appointments.countByStatusOf(a.getPatientId())) history.put(String.valueOf(row[0]), (Long) row[1]);
+      m.put("patientInfo", Json.obj(
+          "dateOfBirth", p.getDateOfBirth(),
+          "gender", p.getGender(),
+          "accountCreatedAt", p.getUser() == null ? null : p.getUser().getCreatedAt(),
+          "completed", history.getOrDefault("COMPLETED", 0L),
+          "noShow", history.getOrDefault("NO_SHOW", 0L),
+          "cancelled", history.getOrDefault("CANCELLED", 0L),
+          "rejected", history.getOrDefault("REJECTED", 0L),
+          "waiting", waitingByPatient.getOrDefault(a.getPatientId(), 0L)));
+      return m;
+    }).toList();
+    return Json.obj("items", items, "total", items.size());
+  }
+
+  /** Số lịch đang chờ duyệt (số trên menu của lễ tân). */
+  @Transactional(readOnly = true)
+  public Map<String, Object> pendingCount() {
+    return Json.obj("count", appointments.countPendingReview(Instant.now()));
+  }
+
+  /** Lễ tân duyệt lịch: lịch có hiệu lực, bệnh nhân nhận thông báo và được tự check-in bằng QR. */
+  @Transactional
+  public Map<String, Object> confirm(AuthUser staff, String id) {
+    Appointment a = reviewable(id);
+    a.setStatus(AppointmentStatus.CONFIRMED);
+    a.setReviewedAt(Instant.now());
+    a.setReviewedById(staff.sub());
+    appointments.saveAndFlush(a);
+    reviewed(a);
+    return AppointmentViews.view(a);
+  }
+
+  /** Lễ tân từ chối lịch (vd. đặt hàng loạt, thông tin không rõ ràng): khung giờ được mở lại cho người khác. */
+  @Transactional
+  public Map<String, Object> reject(AuthUser staff, String id, String reason) {
+    Appointment a = reviewable(id);
+    String r = reason == null ? null : reason.trim();
+    if (r != null && r.length() > REJECT_REASON_MAX) throw ApiException.badRequest("Lý do tối đa " + REJECT_REASON_MAX + " ký tự");
+    schedules.release(a.getScheduleId());
+    a = appointments.findById(id).orElseThrow();
+    a.setStatus(AppointmentStatus.REJECTED);
+    a.setRejectReason(r == null || r.isEmpty() ? null : r);
+    a.setReviewedAt(Instant.now());
+    a.setReviewedById(staff.sub());
+    appointments.saveAndFlush(a);
+    reviewed(a);
+    return AppointmentViews.view(a);
+  }
+
+  private Appointment reviewable(String id) {
+    Appointment a = appointments.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy lịch hẹn"));
+    if (a.getStatus() != AppointmentStatus.PENDING) throw ApiException.conflict("Lịch hẹn này đã được xử lý");
+    if (!a.getSchedule().getStartTime().isAfter(Instant.now().minusSeconds(rules.checkinLateMinutes() * MINUTE))) {
+      throw ApiException.conflict("Lịch hẹn đã quá giờ khám");
+    }
+    return a;
+  }
+
+  private void reviewed(Appointment a) {
+    realtime.staffChanged();
+    String userId = a.getPatient().getUserId();
+    if (userId != null) realtime.toUser(userId, "appointment:changed", Json.obj("appointmentId", a.getId(), "status", a.getStatus()));
+    notifications.appointmentReviewed(a.getId());
   }
 
   /** Khung giờ được check-in của lịch hẹn (để app và lễ tân nhắc giờ). */
