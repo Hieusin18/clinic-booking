@@ -71,10 +71,8 @@ jobs:
         run: npm ci && npm run typecheck && npm test --if-present
 
   docker:
-    # Dựng toàn bộ hệ thống như hôm demo (DOMAIN=:80) và kiểm tra nó thật sự chạy.
-    # Giữ Ubuntu 24.04: trên ubuntu-latest (26.04) cAdvisor v0.49 không đọc được tên container nên biểu đồ
-    # "CPU/RAM từng container" trống
-    runs-on: ubuntu-24.04
+    # Dựng toàn bộ hệ thống như hôm demo (DOMAIN=:80) và kiểm tra nó thật sự chạy
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -96,6 +94,10 @@ jobs:
           curl -fsS http://localhost/ | grep -q '<div id="root">'
           curl -fsS -X POST http://localhost/api/auth/login -H 'Content-Type: application/json' \
             -d '{"phone":"0900000001","password":"123456"}' | grep -q accessToken
+      - name: Luồng chính qua Caddy (cấp số, gọi số realtime, bệnh án PDF)
+        run: |
+          pip install --quiet "python-socketio[client]==5.13.0"
+          python3 ci/smoke.py http://localhost
       - name: Giám sát Prometheus + Grafana
         # Dựng bộ giám sát cạnh hệ thống vừa chạy, kiểm tra mọi target up và mọi biểu đồ có dữ liệu
         run: bash monitoring/check.sh
