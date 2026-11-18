@@ -7,9 +7,10 @@ import { Button, Card, ErrorBox, Field, Muted, Screen, SectionLabel, colors } fr
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { passwordChecks, passwordProblem } from '@/lib/password';
+import { withLogin } from '@/components/LoginRequired';
 
 /** Đổi mật khẩu và đăng xuất khỏi mọi thiết bị (tab Hồ sơ → Đổi mật khẩu). */
-export default function ChangePassword() {
+function ChangePassword() {
   const { user, changePassword, logoutAll } = useAuth();
   const [form, setForm] = useState({ current: '', next: '', confirm: '' });
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function ChangePassword() {
   const confirmLogoutAll = () => {
     const run = () =>
       void logoutAll().then(
-        () => router.replace('/login'),
+        () => router.replace('/(tabs)'),
         (err: unknown) => setError(errorMessage(err)),
       );
     if (Platform.OS === 'web') {
@@ -87,3 +88,5 @@ export default function ChangePassword() {
     </Screen>
   );
 }
+
+export default withLogin(ChangePassword, { reason: 'Đăng nhập để đổi mật khẩu' });

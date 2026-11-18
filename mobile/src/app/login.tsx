@@ -1,12 +1,13 @@
 import { Link, Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/Text';
 import { Button, ErrorBox, Field, colors, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { PHONE_REGEX } from '@/lib/format';
+import { finishSignIn, setReturnTo } from '@/lib/returnTo';
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -24,7 +25,7 @@ export default function Login() {
     setError(null);
     try {
       await login(phone.trim(), password);
-      router.replace('/(tabs)');
+      finishSignIn();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -36,7 +37,20 @@ export default function Login() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 20, gap: 24 }} keyboardShouldPersistTaps="handled">
-          <View style={{ gap: 14, marginTop: 32 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Để sau, xem bác sĩ trước"
+            onPress={() => {
+              setReturnTo(null);
+              if (router.canGoBack()) router.back();
+              else router.replace('/(tabs)');
+            }}
+            hitSlop={8}
+            style={{ alignSelf: 'flex-end', paddingVertical: 6 }}
+          >
+            <Text style={{ color: colors.stamp, fontWeight: '600', fontSize: 15 }}>Để sau</Text>
+          </Pressable>
+          <View style={{ gap: 14, marginTop: 8 }}>
             <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: '#fff', fontSize: 34, fontWeight: '700', lineHeight: 40 }}>+</Text>
             </View>

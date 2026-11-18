@@ -11,12 +11,13 @@ import { errorMessage } from '@/lib/errors';
 import { doctorName } from '@/lib/format';
 import { NEEDS_DOCTOR } from '@/lib/queue';
 import type { Doctor, Page, Visit } from '@/lib/types';
+import { withLogin } from '@/components/LoginRequired';
 
 /**
  * Quét mã QR ở quầy. Đã đặt lịch hôm nay → backend tự check-in.
  * Chưa đặt → chọn bác sĩ rồi gửi lại (mã QR có hạn 60 giây, hết hạn thì quét lại).
  */
-export default function Scan() {
+function Scan() {
   const queryClient = useQueryClient();
   const [permission, requestPermission] = useCameraPermissions();
   const [token, setToken] = useState<string | null>(null);
@@ -135,3 +136,5 @@ export default function Scan() {
     </Screen>
   );
 }
+
+export default withLogin(Scan, { reason: 'Đăng nhập để lấy số bằng mã QR' });

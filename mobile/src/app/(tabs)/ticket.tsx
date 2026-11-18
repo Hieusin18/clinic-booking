@@ -10,6 +10,7 @@ import { VISIT_STATUS, waitHint } from '@/lib/queue';
 import { useMarkVisitRead } from '@/lib/notifications';
 import { useRealtime } from '@/lib/realtime';
 import type { QueuePosition, Visit } from '@/lib/types';
+import { withLogin } from '@/components/LoginRequired';
 
 /** Một cột số nhỏ ở cuống phiếu. */
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -109,7 +110,7 @@ function TicketCard({ visitId }: { visitId: string }) {
   );
 }
 
-export default function Ticket() {
+function Ticket() {
   const { connected } = useRealtime();
   const mine = useQuery({
     queryKey: ['queue', 'mine'],
@@ -141,3 +142,5 @@ export default function Ticket() {
     </Screen>
   );
 }
+
+export default withLogin(Ticket, { title: 'Lấy số', reason: 'Đăng nhập để lấy số thứ tự', hint: 'Đăng nhập rồi quét mã QR ở quầy để lấy số và theo dõi lượt gọi trên điện thoại.' });

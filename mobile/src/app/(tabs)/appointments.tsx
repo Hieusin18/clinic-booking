@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { dayLabel, doctorName, formatDate, formatTime, ymd } from '@/lib/format';
 import type { Appointment, AppointmentStatus } from '@/lib/types';
+import { withLogin } from '@/components/LoginRequired';
 
 const STATUS: Record<AppointmentStatus, { label: string; tone: 'primary' | 'success' | 'warning' | 'danger' | 'neutral' }> = {
   PENDING: { label: 'Chờ xác nhận', tone: 'warning' },
@@ -106,7 +107,7 @@ function PastRow({ a }: { a: Appointment }) {
   );
 }
 
-export default function Appointments() {
+function Appointments() {
   const [when, setWhen] = useState<'upcoming' | 'past'>('upcoming');
   const queryClient = useQueryClient();
   const list = useQuery({
@@ -154,3 +155,5 @@ export default function Appointments() {
     </Screen>
   );
 }
+
+export default withLogin(Appointments, { title: 'Lịch hẹn', reason: 'Đăng nhập để xem lịch hẹn của bạn' });
