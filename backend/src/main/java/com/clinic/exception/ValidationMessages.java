@@ -1,6 +1,5 @@
 package com.clinic.exception;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Path;
@@ -56,7 +55,6 @@ public final class ValidationMessages {
             .collect(Collectors.joining("."));
         return name + " " + missing(f.getTargetType());
       }
-      if (t instanceof JsonMappingException m && t.getCause() == null) break;
     }
     return null;
   }
@@ -125,11 +123,8 @@ public final class ValidationMessages {
 
   /** Vị trí khai báo của trường (cấp ngoài cùng) trong DTO. */
   private static int order(ConstraintViolation<?> v) {
-    String top = null;
-    for (Path.Node n : v.getPropertyPath()) {
-      top = n.getName();
-      break;
-    }
+    java.util.Iterator<Path.Node> nodes = v.getPropertyPath().iterator();
+    String top = nodes.hasNext() ? nodes.next().getName() : null;
     RecordComponent[] components = v.getRootBeanClass().getRecordComponents();
     if (components == null || top == null) return Integer.MAX_VALUE;
     for (int i = 0; i < components.length; i++) if (components[i].getName().equals(top)) return i;
