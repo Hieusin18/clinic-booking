@@ -67,6 +67,14 @@ public class RealtimeGateway {
     SocketConfig socket = new SocketConfig();
     socket.setReuseAddress(true);
     config.setSocketConfig(socket);
+    // Giữ cả trường null trong dữ liệu gửi đi (mặc định netty-socketio bỏ đi), giống JSON của API và bản cũ
+    config.setJsonSupport(new com.corundumstudio.socketio.protocol.JacksonJsonSupport() {
+      @Override
+      protected void init(com.fasterxml.jackson.databind.ObjectMapper om) {
+        super.init(om);
+        om.setDefaultPropertyInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS);
+      }
+    });
     server = new SocketIOServer(config);
     timers = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "realtime-auth");

@@ -35,7 +35,11 @@ public class SocketProxyEndpoint extends Endpoint {
     try {
       upstream = http.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(5)).buildAsync(URI.create(target), new Upstream(session))
           .get(10, TimeUnit.SECONDS);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      closeQuietly(session, CloseReason.CloseCodes.TRY_AGAIN_LATER);
+      return;
+    } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
       closeQuietly(session, CloseReason.CloseCodes.TRY_AGAIN_LATER);
       return;
     }

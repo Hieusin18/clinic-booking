@@ -57,9 +57,11 @@ services:
       - /:/rootfs:ro
     networks: [monitoring]
 
-  # Số liệu từng container: CPU, RAM, mạng
+  # Số liệu từng container: CPU, RAM, mạng.
+  # Từ Docker 29 (kho image containerd) bản cAdvisor cũ ở gcr.io không đọc được container nữa; bản 0.55 ở ghcr.io
+  # chạy được với cả Docker 28 và 29
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    image: ghcr.io/google/cadvisor:0.55.0
     restart: unless-stopped
     privileged: true
     devices:

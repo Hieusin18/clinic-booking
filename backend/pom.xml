@@ -154,6 +154,8 @@
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
           <trimStackTrace>false</trimStackTrace>
+          <!-- Như main(): JVM chạy giờ UTC dù máy đặt giờ Việt Nam (giữ @{argLine} của JaCoCo) -->
+          <argLine>@{argLine} -Duser.timezone=UTC</argLine>
         </configuration>
       </plugin>
       <!-- Độ phủ test cho SonarQube: target/site/jacoco/jacoco.xml -->

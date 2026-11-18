@@ -57,7 +57,22 @@ public class LabResultsService {
   }
 
   /** Tệp tải về. */
-  public record FileData(byte[] data, String mimeType, String fileName) {}
+  public record FileData(byte[] data, String mimeType, String fileName) {
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof FileData x && java.util.Arrays.equals(data, x.data) && java.util.Objects.equals(mimeType, x.mimeType) && java.util.Objects.equals(fileName, x.fileName);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * java.util.Arrays.hashCode(data) + java.util.Objects.hashCode(mimeType) + java.util.Objects.hashCode(fileName);
+    }
+
+    @Override
+    public String toString() {
+      return "FileData[" + (data == null ? 0 : data.length) + " bytes" + ", " + mimeType + ", " + fileName + "]";
+    }
+  }
 
   private LabOrder ownOrder(AuthUser user, String id) {
     LabOrder o = orders.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy chỉ định"));

@@ -92,6 +92,6 @@ echo "Lỗi (bug) và lỗ hổng:"
 $SQ "http://localhost:9000/api/issues/search?componentKeys=clinic-booking&types=BUG,VULNERABILITY&resolved=false&ps=50" \
   | python3 -c 'import json,sys; [print(" ", i["severity"], i["component"].split(":",1)[-1], i.get("line"), i["message"]) for i in json.load(sys.stdin)["issues"]]' || true
 echo "Điểm nóng bảo mật (security hotspot):"
-$SQ "http://localhost:9000/api/hotspots/search?projectKey=clinic-booking&ps=50" \
-  | python3 -c 'import json,sys; [print(" ", h["vulnerabilityProbability"], h["component"].split(":",1)[-1], h.get("line"), h["message"]) for h in json.load(sys.stdin)["hotspots"]]' || true
+$SQ "http://localhost:9000/api/hotspots/search?project=clinic-booking&ps=50" \
+  | python3 -c 'import json,sys; [print(" ", h["vulnerabilityProbability"], h["component"].split(":",1)[-1], h.get("line"), h["message"]) for h in json.load(sys.stdin).get("hotspots", [])]' || true
 echo "::endgroup::"
