@@ -6,6 +6,36 @@ on:
     branches: [tmp/kiem-tra]
 
 jobs:
+  chan-doan:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: clinic, POSTGRES_PASSWORD: clinic, POSTGRES_DB: clinic_test }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U clinic" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: wget tải Maven
+        run: |
+          wget --version | head -2 || true
+          wget -S -O /dev/null https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.9/apache-maven-3.9.9-bin.zip 2>&1 | tail -15 || true
+          curl -sSI https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.9/apache-maven-3.9.9-bin.zip | head -3
+      - name: Test với giờ Việt Nam
+        working-directory: backend
+        env:
+          TZ: Asia/Ho_Chi_Minh
+          DATABASE_URL: postgresql://clinic:clinic@localhost:5432/clinic_test
+        run: |
+          MVNW_VERBOSE=true ./mvnw -B -ntp verify -Dtest='BookingTest,StatsTest,QueueTest,NotificationsTest,CliTest' -Dsurefire.failIfNoSpecifiedTests=false || true
+          for f in target/surefire-reports/*.txt; do grep -q FAIL "$f" && sed -n 1,60p "$f"; done || true
+
   so-sanh-api:
     runs-on: ubuntu-24.04
     services:
