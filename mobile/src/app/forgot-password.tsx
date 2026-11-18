@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { PHONE_REGEX } from '@/lib/format';
 import { passwordChecks, passwordProblem } from '@/lib/password';
+import { finishSignIn } from '@/lib/returnTo';
 
 /**
  * Quên mật khẩu: (1) nhập số điện thoại → (2) nhắn tin xác minh từ chính số đó → (3) đặt mật khẩu mới.
@@ -35,7 +36,7 @@ export default function ForgotPassword() {
     setError(null);
     try {
       await resetPassword(verified!, pw.next);
-      router.replace('/(tabs)');
+      finishSignIn();
     } catch (err) {
       setError(errorMessage(err));
     } finally {

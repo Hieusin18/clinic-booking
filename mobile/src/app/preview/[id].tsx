@@ -4,9 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RecordActions } from '@/components/RecordActions';
 import { RecordFrame } from '@/components/RecordFrame';
 import { colors, Muted } from '@/components/ui';
+import { withLogin } from '@/components/LoginRequired';
 
 /** Xem trước bệnh án + đơn thuốc đúng như bản in, rồi mới tải PDF/Word. */
-export default function PreviewScreen() {
+function PreviewScreen() {
   const { id, date } = useLocalSearchParams<{ id: string; date?: string }>();
   const insets = useSafeAreaInsets();
   return (
@@ -22,3 +23,5 @@ export default function PreviewScreen() {
     </View>
   );
 }
+
+export default withLogin(PreviewScreen, { reason: 'Đăng nhập để xem bản điện tử' });

@@ -12,9 +12,10 @@ import { useInbox } from '@/lib/notifications';
 import { unreadResults } from '@/lib/notify';
 import { dayMonth, doctorName } from '@/lib/format';
 import type { VisitDetail } from '@/lib/types';
+import { withLogin } from '@/components/LoginRequired';
 
 /** Lịch sử các lần khám đã hoàn tất, mới nhất trước. */
-export default function History() {
+function History() {
   const list = useQuery({ queryKey: ['visits', 'mine'], queryFn: async () => (await api.get<VisitDetail[]>('/visits/mine')).data });
   const fresh = unreadResults(useInbox().data?.items ?? []).visits;
 
@@ -72,3 +73,5 @@ export default function History() {
     </Screen>
   );
 }
+
+export default withLogin(History, { title: 'Lịch sử khám', reason: 'Đăng nhập để xem lịch sử khám', hint: 'Bệnh án, đơn thuốc và kết quả cận lâm sàng của bạn nằm ở đây sau khi đăng nhập.' });

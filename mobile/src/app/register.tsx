@@ -9,6 +9,7 @@ import { errorMessage } from '@/lib/errors';
 import { GENDER_LABEL, parseVnDate, PHONE_REGEX } from '@/lib/format';
 import { passwordProblem } from '@/lib/password';
 import type { Gender } from '@/lib/types';
+import { finishSignIn } from '@/lib/returnTo';
 
 export default function Register() {
   const { register } = useAuth();
@@ -48,7 +49,7 @@ export default function Register() {
           gender: gender!,
           ...v,
         });
-        router.replace('/(tabs)');
+        finishSignIn();
       } catch (err) {
         setError(errorMessage(err));
         setVerifying(false);

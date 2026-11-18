@@ -1,22 +1,19 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { fontFor } from '@/components/Text';
 import { colors } from '@/components/ui';
-import { useAuth } from '@/lib/auth';
 import { useInbox } from '@/lib/notifications';
 import { unreadResults } from '@/lib/notify';
 
 const icon = (name: IconName) => ({ color }: { color: ColorValue }) => <Icon name={name} color={String(color)} size={24} />;
 
 export default function TabsLayout() {
-  const { user, loading } = useAuth();
   // Chữ Be Vietnam Pro cao hơn chữ hệ thống (dấu tiếng Việt): nới thanh tab để nhãn không bị cắt
   const insets = useSafeAreaInsets();
   // Số lần khám có kết quả mới chưa xem: hiện trên tab Lịch sử
   const results = unreadResults(useInbox().data?.items ?? []).count;
-  if (!loading && !user) return <Redirect href="/login" />;
 
   return (
     <Tabs
