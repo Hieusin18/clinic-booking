@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Admin quản lý tài khoản lễ tân */
+/** Tài khoản nhân viên không phải bác sĩ (lễ tân, điều dưỡng) do admin tạo và khóa/mở. */
 @Service
 public class StaffService {
   private final UserRepository users;
@@ -28,13 +29,13 @@ public class StaffService {
   }
 
   @Transactional(readOnly = true)
-  public Map<String, Object> list(PageQuery q) {
-    Page<User> page = users.searchByRole(Role.RECEPTIONIST, q.q() == null ? "" : q.q(), q.pageable(Sort.by("fullName")));
+  public Map<String, Object> list(Role role, PageQuery q) {
+    Page<User> page = users.searchByRole(role, q.q() == null ? "" : q.q(), q.pageable(Sort.by("fullName")));
     return q.toPage(page.getContent().stream().map(Rows::publicUser).toList(), page.getTotalElements());
   }
 
   @Transactional
-  public Map<String, Object> create(ReceptionistRequest dto) {
+  public Map<String, Object> create(Role role, ReceptionistRequest dto) {
     String weak = Passwords.problem(dto.password(), dto.phone());
     if (weak != null) throw ApiException.badRequest(weak);
     if (users.findByPhone(dto.phone()).isPresent()) throw ApiException.conflict("Số điện thoại đã được dùng cho tài khoản khác");
@@ -43,16 +44,16 @@ public class StaffService {
     u.setPhone(dto.phone());
     u.setEmail(dto.email());
     u.setPasswordHash(Passwords.hash(dto.password()));
-    u.setRole(Role.RECEPTIONIST);
+    u.setRole(role);
     // Mật khẩu ban đầu do admin đặt: người dùng phải đổi ở lần đăng nhập đầu
     u.setMustChangePassword(true);
     return Rows.publicUser(users.saveAndFlush(u));
   }
 
   @Transactional
-  public Map<String, Object> update(String id, BodyReader.Patch<ReceptionistPatch> patch) {
-    User u = users.findById(id).filter(x -> x.getRole() == Role.RECEPTIONIST)
-        .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản lễ tân"));
+  public Map<String, Object> update(Role role, String id, BodyReader.Patch<ReceptionistPatch> patch) {
+    User u = users.findById(id).filter(x -> x.getRole() == role)
+        .orElseThrow(() -> ApiException.notFound(role == Role.NURSE ? "Không tìm thấy tài khoản điều dưỡng" : "Không tìm thấy tài khoản lễ tân"));
     ReceptionistPatch dto = patch.value();
     if (dto.fullName() != null) u.setFullName(dto.fullName());
     if (dto.isActive() != null) u.setActive(dto.isActive());

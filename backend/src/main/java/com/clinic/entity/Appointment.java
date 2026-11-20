@@ -31,6 +31,13 @@ public class Appointment extends BaseEntity {
   private Instant remindedDayAt;
   private Instant remindedHourAt;
 
+  /** Lễ tân duyệt / từ chối lịch đặt online: lúc nào, ai, lý do từ chối */
+  private Instant reviewedAt;
+  private String reviewedById;
+  private String rejectReason;
+  /** Lịch tái khám bác sĩ đặt cho lượt khám này (null = bệnh nhân tự đặt) */
+  private String followUpOfVisitId;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "patientId", insertable = false, updatable = false)
   private Patient patient;

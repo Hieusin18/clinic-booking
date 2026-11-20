@@ -12,8 +12,9 @@ import type { Appointment, AppointmentStatus } from '@/lib/types';
 import { withLogin } from '@/components/LoginRequired';
 
 const STATUS: Record<AppointmentStatus, { label: string; tone: 'primary' | 'success' | 'warning' | 'danger' | 'neutral' }> = {
-  PENDING: { label: 'Chờ xác nhận', tone: 'warning' },
+  PENDING: { label: 'Chờ duyệt', tone: 'warning' },
   CONFIRMED: { label: 'Đã xác nhận', tone: 'primary' },
+  REJECTED: { label: 'Bị từ chối', tone: 'danger' },
   COMPLETED: { label: 'Đã khám', tone: 'success' },
   CANCELLED: { label: 'Đã hủy', tone: 'neutral' },
   NO_SHOW: { label: 'Không đến', tone: 'warning' },
@@ -73,8 +74,16 @@ function UpcomingStub({ a, cancelling, onCancel }: { a: Appointment; cancelling:
       <View style={{ flex: 1, padding: 14, gap: 4 }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{doctorName(a.schedule.doctor)}</Text>
         {a.schedule.doctor.specialty ? <Muted>{a.schedule.doctor.specialty.name}</Muted> : null}
+        {a.followUpOfVisitId ? (
+          <View style={{ alignSelf: 'flex-start' }}>
+            <Badge label="Tái khám · bác sĩ đặt" tone="success" />
+          </View>
+        ) : null}
         {a.reason ? <Muted>Lý do: {a.reason}</Muted> : null}
-        {a.checkinOpensAt && a.checkinClosesAt ? (
+        {a.status === 'PENDING' ? (
+          <Text style={{ fontSize: 13.5, lineHeight: 19, color: colors.muted }}>Phòng khám sẽ xác nhận lịch này sớm; bạn sẽ nhận được thông báo.</Text>
+        ) : null}
+        {a.status === 'CONFIRMED' && a.checkinOpensAt && a.checkinClosesAt ? (
           <View style={[styles.row, { gap: 6, marginTop: 4 }]}>
             <Icon name="clock" color={colors.stamp} size={16} strokeWidth={2} />
             <Text style={{ fontSize: 14, fontWeight: '600', color: colors.stamp }}>
@@ -101,6 +110,7 @@ function PastRow({ a }: { a: Appointment }) {
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{doctorName(a.schedule.doctor)}</Text>
         <Muted>{formatDate(a.schedule.startTime)}</Muted>
+        {a.status === 'REJECTED' && a.rejectReason ? <Muted>Lý do: {a.rejectReason}</Muted> : null}
       </View>
       <Badge label={STATUS[a.status].label} tone={STATUS[a.status].tone} />
     </Card>

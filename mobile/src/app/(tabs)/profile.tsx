@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DateField } from '@/components/DateField';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
 import { Icon } from '@/components/Icon';
@@ -16,7 +17,7 @@ import type { Gender, Patient } from '@/lib/types';
 import { withLogin } from '@/components/LoginRequired';
 
 const LOCAL_ERRORS: Record<string, string> = {
-  dob: 'Ngày sinh không hợp lệ (ngày/tháng/năm)',
+  dob: 'Chọn ngày sinh',
   insurance: 'Hạn thẻ BHYT không hợp lệ (ngày/tháng/năm)',
   relativePhone: 'SĐT người nhà gồm 10 chữ số, bắt đầu bằng 0',
 };
@@ -211,7 +212,7 @@ function Profile() {
       ) : (
         <Card>
           <Field label="Họ và tên" value={form.fullName} onChangeText={set('fullName')} />
-          <Field label="Ngày sinh" value={form.dob} onChangeText={set('dob')} placeholder="ngày/tháng/năm" />
+          <DateField label="Ngày sinh" value={form.dob} onChange={set('dob')} placeholder="Chọn ngày sinh" />
           <View style={{ gap: 6 }}>
             <Text style={styles.label}>Giới tính</Text>
             <View style={styles.wrap}>

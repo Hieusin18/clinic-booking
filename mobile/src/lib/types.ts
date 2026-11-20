@@ -5,7 +5,7 @@ export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'AWAITING_RESULTS' | 'DONE' | 'LEFT';
 /** Cách nhận kết quả cận lâm sàng: quay lại phòng khám hoặc nhận online */
 export type ResultMode = 'RETURN' | 'ONLINE';
-export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 
 export interface Page<T> {
   items: T[];
@@ -52,6 +52,8 @@ export interface Doctor {
   avatarVersion: number | null;
   specialty: { id: string; name: string };
   user: { fullName: string };
+  /** Điểm đánh giá của bệnh nhân; average null = chưa có đánh giá */
+  rating?: { average: number | null; count: number };
   /** Có ở danh sách bác sĩ: số chỗ trống hôm nay, công việc hiện tại */
   freeToday?: number;
   currentPosition?: string | null;
@@ -167,6 +169,9 @@ export interface BookingStanding {
   windowDays: number;
   /** Ngày cuối bị khóa (YYYY-MM-DD) */
   lockedUntil: string | null;
+  /** Số lịch đang chờ phòng khám xác nhận và giới hạn (0 = không giới hạn) */
+  pending?: number;
+  pendingLimit?: number;
 }
 
 export interface Appointment {
@@ -180,6 +185,11 @@ export interface Appointment {
   /** Có ở /appointments/mine: khung giờ được check-in */
   checkinOpensAt?: string;
   checkinClosesAt?: string;
+  /** Lịch tái khám bác sĩ đặt cho một lượt khám */
+  followUpOfVisitId?: string | null;
+  /** Lễ tân duyệt lịch đặt online: thời điểm duyệt/từ chối và lý do từ chối */
+  reviewedAt?: string | null;
+  rejectReason?: string | null;
 }
 
 /** Bệnh án ngoại trú theo bố cục mẫu Bộ Y tế */
@@ -257,4 +267,39 @@ export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   prescriptions?: Prescription[];
   prescription: Prescription | null;
   labOrders?: LabOrder[];
+  /** Lịch tái khám bác sĩ đã đặt sẵn (null = chưa đặt, tự đặt trong app) */
+  followUpAppointment?: Appointment | null;
+}
+
+/** Đánh giá của bệnh nhân cho một lượt khám */
+export interface MyReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  /** Admin đã ẩn (góp ý không phù hợp) */
+  hidden: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** GET /visits/:id/review */
+export interface VisitReviewState {
+  review: MyReview | null;
+  canReview: boolean;
+  reviewableUntil: string | null;
+}
+
+export interface RatingSummary {
+  average: number | null;
+  count: number;
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+}
+
+/** GET /doctors/:id/reviews */
+export interface DoctorReviews {
+  items: { id: string; rating: number; comment: string; createdAt: string; patientName: string }[];
+  total: number;
+  page: number;
+  pageSize: number;
+  summary: RatingSummary;
 }

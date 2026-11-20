@@ -41,10 +41,12 @@ public class AppointmentReminder {
   private final QueueRules rules;
   private final AppEnv env;
   private final TransactionTemplate tx;
+  private final FollowUpService followUps;
   private ScheduledExecutorService timer;
 
   public AppointmentReminder(AppointmentRepository appointments, NotificationsService notifications, QueueRules rules, AppEnv env,
-      PlatformTransactionManager txm) {
+      PlatformTransactionManager txm, FollowUpService followUps) {
+    this.followUps = followUps;
     this.appointments = appointments;
     this.notifications = notifications;
     this.rules = rules;
@@ -66,6 +68,8 @@ public class AppointmentReminder {
       try {
         int n = sweep(Instant.now());
         if (n > 0) log.info("Đã gửi {} nhắc lịch", n);
+        int f = followUps.sweep(Instant.now());
+        if (f > 0) log.info("Đã nhắc {} bệnh nhân đặt lịch tái khám", f);
       } catch (RuntimeException e) {
         log.error("Nhắc lịch lỗi: {}", e.toString());
       }
@@ -96,8 +100,8 @@ public class AppointmentReminder {
       long lead = day ? 24 * HOUR : HOUR;
       List<Due> due = tx.execute(s -> {
         List<Appointment> list = day
-            ? appointments.dueForDayReminder(AppointmentsService.ACTIVE, now.plusSeconds(lead), now.plusSeconds(DAY_REMINDER_CUTOFF))
-            : appointments.dueForHourReminder(AppointmentsService.ACTIVE, now.plusSeconds(lead), now);
+            ? appointments.dueForDayReminder(AppointmentsService.CONFIRMED, now.plusSeconds(lead), now.plusSeconds(DAY_REMINDER_CUTOFF))
+            : appointments.dueForHourReminder(AppointmentsService.CONFIRMED, now.plusSeconds(lead), now);
         return list.stream().map(a -> new Due(a.getId(), a.getPatient().getUserId(), a.getSchedule().getStartTime(), a.getCreatedAt(),
             a.getSchedule().getDoctor(), a.getSchedule().getDoctor().getUser().getFullName())).toList();
       });

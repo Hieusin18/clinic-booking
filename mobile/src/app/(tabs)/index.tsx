@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { BannerStrip } from '@/components/BannerStrip';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { Icon } from '@/components/Icon';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -9,6 +10,7 @@ import { Text } from '@/components/Text';
 import { Chip, Empty, ErrorBox, Loading, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { experienceText } from '@/lib/doctor';
+import { ratingText } from '@/lib/review';
 import { errorMessage } from '@/lib/errors';
 import { doctorName } from '@/lib/format';
 import type { Doctor, Page, Specialty } from '@/lib/types';
@@ -21,6 +23,7 @@ function freeText(n: number | undefined) {
 
 /** Tab Đặt lịch: tìm, lọc chuyên khoa → xem hồ sơ bác sĩ → đặt lịch. */
 export default function BookHome() {
+  const queryClient = useQueryClient();
   const [specialtyId, setSpecialtyId] = useState<string | null>(null);
   const [term, setTerm] = useState('');
   const q = term.trim();
@@ -40,8 +43,9 @@ export default function BookHome() {
       action={<NotificationBell />}
       subtitle="Chọn chuyên khoa, xem hồ sơ rồi chọn giờ"
       refreshing={doctors.isRefetching}
-      onRefresh={() => void Promise.all([specialties.refetch(), doctors.refetch()])}
+      onRefresh={() => void Promise.all([specialties.refetch(), doctors.refetch(), queryClient.invalidateQueries({ queryKey: ['banners'] })])}
     >
+      <BannerStrip />
       <View style={styles.inputBox}>
         <Icon name="search" color={colors.muted} size={20} />
         <TextInput
@@ -77,6 +81,11 @@ export default function BookHome() {
                   <View style={{ flex: 1, gap: 3 }}>
                     <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{doctorName(d)}</Text>
                     <Text style={{ fontSize: 14, color: colors.muted }}>{[d.specialty.name, exp].filter(Boolean).join(' · ')}</Text>
+                    {d.rating?.count ? (
+                      <Text style={{ fontSize: 13.5, color: colors.muted }}>
+                        <Text style={{ color: '#D99A0B' }}>★</Text> {ratingText(d.rating).replace(' ★', '')}
+                      </Text>
+                    ) : null}
                     {d.expertise.length ? (
                       <Text style={{ fontSize: 14, lineHeight: 20, color: colors.text }} numberOfLines={2}>
                         {d.expertise.join(', ')}

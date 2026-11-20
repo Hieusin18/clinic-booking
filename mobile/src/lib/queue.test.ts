@@ -60,6 +60,11 @@ describe('cảnh báo khi đặt lịch', () => {
   it('còn 1 lần nữa là bị khóa thì nhắc trước', () => {
     expect(standingNotice({ ...base, recentNoShows: 2 })).toMatchObject({ blocked: false, text: expect.stringMatching(/thêm 1 lần nữa/) });
   });
+  it('đủ số lịch chờ duyệt thì không cho đặt thêm', () => {
+    expect(standingNotice({ ...base, recentNoShows: 0, pending: 3, pendingLimit: 3 })).toMatchObject({ blocked: true, text: expect.stringMatching(/3 lịch chờ.*tối đa 3/) });
+    expect(standingNotice({ ...base, recentNoShows: 0, pending: 2, pendingLimit: 3 })).toBeNull();
+    expect(standingNotice({ ...base, recentNoShows: 0, pending: 9, pendingLimit: 0 })).toBeNull();
+  });
   it('đang bị khóa thì không cho đặt và báo ngày mở lại', () => {
     expect(standingNotice({ ...base, recentNoShows: 3, lockedUntil: '2026-11-21' })).toMatchObject({
       blocked: true,

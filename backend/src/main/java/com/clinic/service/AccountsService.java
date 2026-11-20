@@ -45,8 +45,8 @@ public class AccountsService {
   public Map<String, Object> resetPassword(AuthUser admin, String userId) {
     User target = users.findById(userId).orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản"));
     if (userId.equals(admin.sub())) throw ApiException.badRequest("Hãy dùng chức năng Đổi mật khẩu cho tài khoản của bạn");
-    if (target.getRole() != Role.DOCTOR && target.getRole() != Role.RECEPTIONIST) {
-      throw ApiException.badRequest("Chỉ đặt lại được mật khẩu của bác sĩ và lễ tân");
+    if (target.getRole() != Role.DOCTOR && target.getRole() != Role.RECEPTIONIST && target.getRole() != Role.NURSE) {
+      throw ApiException.badRequest("Chỉ đặt lại được mật khẩu của bác sĩ, lễ tân và điều dưỡng");
     }
     Map<String, Object> result = issueTemporaryPassword(userId);
     sessions.revoke(userId);

@@ -183,6 +183,10 @@ public class QueueService {
         + " nên lịch hẹn đã hết hiệu lực. Vui lòng lấy số thường.";
   }
 
+  public String pendingMessage(Instant start) {
+    return "Lịch hẹn lúc " + VnTime.time(start) + " chưa được phòng khám xác nhận. Vui lòng đến quầy lễ tân để được check-in.";
+  }
+
   /** Lịch hẹn cần để check-in (đọc trong transaction). */
   private record ApptInfo(String id, String patientId, AppointmentStatus status, LocalDate date, Instant start, String doctorId, String reason,
       String visitLabel) {}
@@ -206,6 +210,9 @@ public class QueueService {
     // Giờ hẹn và khung check-in gửi kèm lỗi để màn hình lễ tân tự diễn đạt
     Map<String, Object> times = Json.obj("appointmentAt", start, "opensAt", opens, "closesAt", closes);
     if (appt.status() == AppointmentStatus.NO_SHOW && !override) throw ApiException.conflictWithCode("CHECKIN_TOO_LATE", lateMessage(start), times);
+    // Lịch chưa được duyệt: bệnh nhân không tự check-in được; lễ tân check-in tại quầy là duyệt luôn
+    boolean pending = appt.status() == AppointmentStatus.PENDING;
+    if (pending && method == CheckinMethod.QR) throw ApiException.conflictWithCode("APPOINTMENT_PENDING", pendingMessage(start), times);
     if (!List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED, AppointmentStatus.NO_SHOW).contains(appt.status())) {
       throw ApiException.conflict("Lịch hẹn đã bị hủy hoặc đã xử lý");
     }
@@ -216,14 +223,16 @@ public class QueueService {
         throw ApiException.conflictWithCode("CHECKIN_TOO_EARLY", "Lịch hẹn lúc " + VnTime.time(start) + " mở check-in từ " + VnTime.time(opens)
             + ". Nếu cần khám sớm, vui lòng liên hệ quầy lễ tân.", times);
       }
-      tx.executeWithoutResult(s -> appointments.moveStatus(appt.id(), ACTIVE, AppointmentStatus.NO_SHOW));
+      // Lịch chưa duyệt mà quá giờ không tính là bệnh nhân không đến
+      tx.executeWithoutResult(s -> appointments.moveStatus(appt.id(), AppointmentsService.CONFIRMED, AppointmentStatus.NO_SHOW));
       throw ApiException.conflictWithCode("CHECKIN_TOO_LATE", lateMessage(start), times);
     }
 
     Map<String, Object> visit = issueTicket(new TicketInput(appt.patientId(), appt.doctorId(), VisitSource.ONLINE, method, appt.reason(), appt.id(),
         start, outside || appt.status() == AppointmentStatus.NO_SHOW));
-    if (appt.status() == AppointmentStatus.NO_SHOW) {
-      tx.executeWithoutResult(s -> appointments.moveStatus(appt.id(), List.of(AppointmentStatus.NO_SHOW), AppointmentStatus.CONFIRMED));
+    if (appt.status() == AppointmentStatus.NO_SHOW || pending) {
+      tx.executeWithoutResult(s -> appointments.moveStatus(appt.id(), List.of(AppointmentStatus.NO_SHOW, AppointmentStatus.PENDING),
+          AppointmentStatus.CONFIRMED));
     }
     return visit;
   }

@@ -42,9 +42,10 @@ public class DoctorsService {
   private final SpecialtyRepository specialties;
   private final UserRepository users;
   private final SessionsService sessions;
+  private final ReviewsService reviews;
 
   public DoctorsService(DoctorRepository doctors, DoctorHistoryRepository histories, DoctorAvatarRepository avatars, ScheduleRepository schedules,
-      SpecialtyRepository specialties, UserRepository users, SessionsService sessions) {
+      SpecialtyRepository specialties, UserRepository users, SessionsService sessions, ReviewsService reviews) {
     this.doctors = doctors;
     this.histories = histories;
     this.avatars = avatars;
@@ -52,6 +53,7 @@ public class DoctorsService {
     this.specialties = specialties;
     this.users = users;
     this.sessions = sessions;
+    this.reviews = reviews;
   }
 
   /** Ảnh đại diện để trả về: dữ liệu và kiểu. */
@@ -92,7 +94,14 @@ public class DoctorsService {
         "expertise", DoctorProfile.splitExpertise(d.getExpertise()),
         "experienceYears", DoctorProfile.experienceYears(d.getPracticeSince(), now),
         // Thời điểm cập nhật ảnh (ms); null = chưa có ảnh. Ảnh ở GET /doctors/:id/avatar?v=<số này>
-        "avatarVersion", avatarAt == null ? null : avatarAt.toEpochMilli());
+        "avatarVersion", avatarAt == null ? null : avatarAt.toEpochMilli(),
+        // Đánh giá của bệnh nhân: {average, count}; average null khi chưa có
+        "rating", ratingOf(d.getId()));
+  }
+
+  private Map<String, Object> ratingOf(String doctorId) {
+    Map<String, Object> s = reviews.summary(doctorId);
+    return Json.obj("average", s.get("average"), "count", s.get("count"));
   }
 
   private Map<String, Object> withHistory(Doctor d, boolean forAdmin) {

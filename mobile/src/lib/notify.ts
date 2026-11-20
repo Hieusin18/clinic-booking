@@ -5,7 +5,7 @@
 import { formatTime } from './format';
 import type { Appointment } from './types';
 
-export type NotificationType = 'CALLED' | 'RESULTS_READY' | 'VISIT_DONE' | 'APPOINTMENT_REMINDER';
+export type NotificationType = 'CALLED' | 'RESULTS_READY' | 'VISIT_DONE' | 'APPOINTMENT_REMINDER' | 'APPOINTMENT_CONFIRMED' | 'APPOINTMENT_REJECTED' | 'FOLLOW_UP';
 
 export interface AppNotification {
   id: string;
@@ -64,7 +64,8 @@ const HOUR = 60 * MINUTE;
 export function reminderPlan(appointments: Appointment[], now = new Date()): LocalReminder[] {
   const plan: LocalReminder[] = [];
   for (const a of appointments) {
-    if (a.status !== 'PENDING' && a.status !== 'CONFIRMED') continue;
+    // Chỉ nhắc lịch phòng khám đã xác nhận (lịch chờ duyệt có thể bị từ chối)
+    if (a.status !== 'CONFIRMED') continue;
     if (a.visit) continue;
     const start = new Date(a.schedule.startTime).getTime();
     const created = new Date(a.createdAt).getTime();

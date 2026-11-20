@@ -89,7 +89,10 @@ public class QueueJanitor {
   }
 
   private Map<String, Object> doSweep(Instant now) {
-    long noShow = appointments.markNoShows(QueueService.ACTIVE, now.minusSeconds(rules.checkinLateMinutes() * 60L));
+    Instant late = now.minusSeconds(rules.checkinLateMinutes() * 60L);
+    // Bỏ hẹn chỉ tính với lịch đã duyệt; lịch chưa ai duyệt mà quá giờ thì tự từ chối, không tính lỗi cho bệnh nhân
+    long noShow = appointments.markNoShows(AppointmentsService.CONFIRMED, late);
+    long expired = appointments.expirePending(late, now, "Phòng khám chưa xác nhận lịch trước giờ khám");
 
     LocalDate today = VnTime.today(now);
     boolean afterHours = VnTime.hour(now) >= rules.dayEndHour();
@@ -100,7 +103,7 @@ public class QueueJanitor {
       visits.moveStatusAll(ids, List.of(VisitStatus.WAITING), VisitStatus.LEFT);
       if (!appointmentIds.isEmpty()) appointments.moveStatusAll(appointmentIds, QueueService.ACTIVE, AppointmentStatus.NO_SHOW);
     }
-    if (noShow > 0 || !stale.isEmpty()) realtime.staffChanged();
+    if (noShow > 0 || expired > 0 || !stale.isEmpty()) realtime.staffChanged();
     return Json.obj("noShow", noShow, "left", (long) stale.size());
   }
 }

@@ -91,7 +91,7 @@ export function LoginPage() {
             Login
           </Typography.Title>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 28 }}>
-            Dành cho bác sĩ, lễ tân và quản trị viên
+            Dành cho bác sĩ, điều dưỡng, lễ tân và quản trị viên
           </Typography.Paragraph>
           {error && <Alert type="error" title={error} showIcon style={{ marginBottom: 16 }} />}
           {!error && notice && <Alert type="warning" title={notice} showIcon style={{ marginBottom: 16 }} />}

@@ -2,7 +2,8 @@ import { Navigate, type RouteObject } from 'react-router';
 import { DoctorsPage } from './features/admin/DoctorsPage';
 import { MyProfilePage } from './features/doctor-profile/MyProfilePage';
 import { MedicinesPage } from './features/admin/MedicinesPage';
-import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
+import { NursesPage, ReceptionistsPage } from './features/admin/ReceptionistsPage';
+import { NursePage } from './features/nurse/NursePage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
 import { StatsPage } from './features/admin/stats/StatsPage';
 import { SmsPage } from './features/admin/SmsPage';
@@ -11,6 +12,12 @@ import { LoginPage } from './features/auth/LoginPage';
 import { ExamPage } from './features/exam/ExamPage';
 import { RecordsPage } from './features/exam/RecordsPage';
 import { CounterPage } from './features/reception/CounterPage';
+import { PendingAppointmentsPage } from './features/reception/PendingAppointmentsPage';
+import { ReviewsPage } from './features/admin/ReviewsPage';
+import { BannersPage } from './features/admin/BannersPage';
+import { AdminRecordsPage } from './features/admin/records/AdminRecordsPage';
+import { MyShiftsPage } from './features/work-schedule/MyShiftsPage';
+import { WorkSchedulePage } from './features/work-schedule/WorkSchedulePage';
 import { QueueBoardPage } from './features/reception/QueueBoardPage';
 import { ReceptionPage } from './features/reception/ReceptionPage';
 import { SchedulePage } from './features/schedule/SchedulePage';
@@ -28,7 +35,7 @@ function Home() {
  * Bảng định tuyến, mỗi nhóm trang thuộc một chức năng:
  * - Tài khoản và quản trị: /login, /admin/*
  * - Lịch khám: /doctor/schedule
- * - Tiếp đón và hàng đợi: /reception, /reception/queue, /counter
+ * - Tiếp đón và hàng đợi: /reception, /reception/pending (duyệt lịch đặt online), /reception/queue, /counter
  * - Khám bệnh: /doctor/queue
  * - Bệnh án đã khám: /doctor/records
  * - Hồ sơ của tôi: /doctor/profile
@@ -55,12 +62,17 @@ export const routes: RouteObject[] = [
       },
       {
         path: CHANGE_PASSWORD_PATH,
-        element: <RequireRole roles={['ADMIN', 'DOCTOR', 'RECEPTIONIST']}><ChangePasswordPage /></RequireRole>,
+        element: <RequireRole roles={['ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE']}><ChangePasswordPage /></RequireRole>,
       },
       { path: '/admin/sms', element: <RequireRole roles={['ADMIN']}><SmsPage /></RequireRole> },
       { path: '/admin/stats', element: <RequireRole roles={['ADMIN']}><StatsPage /></RequireRole> },
       { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><SpecialtiesPage /></RequireRole> },
+      { path: '/admin/banners', element: <RequireRole roles={['ADMIN']}><BannersPage /></RequireRole> },
+      { path: '/admin/reviews', element: <RequireRole roles={['ADMIN']}><ReviewsPage /></RequireRole> },
+      { path: '/admin/records', element: <RequireRole roles={['ADMIN']}><AdminRecordsPage /></RequireRole> },
+      { path: '/admin/work-schedule', element: <RequireRole roles={['ADMIN']}><WorkSchedulePage /></RequireRole> },
       { path: '/admin/doctors', element: <RequireRole roles={['ADMIN']}><DoctorsPage /></RequireRole> },
+      { path: '/admin/nurses', element: <RequireRole roles={['ADMIN']}><NursesPage /></RequireRole> },
       { path: '/admin/receptionists', element: <RequireRole roles={['ADMIN']}><ReceptionistsPage /></RequireRole> },
       { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><MedicinesPage /></RequireRole> },
       { path: '/doctor/queue', element: <RequireRole roles={['DOCTOR']}><ExamPage /></RequireRole> },
@@ -69,6 +81,9 @@ export const routes: RouteObject[] = [
       { path: '/doctor/profile', element: <RequireRole roles={['DOCTOR']}><MyProfilePage /></RequireRole> },
       { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ReceptionPage /></RequireRole> },
       { path: '/reception/queue', element: <RequireRole roles={['RECEPTIONIST']}><QueueBoardPage /></RequireRole> },
+      { path: '/reception/shifts', element: <RequireRole roles={['RECEPTIONIST', 'NURSE']}><MyShiftsPage /></RequireRole> },
+      { path: '/nurse', element: <RequireRole roles={['NURSE']}><NursePage /></RequireRole> },
+      { path: '/reception/pending', element: <RequireRole roles={['RECEPTIONIST']}><PendingAppointmentsPage /></RequireRole> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

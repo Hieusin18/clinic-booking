@@ -260,6 +260,11 @@ export function ReceptionPage() {
                             Quá giờ, chưa đến
                           </Tag>
                         ) : null}
+                        {a.status === 'PENDING' && !a.visit ? (
+                          <Tag color="processing" style={{ marginLeft: 8 }}>
+                            Chờ duyệt · check-in là duyệt
+                          </Tag>
+                        ) : null}
                       </>
                     }
                   />

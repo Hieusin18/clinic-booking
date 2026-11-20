@@ -67,6 +67,35 @@ public class AppointmentsController {
     return service.cancel(user, id);
   }
 
+  /** Lịch đặt online đang chờ lễ tân duyệt */
+  @Roles({Role.RECEPTIONIST, Role.ADMIN})
+  @GetMapping("/pending")
+  public Map<String, Object> pending() {
+    return service.pending();
+  }
+
+  /** Số lịch đang chờ duyệt (hiện trên menu) */
+  @Roles({Role.RECEPTIONIST, Role.ADMIN})
+  @GetMapping("/pending/count")
+  public Map<String, Object> pendingCount() {
+    return service.pendingCount();
+  }
+
+  @Roles({Role.RECEPTIONIST, Role.ADMIN})
+  @PostMapping("/{id}/confirm")
+  public Map<String, Object> confirm(@CurrentUser AuthUser user, @PathVariable String id) {
+    return service.confirm(user, id);
+  }
+
+  /** @param reason lý do từ chối, bệnh nhân thấy trong thông báo */
+  public record RejectRequest(@Size(max = 300) String reason) {}
+
+  @Roles({Role.RECEPTIONIST, Role.ADMIN})
+  @PostMapping("/{id}/reject")
+  public Map<String, Object> reject(@CurrentUser AuthUser user, @PathVariable String id, @Valid @RequestBody(required = false) RejectRequest dto) {
+    return service.reject(user, id, dto == null ? null : dto.reason());
+  }
+
   /** date: YYYY-MM-DD; bỏ trống = hôm nay */
   @Roles({Role.RECEPTIONIST, Role.ADMIN})
   @GetMapping

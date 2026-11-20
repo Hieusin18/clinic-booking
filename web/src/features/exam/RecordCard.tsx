@@ -1,11 +1,13 @@
 import { EyeOutlined, FilePdfOutlined, FileWordOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, App, AutoComplete, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Row, Space, Spin, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Card, Col, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Row, Space, Spin, Tag, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import { api, errorMessage } from '../../lib/api';
 import { useAction } from '../../lib/hooks';
-import type { MedicalRecord } from '../../lib/types';
+import { formatTime } from '../../lib/format';
+import type { MedicalRecord, Vitals } from '../../lib/types';
+import { prefill, summary, warnings } from '../nurse/vitals';
 
 /** Giá trị form: ngày tái khám dùng Dayjs, còn lại giống bệnh án. */
 export type RecordForm = Omit<MedicalRecord, 'id' | 'followUpDate'> & { followUpDate?: Dayjs | null };
@@ -19,6 +21,35 @@ export function toRecordPayload(f: RecordForm) {
     else out[k] = v === undefined || v === '' ? null : v;
   }
   return out;
+}
+
+function VitalWarnings({ v }: { v: Vitals }) {
+  const list = warnings(v);
+  if (!list.length) return null;
+  return (
+    <Flex gap={4} wrap>
+      {list.map((w) => (
+        <Tag key={w.text} color={w.severe ? 'error' : 'warning'} style={{ margin: 0 }}>
+          {w.text}
+        </Tag>
+      ))}
+    </Flex>
+  );
+}
+
+/** Chọn nhanh ngày tái khám */
+export const FOLLOW_UP_PRESETS = [
+  { label: '3 ngày', days: 3 },
+  { label: '7 ngày', days: 7 },
+  { label: '14 ngày', days: 14 },
+  { label: '1 tháng', months: 1 },
+  { label: '3 tháng', months: 3 },
+] as const;
+
+/** Ngày tái khám = ngày khám + N ngày / N tháng */
+export function followUpAfter(visitDate: string, p: { days?: number; months?: number }) {
+  const base = dayjs(visitDate.slice(0, 10));
+  return 'months' in p && p.months ? base.add(p.months, 'month') : base.add(p.days ?? 0, 'day');
 }
 
 /** BMI = cân nặng (kg) / chiều cao (m)², làm tròn 1 chữ số. */
@@ -83,7 +114,7 @@ function PreviewModal({ visitId, open, onClose }: { visitId: string; open: boole
   );
 }
 
-function DownloadButtons({ visitId, size, primary }: { visitId: string; size?: 'small' | 'middle'; primary?: boolean }) {
+export function DownloadButtons({ visitId, size, primary }: { visitId: string; size?: 'small' | 'middle'; primary?: boolean }) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState<'pdf' | 'docx' | null>(null);
   const get = async (format: 'pdf' | 'docx') => {
@@ -157,16 +188,34 @@ const num = (min: number, max: number, unit: string, step = 1) => (
 );
 
 /** Bệnh án ngoại trú: hỏi bệnh, khám (sinh hiệu), chẩn đoán ICD-10, điều trị; tải bản PDF/Word. */
-export function RecordCard({ visitId, visitDate, reason, record }: { visitId: string; visitDate: string; reason: string | null; record: MedicalRecord | null }) {
+export function RecordCard({
+  visitId,
+  visitDate,
+  reason,
+  record,
+  vitals,
+}: {
+  visitId: string;
+  visitDate: string;
+  reason: string | null;
+  record: MedicalRecord | null;
+  /** Sinh hiệu điều dưỡng đã đo: điền sẵn vào các ô bác sĩ chưa ghi */
+  vitals?: Vitals | null;
+}) {
   const [form] = Form.useForm<RecordForm>();
+  const [filled, setFilled] = useState<string[]>([]);
   useEffect(() => {
     if (record) {
       const { id: _id, followUpDate, ...rest } = record;
-      form.setFieldsValue({ ...rest, followUpDate: followUpDate ? dayjs(followUpDate.slice(0, 10)) : null });
+      const p = prefill(rest, vitals);
+      setFilled(p.filled);
+      form.setFieldsValue({ ...p.values, followUpDate: followUpDate ? dayjs(followUpDate.slice(0, 10)) : null });
     } else {
-      form.setFieldsValue({ reason: reason ?? '' });
+      const p = prefill({} as Partial<RecordForm>, vitals);
+      setFilled(p.filled);
+      form.setFieldsValue({ reason: reason ?? '', ...p.values });
     }
-  }, [record, reason, form]);
+  }, [record, reason, vitals, form]);
 
   const save = useAction((f: RecordForm) => api.put(`/visits/${visitId}/record`, toRecordPayload(f)), { success: 'Đã lưu bệnh án', invalidate: ['visit'] });
   const weight = Form.useWatch('weight', form);
@@ -176,6 +225,23 @@ export function RecordCard({ visitId, visitDate, reason, record }: { visitId: st
   return (
     <Card title="Bệnh án ngoại trú" extra={record && <ExportButtons visitId={visitId} size="small" />}>
       <Form<RecordForm> form={form} layout="vertical" requiredMark={false} onFinish={(f) => save.mutate(f)}>
+        {vitals && filled.length > 0 && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title={`Sinh hiệu ${vitals.measuredBy ? `do ${vitals.measuredBy.fullName} ` : ''}đo lúc ${formatTime(vitals.measuredAt)} đã được điền sẵn`}
+            description={
+              <Flex vertical gap={4}>
+                <span>
+                  {summary(vitals)}. Kiểm tra lại rồi bấm Lưu bệnh án.
+                </span>
+                {vitals.note && <span>Ghi chú của điều dưỡng: {vitals.note}</span>}
+                <VitalWarnings v={vitals} />
+              </Flex>
+            }
+          />
+        )}
         <Section>Hỏi bệnh</Section>
         <Form.Item label="Lý do đến khám" name="reason">
           <Input />
@@ -288,13 +354,23 @@ export function RecordCard({ visitId, visitDate, reason, record }: { visitId: st
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
-            <Form.Item label="Hẹn tái khám" name="followUpDate">
-              <DatePicker
-                placeholder="Chọn ngày"
-                format="DD/MM/YYYY"
-                style={{ width: '100%' }}
-                disabledDate={(d) => !d.isAfter(dayjs(visitDate.slice(0, 10)), 'day')}
-              />
+            <Form.Item label="Hẹn tái khám" style={{ marginBottom: 8 }}>
+              <Form.Item name="followUpDate" noStyle>
+                <DatePicker
+                  placeholder="Chọn ngày"
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  disabledDate={(d) => !d.isAfter(dayjs(visitDate.slice(0, 10)), 'day')}
+                />
+              </Form.Item>
+              {/* Chọn nhanh "tái khám sau N ngày" tính từ ngày khám */}
+              <Flex gap={4} wrap style={{ marginTop: 6 }}>
+                {FOLLOW_UP_PRESETS.map((p) => (
+                  <Button key={p.label} size="small" onClick={() => form.setFieldValue('followUpDate', followUpAfter(visitDate, p))}>
+                    {p.label}
+                  </Button>
+                ))}
+              </Flex>
             </Form.Item>
           </Col>
         </Row>

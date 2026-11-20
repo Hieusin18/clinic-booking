@@ -1,6 +1,7 @@
 package com.clinic.repository;
 
 import com.clinic.entity.Doctor;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,4 +22,7 @@ public interface DoctorRepository extends JpaRepository<Doctor, String> {
       countQuery = "select count(d) from Doctor d join d.user u where (:sid = '' or d.specialtyId = :sid) and (:all = true or u.active = true) "
           + "and (:term = '' or lower(u.fullName) like lower(concat('%', :term, '%')))")
   Page<Doctor> search(@Param("sid") String specialtyId, @Param("term") String term, @Param("all") boolean includeInactive, Pageable page);
+
+  @Query("select d from Doctor d join fetch d.user u join fetch d.specialty where u.active = true order by u.fullName asc")
+  List<Doctor> allActive();
 }

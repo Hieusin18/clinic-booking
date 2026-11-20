@@ -3,13 +3,15 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { LabResults } from '@/components/LabResults';
 import { RecordActions } from '@/components/RecordActions';
+import { ReviewCard } from '@/components/ReviewCard';
 import { Icon } from '@/components/Icon';
 import { Text } from '@/components/Text';
 import { Badge, Button, Card, Empty, ErrorBox, Loading, Muted, Perforation, Screen, SectionLabel, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { useMarkVisitRead } from '@/lib/notifications';
-import { doctorName, formatDate, formatDay } from '@/lib/format';
+import { doctorName, formatDate, formatDay, formatTime } from '@/lib/format';
+import { daysUntil } from '@/lib/followUp';
 import { medicineName, usage } from '@/lib/prescription';
 import { vitals, withIcd } from '@/lib/record';
 import type { VisitDetail } from '@/lib/types';
@@ -103,8 +105,20 @@ function VisitScreen() {
             {(r.treatment || r.followUpDate) && <SectionLabel>ĐIỀU TRỊ</SectionLabel>}
             <Row label="Hướng xử trí, điều trị" value={r.treatment} />
             {r.followUpDate && (
-              <View style={{ backgroundColor: colors.stampSoft, borderRadius: 10, padding: 12 }}>
+              <View style={{ backgroundColor: colors.stampSoft, borderRadius: 10, padding: 12, gap: 8 }}>
                 <Text style={{ color: colors.stamp, fontWeight: '700' }}>Hẹn tái khám ngày {formatDay(r.followUpDate)}</Text>
+                {v.followUpAppointment ? (
+                  <Text style={{ color: colors.text, lineHeight: 20 }}>
+                    Bác sĩ đã đặt lịch lúc {formatTime(v.followUpAppointment.schedule.startTime)} ngày {formatDate(v.followUpAppointment.schedule.startTime)}. Xem ở tab Lịch hẹn.
+                  </Text>
+                ) : daysUntil(r.followUpDate) >= 0 ? (
+                  <Button
+                    title="Đặt lịch tái khám"
+                    variant="accent"
+                    icon="calendar"
+                    onPress={() => router.push({ pathname: '/book/[doctorId]', params: { doctorId: v.doctor.id, day: String(daysUntil(r.followUpDate!)) } })}
+                  />
+                ) : null}
               </View>
             )}
           </>
@@ -156,6 +170,8 @@ function VisitScreen() {
       ) : v.status === 'DONE' ? (
         <Empty title="Lần khám này không kê đơn" />
       ) : null}
+
+      {v.status === 'DONE' ? <ReviewCard visitId={v.id} /> : null}
 
       {r && (
         <Card>

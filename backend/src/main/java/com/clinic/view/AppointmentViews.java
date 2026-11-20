@@ -26,6 +26,9 @@ public final class AppointmentViews {
         "status", a.getStatus(),
         "reason", a.getReason(),
         "createdAt", a.getCreatedAt(),
+        "reviewedAt", a.getReviewedAt(),
+        "rejectReason", a.getRejectReason(),
+        "followUpOfVisitId", a.getFollowUpOfVisitId(),
         "schedule", Json.obj("id", s.getId(), "startTime", s.getStartTime(), "endTime", s.getEndTime(), "doctor", doctorBrief(s.getDoctor())),
         "patient", patientBrief(a.getPatient()));
   }

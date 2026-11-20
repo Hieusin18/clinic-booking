@@ -6,6 +6,7 @@ import com.clinic.entity.enums.AppointmentStatus;
 import com.clinic.entity.enums.CheckinMethod;
 import com.clinic.entity.enums.Role;
 import com.clinic.exception.ApiException;
+import com.clinic.service.AppointmentsService;
 import com.clinic.repository.AppointmentRepository;
 import com.clinic.repository.VisitRepository;
 import com.clinic.security.AuthUser;
@@ -44,6 +45,7 @@ public class QueueController {
   public static final String NEEDS_DOCTOR = "Bạn chưa đặt lịch hôm nay, vui lòng chọn bác sĩ";
 
   private final QueueService queue;
+  private final com.clinic.service.VitalsService vitals;
   private final AppointmentRepository appointments;
   private final VisitRepository visits;
   private final PatientScope scope;
@@ -51,7 +53,9 @@ public class QueueController {
   private final TransactionTemplate tx;
 
   public QueueController(QueueService queue, AppointmentRepository appointments, VisitRepository visits, PatientScope scope, AppEnv env,
-      PlatformTransactionManager txm) {
+      PlatformTransactionManager txm,
+      com.clinic.service.VitalsService vitals) {
+    this.vitals = vitals;
     this.queue = queue;
     this.appointments = appointments;
     this.visits = visits;
@@ -89,7 +93,8 @@ public class QueueController {
     }
     Instant now = Instant.now();
     String patientId = scope.patientIdOf(user);
-    List<Booked> booked = tx.execute(s -> appointments.openToday(patientId, QueueService.ACTIVE, VnTime.today(now)).stream()
+    // Chỉ lịch đã được lễ tân duyệt mới tự check-in bằng QR
+    List<Booked> booked = tx.execute(s -> appointments.openToday(patientId, AppointmentsService.CONFIRMED, VnTime.today(now)).stream()
         .map((Appointment a) -> new Booked(a.getId(), a.getSchedule().getStartTime())).toList());
     Booked open = booked.stream().filter(a -> !now.isBefore(queue.opens(a.start())) && !now.isAfter(queue.closes(a.start()))).findFirst().orElse(null);
     if (open != null) return queue.checkIn(open.id(), CheckinMethod.QR, patientId, false, now);
@@ -97,10 +102,20 @@ public class QueueController {
     Booked early = booked.stream().filter(a -> now.isBefore(queue.opens(a.start()))).findFirst().orElse(null);
     if (early != null) return queue.checkIn(early.id(), CheckinMethod.QR, patientId, false, now);
 
+    // Lịch còn chờ duyệt chưa quá giờ: mời ra quầy (lễ tân check-in là duyệt luôn)
+    Booked waiting = tx.execute(s -> appointments.openToday(patientId, List.of(AppointmentStatus.PENDING), VnTime.today(now)).stream()
+        .map((Appointment a) -> new Booked(a.getId(), a.getSchedule().getStartTime())).filter(a -> !now.isAfter(queue.closes(a.start()))).findFirst()
+        .orElse(null));
+    if (waiting != null) {
+      throw ApiException.conflictWithCode("APPOINTMENT_PENDING", queue.pendingMessage(waiting.start()),
+          com.clinic.view.Json.obj("appointmentAt", waiting.start(), "opensAt", queue.opens(waiting.start()), "closesAt", queue.closes(waiting.start())));
+    }
+
     // Còn lại là lịch đã quá giờ: tính là không đến, bệnh nhân lấy số thường
     Booked late = booked.isEmpty() ? null : booked.get(booked.size() - 1);
     if (late != null) {
-      tx.executeWithoutResult(s -> appointments.moveStatusAll(booked.stream().map(Booked::id).toList(), QueueService.ACTIVE, AppointmentStatus.NO_SHOW));
+      tx.executeWithoutResult(s -> appointments.moveStatusAll(booked.stream().map(Booked::id).toList(), AppointmentsService.CONFIRMED,
+          AppointmentStatus.NO_SHOW));
     }
     if (dto.doctorId() == null || dto.doctorId().isEmpty()) {
       Map<String, Object> body = new LinkedHashMap<>();
@@ -155,7 +170,8 @@ public class QueueController {
   @Roles(Role.DOCTOR)
   @GetMapping("/doctor")
   public List<Map<String, Object>> doctorQueue(@CurrentUser AuthUser user) {
-    return queue.today(queue.doctorIdOf(user.sub()), Instant.now());
+    // Kèm sinh hiệu điều dưỡng đã đo để bác sĩ biết ai đã đo
+    return vitals.attach(queue.today(queue.doctorIdOf(user.sub()), Instant.now()));
   }
 
   /** Gọi số tiếp theo theo thứ tự ưu tiên */
