@@ -20,6 +20,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,9 +43,11 @@ public class AppointmentsService {
   private final QueueRules rules;
   private final Refresher refresher;
   private final NotificationsService notifications;
+  private final JdbcTemplate jdbc;
 
   public AppointmentsService(AppointmentRepository appointments, ScheduleRepository schedules, VisitRepository visits, PatientScope scope,
-      RealtimeService realtime, QueueRules rules, Refresher refresher, NotificationsService notifications) {
+      RealtimeService realtime, QueueRules rules, Refresher refresher, NotificationsService notifications, JdbcTemplate jdbc) {
+    this.jdbc = jdbc;
     this.refresher = refresher;
     this.notifications = notifications;
     this.appointments = appointments;
@@ -72,6 +76,9 @@ public class AppointmentsService {
         "recentNoShows", s.recentNoShows(),
         "limit", rules.noShowLimit(),
         "windowDays", rules.noShowWindowDays(),
+        // Lịch đang chờ duyệt và giới hạn (0 = không giới hạn): app báo trước khi đặt thêm
+        "pending", appointments.countPendingOf(patientId, now),
+        "pendingLimit", rules.maxPending(),
         // Ngày cuối cùng bị khóa (YYYY-MM-DD), null = không bị khóa
         "lockedUntil", s.lockedUntil() == null ? null : s.lockedUntil().toString());
   }
@@ -90,6 +97,13 @@ public class AppointmentsService {
       throw ApiException.forbidden("Bạn đã không đến khám " + rules.noShowLimit() + " lần trong " + rules.noShowWindowDays()
           + " ngày nên tạm thời không đặt lịch online được đến hết ngày " + VnTime.dmy(LocalDate.parse((String) lockedUntil))
           + ". Bạn vẫn có thể đến phòng khám lấy số trực tiếp.");
+    }
+    // Khóa theo bệnh nhân: các yêu cầu đặt đồng thời của cùng người chạy lần lượt, không vượt giới hạn
+    jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))", (RowCallbackHandler) rs -> { }, "book:" + patientId);
+    int limit = rules.maxPending();
+    if (limit > 0 && appointments.countPendingOf(patientId, Instant.now()) >= limit) {
+      throw ApiException.conflictWithCode("PENDING_LIMIT", "Bạn đang có " + limit + " lịch chờ phòng khám xác nhận. Vui lòng chờ xác nhận "
+          + "hoặc hủy bớt lịch trước khi đặt thêm.", Json.obj("limit", limit));
     }
     Schedule slot = schedules.findById(scheduleId).orElseThrow(() -> ApiException.notFound("Không tìm thấy khung giờ"));
     if (!slot.getStartTime().isAfter(Instant.now())) throw ApiException.conflict("Khung giờ đã qua, vui lòng chọn giờ khác");

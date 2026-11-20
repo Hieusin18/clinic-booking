@@ -118,6 +118,35 @@ class AppointmentReviewTest extends IntegrationTest {
     assertThat(api.get("/api/appointments/mine").auth(patient.token()).expect(200).body().at("/0/status").asText()).isEqualTo("CONFIRMED");
   }
 
+  /** Khung giờ 08:00 ngày thứ n kể từ hôm nay */
+  String slotOnDay(int n) {
+    api.post("/api/schedules/bulk").auth(doctor.token()).send(Map.of("date", day(n), "start", "08:00", "end", "08:30", "slotMinutes", 15)).expect(201);
+    return api.get("/api/doctors/" + doctor.doctor().getId() + "/schedules?date=" + day(n)).expect(200).body().get(0).get("id").asText();
+  }
+
+  @Test
+  @DisplayName("mỗi bệnh nhân giữ tối đa 3 lịch chờ duyệt; được duyệt hoặc bị từ chối thì đặt thêm được")
+  void pendingLimit() {
+    List<String> ids = new ArrayList<>();
+    for (int d = 1; d <= 3; d++) ids.add(book(patient, slotOnDay(d)));
+    String fourth = slotOnDay(4);
+    JsonNode err = api.post("/api/appointments").auth(patient.token()).send(Map.of("scheduleId", fourth)).expect(409).body();
+    assertThat(err.get("code").asText()).isEqualTo("PENDING_LIMIT");
+    assertThat(err.get("message").asText()).contains("3 lịch chờ");
+    // Bị chặn trước khi giữ chỗ: khung giờ vẫn trống cho người khác
+    assertThat(schedules.findById(fourth).orElseThrow().isBooked()).isFalse();
+    JsonNode standing = api.get("/api/appointments/standing").auth(patient.token()).expect(200).body();
+    assertThat(standing.get("pending").asInt()).isEqualTo(3);
+    assertThat(standing.get("pendingLimit").asInt()).isEqualTo(3);
+
+    // Bệnh nhân khác không bị ảnh hưởng
+    book(fx.createPatient(), fourth);
+
+    api.post("/api/appointments/" + ids.get(0) + "/confirm").auth(reception).expect(200);
+    book(patient, slotOnDay(5));
+    api.post("/api/appointments").auth(patient.token()).send(Map.of("scheduleId", slotOnDay(6))).expect(409);
+  }
+
   @Test
   @DisplayName("lễ tân từ chối kèm lý do: khung giờ mở lại cho người khác, bệnh nhân thấy lý do")
   void reject() {

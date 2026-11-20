@@ -167,6 +167,9 @@ export interface BookingStanding {
   windowDays: number;
   /** Ngày cuối bị khóa (YYYY-MM-DD) */
   lockedUntil: string | null;
+  /** Số lịch đang chờ phòng khám xác nhận và giới hạn (0 = không giới hạn) */
+  pending?: number;
+  pendingLimit?: number;
 }
 
 export interface Appointment {
