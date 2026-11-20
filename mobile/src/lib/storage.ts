@@ -60,3 +60,27 @@ export const userCache = {
     }
   },
 };
+
+const DISMISSED_KEY = 'clinic.dismissedBanners';
+
+/** Id các thông báo (banner) bệnh nhân đã bấm ✕ để ẩn: không cần bảo mật, lưu cùng chỗ cho gọn */
+export const dismissedBanners = {
+  async get(): Promise<string[]> {
+    try {
+      const raw = Platform.OS === 'web' ? localStorage.getItem(DISMISSED_KEY) : await SecureStore.getItemAsync(DISMISSED_KEY);
+      const v = raw ? (JSON.parse(raw) as unknown) : [];
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  },
+  async set(ids: string[]) {
+    try {
+      const raw = JSON.stringify(ids);
+      if (Platform.OS === 'web') localStorage.setItem(DISMISSED_KEY, raw);
+      else await SecureStore.setItemAsync(DISMISSED_KEY, raw);
+    } catch {
+      /* bỏ qua */
+    }
+  },
+};

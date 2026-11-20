@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { BannerStrip } from '@/components/BannerStrip';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { Icon } from '@/components/Icon';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -22,6 +23,7 @@ function freeText(n: number | undefined) {
 
 /** Tab Đặt lịch: tìm, lọc chuyên khoa → xem hồ sơ bác sĩ → đặt lịch. */
 export default function BookHome() {
+  const queryClient = useQueryClient();
   const [specialtyId, setSpecialtyId] = useState<string | null>(null);
   const [term, setTerm] = useState('');
   const q = term.trim();
@@ -41,8 +43,9 @@ export default function BookHome() {
       action={<NotificationBell />}
       subtitle="Chọn chuyên khoa, xem hồ sơ rồi chọn giờ"
       refreshing={doctors.isRefetching}
-      onRefresh={() => void Promise.all([specialties.refetch(), doctors.refetch()])}
+      onRefresh={() => void Promise.all([specialties.refetch(), doctors.refetch(), queryClient.invalidateQueries({ queryKey: ['banners'] })])}
     >
+      <BannerStrip />
       <View style={styles.inputBox}>
         <Icon name="search" color={colors.muted} size={20} />
         <TextInput
