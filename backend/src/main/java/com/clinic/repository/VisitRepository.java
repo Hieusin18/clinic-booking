@@ -90,4 +90,18 @@ public interface VisitRepository extends JpaRepository<Visit, String> {
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update Visit v set v.status = :to where v.id = :id and v.status in :from")
   int moveStatus(@Param("id") String id, @Param("from") Collection<VisitStatus> from, @Param("to") VisitStatus to);
+
+  /**
+   * Admin: mọi lượt khám đã có bệnh án (mọi bác sĩ), lọc theo bác sĩ (rỗng = tất cả), khoảng ngày và từ khóa (tên/SĐT
+   * bệnh nhân, chẩn đoán, mã ICD), mới nhất trước.
+   */
+  @Query(value = "select v from Visit v join v.patient p where (:doctorId = '' or v.doctorId = :doctorId) and v.date >= :from and v.date <= :to "
+      + "and exists (select 1 from MedicalRecord r where r.visitId = v.id and (:text = '' or lower(p.fullName) like lower(concat('%', :text, '%')) "
+      + "or p.phone like concat(:text, '%') or lower(r.diagnosis) like lower(concat('%', :text, '%')) or r.icdCode like concat(:upper, '%'))) "
+      + "order by v.date desc, v.createdAt desc",
+      countQuery = "select count(v) from Visit v join v.patient p where (:doctorId = '' or v.doctorId = :doctorId) and v.date >= :from and v.date <= :to "
+          + "and exists (select 1 from MedicalRecord r where r.visitId = v.id and (:text = '' or lower(p.fullName) like lower(concat('%', :text, '%')) "
+          + "or p.phone like concat(:text, '%') or lower(r.diagnosis) like lower(concat('%', :text, '%')) or r.icdCode like concat(:upper, '%')))")
+  org.springframework.data.domain.Page<Visit> withRecords(@Param("doctorId") String doctorId, @Param("from") LocalDate from, @Param("to") LocalDate to,
+      @Param("text") String text, @Param("upper") String upper, Pageable page);
 }

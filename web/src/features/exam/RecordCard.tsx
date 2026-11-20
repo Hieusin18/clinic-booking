@@ -83,7 +83,7 @@ function PreviewModal({ visitId, open, onClose }: { visitId: string; open: boole
   );
 }
 
-function DownloadButtons({ visitId, size, primary }: { visitId: string; size?: 'small' | 'middle'; primary?: boolean }) {
+export function DownloadButtons({ visitId, size, primary }: { visitId: string; size?: 'small' | 'middle'; primary?: boolean }) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState<'pdf' | 'docx' | null>(null);
   const get = async (format: 'pdf' | 'docx') => {

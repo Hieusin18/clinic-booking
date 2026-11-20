@@ -80,12 +80,14 @@ public class VisitsService {
   private final QueueService queue;
   private final AppEnv env;
   private final com.clinic.repository.Refresher refresher;
+  private final RecordHistoryService history;
   private final String secret;
 
   public VisitsService(VisitRepository visits, DoctorRepository doctors, PatientRepository patients, MedicalRecordRepository records,
       PrescriptionRepository prescriptions, PrescriptionItemRepository items, MedicineRepository medicines, LabOrderRepository labOrders,
       LabFileRepository labFiles, AppointmentRepository appointments, PatientScope scope, AccountLinkService link, RealtimeService realtime,
-      NotificationsService notifications, QueueService queue, AppEnv env, com.clinic.repository.Refresher refresher) {
+      NotificationsService notifications, QueueService queue, AppEnv env, com.clinic.repository.Refresher refresher,
+      RecordHistoryService history) {
     this.visits = visits;
     this.doctors = doctors;
     this.patients = patients;
@@ -103,6 +105,7 @@ public class VisitsService {
     this.queue = queue;
     this.env = env;
     this.refresher = refresher;
+    this.history = history;
     this.secret = env.require("JWT_SECRET");
     // Thiếu font thì dừng ngay lúc khởi động thay vì lỗi khi bệnh nhân tải bệnh án
     com.clinic.export.Fonts.check();
@@ -185,7 +188,10 @@ public class VisitsService {
     r.setSecondaryIcdCodes(secondary == null ? null : String.join(", ", secondary.split("\\s*,\\s*")));
     r.setTreatment(blank(dto.treatment()));
     r.setFollowUpDate(followUp);
-    return Rows.record(records.saveAndFlush(r));
+    MedicalRecord saved = records.saveAndFlush(r);
+    // Lịch sử sửa để admin tra lại (lần lưu không đổi gì thì không ghi)
+    history.recordSaved(saved, user.sub(), visit.getStatus() == VisitStatus.DONE);
+    return Rows.record(saved);
   }
 
   /**
@@ -234,8 +240,8 @@ public class VisitsService {
   }
 
   /**
-   * Chi tiết lượt khám. Bác sĩ phụ trách thấy cả đơn nháp; bệnh nhân chỉ thấy đơn hiệu lực. Lễ tân và admin không có
-   * quyền gọi (chặn ở controller).
+   * Chi tiết lượt khám. Bác sĩ phụ trách thấy cả đơn nháp; bệnh nhân chỉ thấy đơn hiệu lực; admin xem được mọi lượt
+   * (chỉ đọc). Lễ tân không có quyền gọi (chặn ở controller).
    */
   @Transactional(readOnly = true)
   public Map<String, Object> detail(AuthUser user, String visitId) {
@@ -255,7 +261,7 @@ public class VisitsService {
       out.put("prescription", current == null ? null : prescriptionView(current));
       return out;
     }
-    if (!found.getDoctorId().equals(doctorIdOf(user))) throw ApiException.notFound("Không tìm thấy phiếu khám");
+    if (user.role() != Role.ADMIN && !found.getDoctorId().equals(doctorIdOf(user))) throw ApiException.notFound("Không tìm thấy phiếu khám");
     out.put("prescriptions", list.stream().map(this::prescriptionView).toList());
     out.put("labOrders", ClinicalViews.labOrders(orders, filesOf(orders), secret, false));
     out.put("prescription", current == null ? null : prescriptionView(current));
@@ -393,6 +399,33 @@ public class VisitsService {
     LocalDate t = to == null ? LocalDate.of(9999, 12, 31) : LocalDate.parse(to.substring(0, 10));
     Page<Visit> page = visits.examined(doctorId, f, t, text, text.toUpperCase(), PageRequest.of(q.pageOrDefault() - 1, q.sizeOrDefault()));
     return q.toPage(page.getContent().stream().map(v -> historyItem(v, false)).toList(), page.getTotalElements());
+  }
+
+  /** Admin tra cứu bệnh án của mọi bác sĩ, kèm số lần lưu và có sửa sau khi hoàn tất hay không. */
+  @Transactional(readOnly = true)
+  public Map<String, Object> allRecords(PageQuery q, String doctorId, String from, String to) {
+    String text = q.term() == null ? "" : q.term();
+    LocalDate f = from == null ? LocalDate.of(1900, 1, 1) : LocalDate.parse(from.substring(0, 10));
+    LocalDate t = to == null ? LocalDate.of(9999, 12, 31) : LocalDate.parse(to.substring(0, 10));
+    Page<Visit> page = visits.withRecords(doctorId == null ? "" : doctorId, f, t, text, text.toUpperCase(),
+        PageRequest.of(q.pageOrDefault() - 1, q.sizeOrDefault()));
+    Map<String, Map<String, Object>> summary = history.summaries(page.getContent().stream().map(Visit::getId).toList());
+    List<Map<String, Object>> items = page.getContent().stream().map(v -> {
+      Map<String, Object> m = historyItem(v, false);
+      MedicalRecord r = records.findByVisitId(v.getId()).orElseThrow();
+      m.put("recordUpdatedAt", r.getUpdatedAt());
+      m.put("history", summary.getOrDefault(v.getId(), Json.obj("revisions", 0, "editedAfterDone", false)));
+      return m;
+    }).toList();
+    return q.toPage(items, page.getTotalElements());
+  }
+
+  /** Dòng thời gian sửa bệnh án: admin xem mọi lượt, bác sĩ xem lượt mình khám. */
+  @Transactional(readOnly = true)
+  public List<Map<String, Object>> recordHistory(AuthUser user, String visitId) {
+    Visit v = visits.findById(visitId).orElseThrow(() -> ApiException.notFound("Không tìm thấy phiếu khám"));
+    if (user.role() != Role.ADMIN && !v.getDoctorId().equals(doctorIdOf(user))) throw ApiException.notFound("Không tìm thấy phiếu khám");
+    return history.timeline(visitId);
   }
 
   private void checkMedicines(List<PrescriptionRequest.Item> list) {

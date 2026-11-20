@@ -293,3 +293,25 @@ export interface WorkSchedule {
   }[];
   receptionists: { id: string; fullName: string; phone: string; shifts: StaffShift[] }[];
 }
+
+/** Một mốc trong lịch sử bệnh án: lần lưu bệnh án hoặc mốc đơn thuốc */
+export type RecordEvent =
+  | {
+      kind: 'RECORD';
+      id: string;
+      version: number;
+      /** BASELINE = nội dung đã có trước khi hệ thống ghi lịch sử */
+      action: 'CREATE' | 'UPDATE' | 'BASELINE';
+      at: string;
+      afterDone: boolean;
+      editedBy: { id: string; fullName: string; role: Role } | null;
+      changes: { field: keyof MedicalRecord; before: string | number | null; after: string | number | null }[];
+    }
+  | { kind: 'PRESCRIPTION'; id: string; action: 'FINALIZED' | 'REPLACED'; at: string; code: string | null };
+
+/** GET /admin/records */
+export type AdminRecordRow = Visit & {
+  medicalRecord: Pick<MedicalRecord, 'diagnosis' | 'icdCode' | 'followUpDate'>;
+  recordUpdatedAt: string;
+  history: { revisions: number; editedAfterDone: boolean };
+};
