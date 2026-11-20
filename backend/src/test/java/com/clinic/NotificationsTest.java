@@ -297,12 +297,12 @@ class NotificationsTest extends IntegrationTest {
   void reminders() {
     Instant start = Instant.parse("2026-11-20T02:00:00Z"); // 09:00 giờ Việt Nam
     Instant longAgo = Instant.parse("2026-11-10T00:00:00Z");
-    Appointment early = book(start, longAgo, AppointmentStatus.PENDING);
+    Appointment early = book(start, longAgo, AppointmentStatus.CONFIRMED);
     // Đặt 3 giờ trước giờ hẹn: không nhắc trước một ngày, vẫn nhắc trước một giờ
-    Appointment late = book(start, start.minus(HOUR.multipliedBy(3)), AppointmentStatus.PENDING);
+    Appointment late = book(start, start.minus(HOUR.multipliedBy(3)), AppointmentStatus.CONFIRMED);
     book(start, longAgo, AppointmentStatus.CANCELLED);
     // Đã check-in (có phiếu khám) thì thôi nhắc
-    Appointment arrived = book(start, longAgo, AppointmentStatus.PENDING);
+    Appointment arrived = book(start, longAgo, AppointmentStatus.CONFIRMED);
     Schedule sched = schedules.findById(arrived.getScheduleId()).orElseThrow();
     Visit v = new Visit();
     v.setPatientId(patient.patient().getId());

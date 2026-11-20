@@ -4,7 +4,7 @@ import type { Appointment } from './types';
 
 const appt = (extra: Partial<Appointment> = {}): Appointment => ({
   id: 'a1',
-  status: 'PENDING',
+  status: 'CONFIRMED',
   reason: null,
   createdAt: '2026-11-10T00:00:00.000Z',
   schedule: {
@@ -63,6 +63,9 @@ describe('thông báo trên app', () => {
     expect(reminderPlan([appt()], new Date('2026-11-19T12:00:00Z')).map((r) => r.id)).toEqual(['a1:hour']);
     expect(reminderPlan([appt({ createdAt: '2026-11-19T22:00:00.000Z' })], new Date('2026-11-19T22:00:00Z')).map((r) => r.id)).toEqual(['a1:hour']);
     expect(reminderPlan([appt({ status: 'CANCELLED' })], new Date('2026-11-18T00:00:00Z'))).toEqual([]);
+    // Lịch chờ lễ tân duyệt hoặc bị từ chối thì chưa nhắc
+    expect(reminderPlan([appt({ status: 'PENDING' })], new Date('2026-11-18T00:00:00Z'))).toEqual([]);
+    expect(reminderPlan([appt({ status: 'REJECTED' })], new Date('2026-11-18T00:00:00Z'))).toEqual([]);
     expect(reminderPlan([appt({ visit: { id: 'v', queueNumber: 1, source: 'ONLINE', status: 'WAITING' } })], new Date('2026-11-18T00:00:00Z'))).toEqual([]);
   });
 

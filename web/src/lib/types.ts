@@ -5,7 +5,8 @@ export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'AWAITING_RESULTS' | 'DONE' | 'LEFT';
 /** Cách nhận kết quả cận lâm sàng: quay lại phòng khám hoặc nhận online */
 export type ResultMode = 'RETURN' | 'ONLINE';
-export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+/** PENDING = chờ lễ tân duyệt, REJECTED = bị từ chối / hết giờ mà chưa duyệt */
+export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'REJECTED';
 
 export interface Page<T> {
   items: T[];
@@ -153,6 +154,8 @@ export interface Appointment {
   status: AppointmentStatus;
   reason: string | null;
   createdAt: string;
+  reviewedAt?: string | null;
+  rejectReason?: string | null;
   schedule: { id: string; startTime: string; endTime: string; doctor: DoctorRef };
   patient: { id: string; fullName: string; phone: string };
   visit?: { id: string; queueNumber: number; source: 'ONLINE' | 'WALK_IN'; status: VisitStatus } | null;
@@ -240,4 +243,19 @@ export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   prescriptions?: Prescription[];
   prescription: Prescription | null;
   labOrders: LabOrder[];
+}
+
+/** Lịch đặt online chờ lễ tân duyệt, kèm thông tin giúp nhận ra đặt lịch hàng loạt */
+export interface PendingAppointment extends Appointment {
+  patientInfo: {
+    dateOfBirth: string;
+    gender: Gender;
+    accountCreatedAt: string | null;
+    completed: number;
+    noShow: number;
+    cancelled: number;
+    rejected: number;
+    /** Số lịch đang chờ duyệt của cùng người */
+    waiting: number;
+  };
 }

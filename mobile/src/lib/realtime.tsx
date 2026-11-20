@@ -41,6 +41,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     socket.on('disconnect', () => setState((s) => ({ ...s, connected: false })));
     reconnectWithNewToken(socket, token, getApiToken);
     socket.on('visit:changed', refresh);
+    // Lễ tân duyệt hoặc từ chối lịch hẹn
+    socket.on('appointment:changed', refresh);
     socket.on('visit:called', (e: VisitCalledEvent) => {
       if (Platform.OS !== 'web') Vibration.vibrate([0, 400, 200, 400]);
       setState((s) => ({ ...s, lastCall: { ...e, at: Date.now() } }));
