@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { useInbox, usePushMode } from '@/lib/notifications';
 import { targetOf, timeAgo, type AppNotification } from '@/lib/notify';
+import { withLogin } from '@/components/LoginRequired';
 
 const KIND: Record<AppNotification['type'], { icon: IconName; color: string; soft: string }> = {
   CALLED: { icon: 'qr', color: colors.stamp, soft: colors.stampSoft },
@@ -17,7 +18,7 @@ const KIND: Record<AppNotification['type'], { icon: IconName; color: string; sof
 };
 
 /** Hộp thư: gọi số, có kết quả, khám xong, nhắc lịch. Bấm một tin để mở màn hình liên quan. */
-export default function NotificationsScreen() {
+function NotificationsScreen() {
   const inbox = useInbox();
   const mode = usePushMode();
   const queryClient = useQueryClient();
@@ -93,3 +94,5 @@ export default function NotificationsScreen() {
     </Screen>
   );
 }
+
+export default withLogin(NotificationsScreen, { reason: 'Đăng nhập để xem thông báo' });

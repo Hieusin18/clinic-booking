@@ -13,6 +13,7 @@ import { doctorName, formatDate, formatDay } from '@/lib/format';
 import { medicineName, usage } from '@/lib/prescription';
 import { vitals, withIcd } from '@/lib/record';
 import type { VisitDetail } from '@/lib/types';
+import { withLogin } from '@/components/LoginRequired';
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -31,7 +32,7 @@ function splitUnit(value: string) {
 }
 
 /** Chi tiết một lần khám: bệnh án ngoại trú và đơn thuốc; tải bản điện tử PDF/Word để lưu, in hoặc gửi. */
-export default function VisitScreen() {
+function VisitScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const visit = useQuery({ queryKey: ['visit', id], queryFn: async () => (await api.get<VisitDetail>(`/visits/${id}`)).data });
   const v = visit.data;
@@ -167,3 +168,5 @@ export default function VisitScreen() {
     </Screen>
   );
 }
+
+export default withLogin(VisitScreen, { reason: 'Đăng nhập để xem lần khám' });

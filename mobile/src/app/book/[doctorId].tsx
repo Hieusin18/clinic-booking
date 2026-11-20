@@ -12,6 +12,7 @@ import { errorMessage } from '@/lib/errors';
 import { dayLabel, dayParts, doctorName, formatDate, formatTime, ymd } from '@/lib/format';
 import { standingNotice } from '@/lib/queue';
 import type { Appointment, BookingStanding, DayAvailability, Doctor, Slot } from '@/lib/types';
+import { withLogin } from '@/components/LoginRequired';
 
 const DAYS = 7;
 
@@ -52,7 +53,7 @@ function SlotCell({ slot, selected, onPress }: { slot: Slot; selected: boolean; 
 }
 
 /** Chọn ngày, chọn giờ trống rồi đặt lịch với một bác sĩ. */
-export default function BookDoctor() {
+function BookDoctor() {
   const { doctorId, day } = useLocalSearchParams<{ doctorId: string; day?: string }>();
   const queryClient = useQueryClient();
   // Mở từ hồ sơ bác sĩ với một ngày đã chọn (số ngày tính từ hôm nay)
@@ -194,3 +195,5 @@ export default function BookDoctor() {
     </Screen>
   );
 }
+
+export default withLogin(BookDoctor, { reason: 'Đăng nhập để đặt lịch khám', hint: 'Đăng nhập hoặc tạo tài khoản, rồi quay lại đây chọn giờ với bác sĩ này.' });

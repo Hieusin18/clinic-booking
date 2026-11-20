@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import { useAuth } from '@/lib/auth';
 import { useInbox } from '@/lib/notifications';
 import { Icon } from './Icon';
 import { Text } from './Text';
@@ -7,7 +8,10 @@ import { colors } from './ui';
 
 /** Chuông ở góc tiêu đề các tab: số thông báo chưa đọc, bấm để mở hộp thư. */
 export function NotificationBell() {
+  const { user } = useAuth();
   const unread = useInbox().data?.unread ?? 0;
+  // Chưa đăng nhập thì không có hộp thư
+  if (!user) return null;
   return (
     <Pressable
       accessibilityRole="button"

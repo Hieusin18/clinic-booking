@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { GENDER_LABEL, PHONE_REGEX, ageOf, formatDay, parseVnDate, toVnDateInput } from '@/lib/format';
 import type { Gender, Patient } from '@/lib/types';
+import { withLogin } from '@/components/LoginRequired';
 
 const LOCAL_ERRORS: Record<string, string> = {
   dob: 'Ngày sinh không hợp lệ (ngày/tháng/năm)',
@@ -58,7 +59,7 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 }
 
 /** Hồ sơ bệnh nhân: xem, sửa thông tin hành chính (in lên bệnh án), đăng xuất. */
-export default function Profile() {
+function Profile() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const profile = useQuery({
@@ -248,3 +249,5 @@ export default function Profile() {
     </Screen>
   );
 }
+
+export default withLogin(Profile, { title: 'Hồ sơ', reason: 'Đăng nhập để xem hồ sơ của bạn' });
