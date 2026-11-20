@@ -48,7 +48,7 @@ describe('Lịch làm việc (admin)', () => {
     expect(await screen.findByText('BS Nguyễn An')).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith('/work-schedule', expect.objectContaining({ params: expect.objectContaining({ from: expect.any(String), to: expect.any(String) }) }));
     expect(screen.getByText(/08:00–10:00/)).toBeInTheDocument();
-    expect(screen.getByText('· 1/4')).toBeInTheDocument();
+    expect(screen.getByText('1/4 lượt đặt')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: /Lễ tân/ }));
     expect(await screen.findByText('Trần Lễ Tân')).toBeInTheDocument();

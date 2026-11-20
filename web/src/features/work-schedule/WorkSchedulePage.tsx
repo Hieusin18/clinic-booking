@@ -23,9 +23,12 @@ function DoctorCell({ shifts }: { shifts: DoctorShift[] }) {
     <Flex vertical gap={4}>
       {shifts.map((s) => (
         <Tooltip key={s.startTime} title={`${s.booked}/${s.slots} lượt đã có người đặt`}>
-          <Tag color="blue" style={{ margin: 0, fontSize: 12.5 }}>
-            {range(s)} <span style={{ opacity: 0.7 }}>· {s.booked}/{s.slots}</span>
-          </Tag>
+          <Flex vertical style={{ background: C.stampSoft, color: C.stamp, borderRadius: 6, padding: '2px 8px', lineHeight: 1.35 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>{range(s)}</span>
+            <span style={{ fontSize: 11.5, color: C.muted }}>
+              {s.booked}/{s.slots} lượt đặt
+            </span>
+          </Flex>
         </Tooltip>
       ))}
     </Flex>
@@ -90,8 +93,8 @@ export function WorkSchedulePage() {
           <span style={{ fontFamily: NUM, fontSize: 18, fontWeight: 600 }}>{d.format('DD/MM')}</span>
         </Flex>
       ),
-      width: 150,
-      onCell: () => ({ style: isToday ? { background: C.stampSoft } : {} }),
+      width: 122,
+      onCell: () => ({ style: isToday ? { background: 'rgba(58, 63, 176, 0.05)' } : {} }),
       render: (_: unknown, row: T) => render(row, (byDay(row.shifts).get(key) ?? []) as T['shifts']),
     };
   };
@@ -101,7 +104,7 @@ export function WorkSchedulePage() {
       key: 'name',
       title: 'Bác sĩ',
       fixed: 'left' as const,
-      width: 200,
+      width: 180,
       render: (_: unknown, d: Doctor) => (
         <Flex vertical>
           <Typography.Text strong>{doctorName({ title: d.title, user: { fullName: d.fullName } })}</Typography.Text>
@@ -113,7 +116,7 @@ export function WorkSchedulePage() {
       ),
     },
     ...days.map((d) => dayColumn<Doctor>(d, (_row, shifts) => <DoctorCell shifts={shifts} />)),
-    { key: 'total', title: 'Tổng', width: 90, align: 'right' as const, render: (_: unknown, d: Doctor) => totalHours(d.shifts) },
+    { key: 'total', title: 'Tổng', width: 72, align: 'right' as const, render: (_: unknown, d: Doctor) => totalHours(d.shifts) },
   ];
 
   const receptionColumns = [
@@ -121,7 +124,7 @@ export function WorkSchedulePage() {
       key: 'name',
       title: 'Lễ tân',
       fixed: 'left' as const,
-      width: 200,
+      width: 180,
       render: (_: unknown, r: Receptionist) => (
         <Flex vertical>
           <Typography.Text strong>{r.fullName}</Typography.Text>
@@ -137,7 +140,7 @@ export function WorkSchedulePage() {
         return (
           <Flex vertical gap={4} align="flex-start">
             {(shifts as StaffShift[]).map((s) => (
-              <Tag key={s.id} color="green" style={{ margin: 0, fontSize: 12.5, paddingRight: 2 }}>
+              <Tag key={s.id} color="green" style={{ margin: 0, fontSize: 12, paddingInline: '6px 0' }}>
                 <Tooltip title={s.note}>{range(s)}</Tooltip>
                 {!past && (
                   <Popconfirm title="Xóa ca trực này?" okText="Xóa" cancelText="Hủy" onConfirm={() => remove.mutate(s.id)}>
@@ -146,6 +149,7 @@ export function WorkSchedulePage() {
                 )}
               </Tag>
             ))}
+            {past && !shifts.length && <Typography.Text type="secondary">—</Typography.Text>}
             {!past && (
               <Button size="small" type="dashed" icon={<PlusOutlined />} aria-label={`Xếp ca cho ${row.fullName} ngày ${d.format('DD/MM')}`} onClick={() => openAdd(row.id, d)} />
             )}
@@ -153,7 +157,7 @@ export function WorkSchedulePage() {
         );
       }),
     ),
-    { key: 'total', title: 'Tổng', width: 90, align: 'right' as const, render: (_: unknown, r: Receptionist) => totalHours(r.shifts) },
+    { key: 'total', title: 'Tổng', width: 72, align: 'right' as const, render: (_: unknown, r: Receptionist) => totalHours(r.shifts) },
   ];
 
   return (
@@ -191,9 +195,9 @@ export function WorkSchedulePage() {
             children: (
               <>
                 <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-                  Ca khám lấy từ các khung giờ bác sĩ đã mở; số bên cạnh là lượt đã đặt / lượt mở.
+                  Ca khám lấy từ các khung giờ bác sĩ đã mở, kèm số lượt đã có người đặt / số lượt mở.
                 </Typography.Paragraph>
-                <Table<Doctor> rowKey="id" size="small" loading={data.isFetching} dataSource={doctors} columns={doctorColumns} pagination={false} scroll={{ x: 1300 }} locale={{ emptyText: 'Chưa có bác sĩ' }} />
+                <Table<Doctor> rowKey="id" size="small" loading={data.isLoading} dataSource={doctors} columns={doctorColumns} pagination={false} scroll={{ x: 1110 }} locale={{ emptyText: 'Chưa có bác sĩ' }} />
               </>
             ),
           },
@@ -204,11 +208,11 @@ export function WorkSchedulePage() {
               <Table<Receptionist>
                 rowKey="id"
                 size="small"
-                loading={data.isFetching}
+                loading={data.isLoading}
                 dataSource={receptionists}
                 columns={receptionColumns}
                 pagination={false}
-                scroll={{ x: 1300 }}
+                scroll={{ x: 1110 }}
                 locale={{ emptyText: 'Chưa có lễ tân' }}
               />
             ),
