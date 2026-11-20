@@ -71,6 +71,12 @@ export function standingNotice(s: BookingStanding | undefined): { blocked: boole
       text: `Bạn đã không đến khám ${s.limit} lần trong ${s.windowDays} ngày nên tạm thời không đặt lịch online được đến hết ngày ${dmy(s.lockedUntil)}. Bạn vẫn có thể đến phòng khám lấy số trực tiếp.`,
     };
   }
+  if (s.pendingLimit && (s.pending ?? 0) >= s.pendingLimit) {
+    return {
+      blocked: true,
+      text: `Bạn đang có ${s.pending} lịch chờ phòng khám xác nhận (tối đa ${s.pendingLimit}). Vui lòng chờ xác nhận hoặc hủy bớt lịch trong tab Lịch hẹn trước khi đặt thêm.`,
+    };
+  }
   if (s.limit > 0 && s.recentNoShows === s.limit - 1) {
     return {
       blocked: false,

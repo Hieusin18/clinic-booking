@@ -13,6 +13,7 @@ import java.util.function.Function;
  * @param checkinLateMinutes quá giờ hẹn chừng này phút mà chưa check-in thì lịch hẹn thành "không đến"
  * @param dayEndHour sau giờ này (giờ Việt Nam) người còn đang chờ được tính là bỏ về
  * @param noShowLimit không đến chừng này lần trong {@code noShowWindowDays} ngày thì bị khóa đặt lịch online
+ * @param maxPending mỗi bệnh nhân giữ tối đa chừng này lịch đang chờ lễ tân duyệt (chống đặt hàng loạt giữ chỗ); 0 = không giới hạn
  */
 public record QueueRules(
     int leadMinutes,
@@ -23,9 +24,10 @@ public record QueueRules(
     int dayEndHour,
     int noShowLimit,
     int noShowWindowDays,
-    int noShowLockDays) implements OrderRules {
+    int noShowLockDays,
+    int maxPending) implements OrderRules {
 
-  public static final QueueRules DEFAULT = new QueueRules(10, 3, 12, 30, 15, 21, 3, 30, 14);
+  public static final QueueRules DEFAULT = new QueueRules(10, 3, 12, 30, 15, 21, 3, 30, 14, 3);
 
   /** Đọc từ biến môi trường; bỏ trống hoặc sai định dạng (không phải số nguyên ≥ 0) thì dùng giá trị mặc định. */
   public static QueueRules from(Function<String, String> env) {
@@ -39,7 +41,8 @@ public record QueueRules(
         read(env, "QUEUE_DAY_END_HOUR", d.dayEndHour),
         read(env, "NO_SHOW_LIMIT", d.noShowLimit),
         read(env, "NO_SHOW_WINDOW_DAYS", d.noShowWindowDays),
-        read(env, "NO_SHOW_LOCK_DAYS", d.noShowLockDays));
+        read(env, "NO_SHOW_LOCK_DAYS", d.noShowLockDays),
+        read(env, "MAX_PENDING_APPOINTMENTS", d.maxPending));
   }
 
   private static int read(Function<String, String> env, String key, int fallback) {

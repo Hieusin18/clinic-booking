@@ -73,6 +73,11 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
       + "and s.startTime > :after")
   long countPendingReview(@Param("after") Instant after);
 
+  /** Số lịch của một bệnh nhân đang chờ lễ tân duyệt (giờ hẹn chưa qua) */
+  @Query("select count(a) from Appointment a join a.schedule s where a.patientId = :pid "
+      + "and a.status = com.clinic.entity.enums.AppointmentStatus.PENDING and s.startTime > :after")
+  long countPendingOf(@Param("pid") String patientId, @Param("after") Instant after);
+
   /** Số lịch của bệnh nhân theo trạng thái (lễ tân xem trước khi duyệt: đã đến bao nhiêu lần, bỏ bao nhiêu lần). */
   @Query("select a.status, count(a) from Appointment a where a.patientId = :pid group by a.status")
   List<Object[]> countByStatusOf(@Param("pid") String patientId);

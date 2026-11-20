@@ -92,6 +92,8 @@ function BookDoctor() {
       // Khung giờ có thể vừa bị người khác đặt: tải lại để gạch khung giờ đó
       setSlot(null);
       void slots.refetch();
+      // Có thể vừa chạm giới hạn lịch chờ duyệt: tải lại để hiện thông báo và khóa nút đặt
+      void standing.refetch();
     },
   });
 
