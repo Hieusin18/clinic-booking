@@ -7,6 +7,7 @@ import {
   SolutionOutlined,
   TeamOutlined,
   UnorderedListOutlined,
+  CheckSquareOutlined,
   UserOutlined,
   ApartmentOutlined,
   BarChartOutlined,
@@ -15,11 +16,12 @@ import {
   MessageOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Avatar, Button, Dropdown, Flex, Layout, Menu, Spin, Typography } from 'antd';
+import { Avatar, Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { avatarUrl } from '../features/doctor-profile/profileForm';
+import { usePendingCount } from '../features/reception/PendingAppointmentsPage';
 import { api } from '../lib/api';
 import { ROLE_LABEL, useAuth } from '../lib/auth';
 import type { Doctor, Role } from '../lib/types';
@@ -48,6 +50,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
   ],
   RECEPTIONIST: [
     item('/reception', 'Tiếp đón', <UserOutlined />),
+    item('/reception/pending', 'Duyệt lịch hẹn', <CheckSquareOutlined />),
     item('/reception/queue', 'Hàng đợi hôm nay', <UnorderedListOutlined />),
     item('/counter', 'Màn hình quầy (QR)', <QrcodeOutlined />),
   ],
@@ -65,6 +68,8 @@ export function AppLayout() {
     queryFn: async () => (await api.get<Doctor>('/doctors/me')).data,
     staleTime: 5 * 60_000,
   });
+  // Số lịch đặt online chờ lễ tân duyệt, hiện cạnh mục menu
+  const pending = usePendingCount(user?.role === 'RECEPTIONIST' && !user.mustChangePassword);
   // Mở lại trang (F5): chờ kiểm tra token đã lưu, không đẩy về trang đăng nhập rồi về trang chủ
   if (loading) return <Spin size="large" fullscreen />;
   // Đăng xuất hoặc token hết hạn (401) → về trang đăng nhập, không để trang trắng
@@ -72,7 +77,11 @@ export function AppLayout() {
   if (user.role === 'PATIENT') return <PatientOnly />;
 
   // Đang dùng mật khẩu tạm: ẩn menu, chỉ còn trang đổi mật khẩu
-  const items = user.mustChangePassword ? [] : MENU_BY_ROLE[user.role];
+  const items = (user.mustChangePassword ? [] : MENU_BY_ROLE[user.role]).map((i) =>
+    i.key === '/reception/pending' && pending.data && 'label' in i
+      ? ({ ...i, label: <Flex align="center" justify="space-between" gap={8}>{i.label}<Badge count={pending.data} color={C.stamp} /></Flex> } as Item)
+      : i,
+  );
   // Mục đang chọn = mục có đường dẫn dài nhất khớp với trang hiện tại
   const selected = items.filter((i) => pathname === i.key || pathname.startsWith(`${i.key}/`)).sort((a, b) => b.key.length - a.key.length)[0]?.key;
 

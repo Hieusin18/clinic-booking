@@ -167,6 +167,9 @@ class AppointmentReviewTest extends IntegrationTest {
     assertThat(api.get("/api/appointments/standing").auth(patient.token()).expect(200).body().get("recentNoShows").asInt()).isZero();
 
     Appointment soon = today(AppointmentStatus.PENDING, 45);
+    // Đặt từ hôm trước (lịch đặt sát giờ thì không nhắc)
+    soon.setCreatedAt(Instant.now().minusSeconds(2 * 86_400L));
+    appointments.saveAndFlush(soon);
     assertThat(reminder.sweep(Instant.now())).isZero();
     soon.setStatus(AppointmentStatus.CONFIRMED);
     appointments.saveAndFlush(soon);

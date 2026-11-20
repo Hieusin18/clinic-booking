@@ -11,6 +11,7 @@ import { LoginPage } from './features/auth/LoginPage';
 import { ExamPage } from './features/exam/ExamPage';
 import { RecordsPage } from './features/exam/RecordsPage';
 import { CounterPage } from './features/reception/CounterPage';
+import { PendingAppointmentsPage } from './features/reception/PendingAppointmentsPage';
 import { QueueBoardPage } from './features/reception/QueueBoardPage';
 import { ReceptionPage } from './features/reception/ReceptionPage';
 import { SchedulePage } from './features/schedule/SchedulePage';
@@ -28,7 +29,7 @@ function Home() {
  * Bảng định tuyến, mỗi nhóm trang thuộc một chức năng:
  * - Tài khoản và quản trị: /login, /admin/*
  * - Lịch khám: /doctor/schedule
- * - Tiếp đón và hàng đợi: /reception, /reception/queue, /counter
+ * - Tiếp đón và hàng đợi: /reception, /reception/pending (duyệt lịch đặt online), /reception/queue, /counter
  * - Khám bệnh: /doctor/queue
  * - Bệnh án đã khám: /doctor/records
  * - Hồ sơ của tôi: /doctor/profile
@@ -69,6 +70,7 @@ export const routes: RouteObject[] = [
       { path: '/doctor/profile', element: <RequireRole roles={['DOCTOR']}><MyProfilePage /></RequireRole> },
       { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ReceptionPage /></RequireRole> },
       { path: '/reception/queue', element: <RequireRole roles={['RECEPTIONIST']}><QueueBoardPage /></RequireRole> },
+      { path: '/reception/pending', element: <RequireRole roles={['RECEPTIONIST']}><PendingAppointmentsPage /></RequireRole> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
