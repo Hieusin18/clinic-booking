@@ -81,13 +81,15 @@ public class VisitsService {
   private final AppEnv env;
   private final com.clinic.repository.Refresher refresher;
   private final RecordHistoryService history;
+  private final VitalsService vitals;
   private final String secret;
 
   public VisitsService(VisitRepository visits, DoctorRepository doctors, PatientRepository patients, MedicalRecordRepository records,
       PrescriptionRepository prescriptions, PrescriptionItemRepository items, MedicineRepository medicines, LabOrderRepository labOrders,
       LabFileRepository labFiles, AppointmentRepository appointments, PatientScope scope, AccountLinkService link, RealtimeService realtime,
       NotificationsService notifications, QueueService queue, AppEnv env, com.clinic.repository.Refresher refresher,
-      RecordHistoryService history) {
+      RecordHistoryService history, VitalsService vitals) {
+    this.vitals = vitals;
     this.visits = visits;
     this.doctors = doctors;
     this.patients = patients;
@@ -263,6 +265,8 @@ public class VisitsService {
     }
     if (user.role() != Role.ADMIN && !found.getDoctorId().equals(doctorIdOf(user))) throw ApiException.notFound("Không tìm thấy phiếu khám");
     out.put("prescriptions", list.stream().map(this::prescriptionView).toList());
+    // Sinh hiệu điều dưỡng đo lúc chờ: web điền sẵn vào bệnh án
+    out.put("vitals", vitals.of(visitId));
     out.put("labOrders", ClinicalViews.labOrders(orders, filesOf(orders), secret, false));
     out.put("prescription", current == null ? null : prescriptionView(current));
     return out;

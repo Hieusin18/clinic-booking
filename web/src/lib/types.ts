@@ -1,6 +1,6 @@
 /** Kiểu dữ liệu trả về từ backend (xem Swagger tại /api/docs). */
 
-export type Role = 'PATIENT' | 'RECEPTIONIST' | 'DOCTOR' | 'ADMIN';
+export type Role = 'PATIENT' | 'RECEPTIONIST' | 'DOCTOR' | 'ADMIN' | 'NURSE';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'AWAITING_RESULTS' | 'DONE' | 'LEFT';
 /** Cách nhận kết quả cận lâm sàng: quay lại phòng khám hoặc nhận online */
@@ -133,6 +133,8 @@ export interface Visit {
   createdAt: string;
   patient: { id: string; fullName: string; phone: string; dateOfBirth: string; gender: Gender; allergies: string | null };
   doctor: DoctorRef;
+  /** Có ở /queue/doctor và /vitals/today: sinh hiệu điều dưỡng đã đo (null = chưa đo) */
+  vitals?: Vitals | null;
   /** Có ở /queue/today và /queue/doctor: thứ tự gọi dự kiến (0 = người tiếp theo) của người đang chờ */
   predictedOrder?: number | null;
   estimatedCallAt?: string | null;
@@ -238,8 +240,25 @@ export interface LabOrder {
   files: LabFile[];
 }
 
+/** Sinh hiệu điều dưỡng đo khi bệnh nhân chờ khám */
+export interface Vitals {
+  pulse: number | null;
+  temperature: number | null;
+  bpSystolic: number | null;
+  bpDiastolic: number | null;
+  respiratoryRate: number | null;
+  spo2: number | null;
+  weight: number | null;
+  height: number | null;
+  note: string | null;
+  measuredAt: string;
+  measuredBy: { id: string; fullName: string } | null;
+}
+
 export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   medicalRecord: MedicalRecord | null;
+  /** Có ở bác sĩ/admin: sinh hiệu đo trước (null = chưa đo) */
+  vitals?: Vitals | null;
   prescriptions?: Prescription[];
   prescription: Prescription | null;
   labOrders: LabOrder[];
@@ -292,6 +311,7 @@ export interface WorkSchedule {
     shifts: DoctorShift[];
   }[];
   receptionists: { id: string; fullName: string; phone: string; shifts: StaffShift[] }[];
+  nurses?: { id: string; fullName: string; phone: string; shifts: StaffShift[] }[];
 }
 
 /** Một mốc trong lịch sử bệnh án: lần lưu bệnh án hoặc mốc đơn thuốc */

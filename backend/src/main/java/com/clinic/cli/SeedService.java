@@ -59,6 +59,7 @@ public class SeedService {
     String hash = Passwords.hash("123456");
     upsertUser("Quản trị viên", "0900000001", Role.ADMIN, hash);
     upsertUser("Lễ tân Mai", "0900000002", Role.RECEPTIONIST, hash);
+    upsertUser("Điều dưỡng Lan", "0900000004", Role.NURSE, hash);
     User patientUser = upsertUser("Đỗ Hữu Phúc", "0900000003", Role.PATIENT, hash);
     if (patients.findByPhone("0900000003").isEmpty()) {
       Patient p = new Patient();

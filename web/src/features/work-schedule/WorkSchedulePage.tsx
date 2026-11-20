@@ -38,7 +38,7 @@ function DoctorCell({ shifts }: { shifts: DoctorShift[] }) {
 /** Admin: xem lịch làm việc theo tuần của bác sĩ (từ khung giờ khám đã mở) và lễ tân (ca trực), xếp ca trực lễ tân. */
 export function WorkSchedulePage() {
   const [weekStart, setWeekStart] = useState(() => dayjs().startOf('week'));
-  const [tab, setTab] = useState<'doctors' | 'receptionists'>('doctors');
+  const [tab, setTab] = useState<'doctors' | 'receptionists' | 'nurses'>('doctors');
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);
   const [form] = Form.useForm<ShiftForm>();
@@ -81,6 +81,10 @@ export function WorkSchedulePage() {
     [data.data, term],
   );
   const receptionists = useMemo(() => (data.data?.receptionists ?? []).filter((r) => !term || r.fullName.toLowerCase().includes(term)), [data.data, term]);
+  const nurses = useMemo(() => (data.data?.nurses ?? []).filter((r) => !term || r.fullName.toLowerCase().includes(term)), [data.data, term]);
+  // Ai được xếp ca: tab đang mở là điều dưỡng thì chọn điều dưỡng, còn lại chọn lễ tân
+  const staffKind = tab === 'nurses' ? 'điều dưỡng' : 'lễ tân';
+  const staffOptions = (tab === 'nurses' ? (data.data?.nurses ?? []) : (data.data?.receptionists ?? [])).map((r) => ({ value: r.id, label: r.fullName }));
 
   const dayColumn = <T extends { shifts: { date: string }[] }>(d: Dayjs, render: (row: T, shifts: T['shifts']) => ReactNode) => {
     const key = d.format('YYYY-MM-DD');
@@ -119,10 +123,10 @@ export function WorkSchedulePage() {
     { key: 'total', title: 'Tổng', width: 72, align: 'right' as const, render: (_: unknown, d: Doctor) => totalHours(d.shifts) },
   ];
 
-  const receptionColumns = [
+  const staffColumns = (title: string) => [
     {
       key: 'name',
-      title: 'Lễ tân',
+      title,
       fixed: 'left' as const,
       width: 180,
       render: (_: unknown, r: Receptionist) => (
@@ -180,8 +184,8 @@ export function WorkSchedulePage() {
         onChange={(k) => setTab(k as typeof tab)}
         tabBarExtraContent={
           <Flex gap={8}>
-            <Input.Search allowClear placeholder={tab === 'doctors' ? 'Tìm bác sĩ, chuyên khoa' : 'Tìm lễ tân'} onSearch={setSearch} onChange={(e) => !e.target.value && setSearch('')} style={{ width: 220 }} />
-            {tab === 'receptionists' && (
+            <Input.Search allowClear placeholder={tab === 'doctors' ? 'Tìm bác sĩ, chuyên khoa' : `Tìm ${staffKind}`} onSearch={setSearch} onChange={(e) => !e.target.value && setSearch('')} style={{ width: 220 }} />
+            {tab !== 'doctors' && (
               <Button type="primary" icon={<PlusOutlined />} onClick={() => openAdd()}>
                 Xếp ca
               </Button>
@@ -210,17 +214,33 @@ export function WorkSchedulePage() {
                 size="small"
                 loading={data.isLoading}
                 dataSource={receptionists}
-                columns={receptionColumns}
+                columns={staffColumns('Lễ tân')}
                 pagination={false}
                 scroll={{ x: 1110 }}
                 locale={{ emptyText: 'Chưa có lễ tân' }}
               />
             ),
           },
+          {
+            key: 'nurses',
+            label: `Điều dưỡng (${data.data?.nurses?.length ?? 0})`,
+            children: (
+              <Table<Receptionist>
+                rowKey="id"
+                size="small"
+                loading={data.isLoading}
+                dataSource={nurses}
+                columns={staffColumns('Điều dưỡng')}
+                pagination={false}
+                scroll={{ x: 1110 }}
+                locale={{ emptyText: 'Chưa có điều dưỡng' }}
+              />
+            ),
+          },
         ]}
       />
       <Modal
-        title="Xếp ca trực lễ tân"
+        title={`Xếp ca trực ${staffKind}`}
         open={adding}
         okText="Xếp ca"
         cancelText="Hủy"
@@ -230,13 +250,8 @@ export function WorkSchedulePage() {
         destroyOnHidden
       >
         <Form<ShiftForm> form={form} layout="vertical" requiredMark={false} onFinish={(v) => create.mutate(v, { onSuccess: () => setAdding(false) })}>
-          <Form.Item label="Lễ tân" name="userId" rules={[{ required: true, message: 'Chọn lễ tân' }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="Chọn lễ tân"
-              options={(data.data?.receptionists ?? []).map((r) => ({ value: r.id, label: r.fullName }))}
-            />
+          <Form.Item label={tab === 'nurses' ? 'Điều dưỡng' : 'Lễ tân'} name="userId" rules={[{ required: true, message: `Chọn ${staffKind}` }]}>
+            <Select showSearch optionFilterProp="label" placeholder={`Chọn ${staffKind}`} options={staffOptions} />
           </Form.Item>
           <Form.Item label="Ngày" name="date" rules={[{ required: true, message: 'Chọn ngày' }]}>
             <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabledDate={(d) => d.isBefore(dayjs(), 'day')} />

@@ -62,7 +62,7 @@ public class WorkScheduleController {
     service.remove(id);
   }
 
-  @Roles(Role.RECEPTIONIST)
+  @Roles({Role.RECEPTIONIST, Role.NURSE})
   @GetMapping("/shifts/mine")
   public List<Map<String, Object>> mine(@CurrentUser AuthUser user, @RequestParam(required = false) String from, @RequestParam(required = false) String to) {
     checkRange(from, to);

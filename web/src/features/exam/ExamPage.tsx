@@ -19,6 +19,7 @@ import {
   Row,
   Space,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import { useEffect, useState } from 'react';
@@ -32,6 +33,7 @@ import { arrivalTag, byCallOrder, VISIT_STATUS } from '../reception/visitStatus'
 import { MedicineSelect, medicineLabel } from './MedicineSelect';
 import { LabCard } from './LabCard';
 import { ExportButtons, RecordCard } from './RecordCard';
+import { summary, warnings } from '../nurse/vitals';
 
 type ItemForm = { medicineId: string; quantity: number; dosePerTime: string; timesPerDay: number; days: number; note?: string };
 type PrescriptionForm = { advice?: string; items: ItemForm[] };
@@ -127,6 +129,11 @@ export function ExamPage() {
                         {v.status === 'WAITING' && v.predictedOrder === 0 ? <Tag style={{ background: C.ink, color: '#fff', borderColor: C.ink }}>Tiếp theo</Tag> : null}
                         <Tag color={src.color}>{src.label}</Tag>
                         {v.status !== 'WAITING' ? <Tag color={VISIT_STATUS[v.status].color}>{VISIT_STATUS[v.status].label}</Tag> : null}
+                        {v.vitals ? (
+                          <Tooltip title={summary(v.vitals)}>
+                            <Tag color={warnings(v.vitals).some((w) => w.severe) ? 'error' : 'cyan'}>Đã đo sinh hiệu</Tag>
+                          </Tooltip>
+                        ) : null}
                       </Space>
                       <div>
                         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -356,7 +363,7 @@ export function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () =>
         )}
       </Card>
 
-      <RecordCard visitId={visitId} visitDate={v.date} reason={v.reason} record={v.medicalRecord} />
+      <RecordCard visitId={visitId} visitDate={v.date} reason={v.reason} record={v.medicalRecord} vitals={v.vitals} />
 
       <LabCard visitId={visitId} orders={v.labOrders} readOnly={done} />
 

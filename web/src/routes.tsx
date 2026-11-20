@@ -2,7 +2,8 @@ import { Navigate, type RouteObject } from 'react-router';
 import { DoctorsPage } from './features/admin/DoctorsPage';
 import { MyProfilePage } from './features/doctor-profile/MyProfilePage';
 import { MedicinesPage } from './features/admin/MedicinesPage';
-import { ReceptionistsPage } from './features/admin/ReceptionistsPage';
+import { NursesPage, ReceptionistsPage } from './features/admin/ReceptionistsPage';
+import { NursePage } from './features/nurse/NursePage';
 import { SpecialtiesPage } from './features/admin/SpecialtiesPage';
 import { StatsPage } from './features/admin/stats/StatsPage';
 import { SmsPage } from './features/admin/SmsPage';
@@ -60,7 +61,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: CHANGE_PASSWORD_PATH,
-        element: <RequireRole roles={['ADMIN', 'DOCTOR', 'RECEPTIONIST']}><ChangePasswordPage /></RequireRole>,
+        element: <RequireRole roles={['ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE']}><ChangePasswordPage /></RequireRole>,
       },
       { path: '/admin/sms', element: <RequireRole roles={['ADMIN']}><SmsPage /></RequireRole> },
       { path: '/admin/stats', element: <RequireRole roles={['ADMIN']}><StatsPage /></RequireRole> },
@@ -69,6 +70,7 @@ export const routes: RouteObject[] = [
       { path: '/admin/records', element: <RequireRole roles={['ADMIN']}><AdminRecordsPage /></RequireRole> },
       { path: '/admin/work-schedule', element: <RequireRole roles={['ADMIN']}><WorkSchedulePage /></RequireRole> },
       { path: '/admin/doctors', element: <RequireRole roles={['ADMIN']}><DoctorsPage /></RequireRole> },
+      { path: '/admin/nurses', element: <RequireRole roles={['ADMIN']}><NursesPage /></RequireRole> },
       { path: '/admin/receptionists', element: <RequireRole roles={['ADMIN']}><ReceptionistsPage /></RequireRole> },
       { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><MedicinesPage /></RequireRole> },
       { path: '/doctor/queue', element: <RequireRole roles={['DOCTOR']}><ExamPage /></RequireRole> },
@@ -77,7 +79,8 @@ export const routes: RouteObject[] = [
       { path: '/doctor/profile', element: <RequireRole roles={['DOCTOR']}><MyProfilePage /></RequireRole> },
       { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ReceptionPage /></RequireRole> },
       { path: '/reception/queue', element: <RequireRole roles={['RECEPTIONIST']}><QueueBoardPage /></RequireRole> },
-      { path: '/reception/shifts', element: <RequireRole roles={['RECEPTIONIST']}><MyShiftsPage /></RequireRole> },
+      { path: '/reception/shifts', element: <RequireRole roles={['RECEPTIONIST', 'NURSE']}><MyShiftsPage /></RequireRole> },
+      { path: '/nurse', element: <RequireRole roles={['NURSE']}><NursePage /></RequireRole> },
       { path: '/reception/pending', element: <RequireRole roles={['RECEPTIONIST']}><PendingAppointmentsPage /></RequireRole> },
     ],
   },
