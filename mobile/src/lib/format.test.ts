@@ -22,7 +22,7 @@ describe('định dạng ngày giờ trên app', () => {
   it('tên bác sĩ kèm học vị', () => expect(doctorName({ title: 'BS', user: { fullName: 'An' } })).toBe('BS An'));
 });
 
-import { parseVnDate, toVnDateInput } from './format';
+import { dateToVnInput, parseVnDate, toVnDateInput, vnInputToDate } from './format';
 
 describe('nhập ngày sinh', () => {
   it('đổi DD/MM/YYYY sang YYYY-MM-DD', () => {
@@ -35,6 +35,12 @@ describe('nhập ngày sinh', () => {
     expect(parseVnDate('01/01/2999')).toBeNull();
   });
   it('hiện lại ngày sinh từ API vào ô nhập', () => expect(toVnDateInput('1998-03-05T00:00:00.000Z')).toBe('05/03/1998'));
+  it('qua lại giữa ô nhập và lịch chọn ngày', () => {
+    const d = vnInputToDate('05/03/1998')!;
+    expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([1998, 2, 5]);
+    expect(dateToVnInput(new Date(2001, 11, 20))).toBe('20/12/2001');
+    expect(vnInputToDate('31/02/2000')).toBeNull();
+  });
 });
 
 describe('ageOf', () => {
