@@ -15,6 +15,7 @@ import {
   KeyOutlined,
   MessageOutlined,
   StarOutlined,
+  HeartOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Avatar, Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Typography } from 'antd';
@@ -43,6 +44,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
     item('/admin/reviews', 'Đánh giá', <StarOutlined />),
     item('/admin/doctors', 'Bác sĩ', <TeamOutlined />),
     item('/admin/receptionists', 'Lễ tân', <IdcardOutlined />),
+    item('/admin/nurses', 'Điều dưỡng', <HeartOutlined />),
     item('/admin/medicines', 'Danh mục thuốc', <MedicineBoxOutlined />),
     item('/admin/sms', 'Tin nhắn xác minh', <MessageOutlined />),
   ],
@@ -58,6 +60,10 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
     item('/reception/queue', 'Hàng đợi hôm nay', <UnorderedListOutlined />),
     item('/reception/shifts', 'Ca trực của tôi', <CalendarOutlined />),
     item('/counter', 'Màn hình quầy (QR)', <QrcodeOutlined />),
+  ],
+  NURSE: [
+    item('/nurse', 'Đo sinh hiệu', <HeartOutlined />),
+    item('/reception/shifts', 'Ca trực của tôi', <CalendarOutlined />),
   ],
 };
 

@@ -62,11 +62,12 @@ public class WorkScheduleService {
     List<Map<String, Object>> doctorRows = doctors.allActive().stream().map(d -> doctorRow(d, slots.getOrDefault(d.getId(), List.of()))).toList();
 
     Map<String, List<StaffShift>> byUser = shifts.findRange(r[0], r[1]).stream().collect(Collectors.groupingBy(StaffShift::getUserId));
-    List<Map<String, Object>> receptionRows = users.activeByRole(Role.RECEPTIONIST).stream()
+    java.util.function.Function<Role, List<Map<String, Object>>> staff = role -> users.activeByRole(role).stream()
         .map(u -> Json.obj("id", u.getId(), "fullName", u.getFullName(), "phone", u.getPhone(),
             "shifts", byUser.getOrDefault(u.getId(), List.of()).stream().map(WorkScheduleService::shiftView).toList()))
         .toList();
-    return Json.obj("from", r[0].toString(), "to", r[1].toString(), "doctors", doctorRows, "receptionists", receptionRows);
+    return Json.obj("from", r[0].toString(), "to", r[1].toString(), "doctors", doctorRows, "receptionists", staff.apply(Role.RECEPTIONIST),
+        "nurses", staff.apply(Role.NURSE));
   }
 
   private static Map<String, Object> doctorRow(Doctor d, List<Schedule> slots) {
@@ -113,8 +114,8 @@ public class WorkScheduleService {
   /** Admin xếp ca trực cho một lễ tân; không cho ca chồng lên ca đã có của cùng người. */
   @Transactional
   public Map<String, Object> create(AuthUser admin, ShiftRequest dto) {
-    User u = users.findById(dto.userId()).filter(x -> x.getRole() == Role.RECEPTIONIST && x.isActive())
-        .orElseThrow(() -> ApiException.notFound("Không tìm thấy lễ tân"));
+    User u = users.findById(dto.userId()).filter(x -> (x.getRole() == Role.RECEPTIONIST || x.getRole() == Role.NURSE) && x.isActive())
+        .orElseThrow(() -> ApiException.notFound("Không tìm thấy lễ tân hoặc điều dưỡng"));
     String ymd = dto.date().substring(0, 10);
     if (ymd.compareTo(VnTime.dateString(Instant.now())) < 0) throw ApiException.badRequest("Không xếp ca cho ngày đã qua");
     if (dto.end().compareTo(dto.start()) <= 0) throw ApiException.badRequest("Giờ kết thúc phải sau giờ bắt đầu");

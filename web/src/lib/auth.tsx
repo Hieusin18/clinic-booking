@@ -92,6 +92,7 @@ export const HOME_BY_ROLE: Record<Role, string> = {
   ADMIN: '/admin/stats',
   DOCTOR: '/doctor/queue',
   RECEPTIONIST: '/reception',
+  NURSE: '/nurse',
   PATIENT: '/patient-only',
 };
 
@@ -99,5 +100,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: 'Quản trị viên',
   DOCTOR: 'Bác sĩ',
   RECEPTIONIST: 'Lễ tân',
+  NURSE: 'Điều dưỡng',
   PATIENT: 'Bệnh nhân',
 };

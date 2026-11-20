@@ -9,31 +9,38 @@ import { initialPasswordRules } from '../../lib/password';
 
 type CreateValues = { fullName: string; phone: string; email?: string; password: string };
 
-export function ReceptionistsPage() {
-  const list = usePagedList<User>('receptionists', '/staff/receptionists');
+/** Tài khoản nhân viên không phải bác sĩ: lễ tân hoặc điều dưỡng. */
+const KIND = {
+  receptionists: { title: 'Tài khoản lễ tân', add: 'Thêm lễ tân', created: 'Đã tạo tài khoản lễ tân', who: 'Lễ tân' },
+  nurses: { title: 'Tài khoản điều dưỡng', add: 'Thêm điều dưỡng', created: 'Đã tạo tài khoản điều dưỡng', who: 'Điều dưỡng' },
+} as const;
+
+export function StaffAccountsPage({ kind }: { kind: keyof typeof KIND }) {
+  const k = KIND[kind];
+  const list = usePagedList<User>(kind, `/staff/${kind}`);
   const [creating, setCreating] = useState(false);
   const [createForm] = Form.useForm<CreateValues>();
 
-  const create = useAction((v: CreateValues) => api.post('/staff/receptionists', { ...v, email: v.email || undefined }), {
-    success: 'Đã tạo tài khoản lễ tân',
-    invalidate: ['receptionists'],
+  const create = useAction((v: CreateValues) => api.post(`/staff/${kind}`, { ...v, email: v.email || undefined }), {
+    success: k.created,
+    invalidate: [kind],
   });
-  const update = useAction(({ id, ...body }: { id: string; isActive?: boolean }) => api.patch(`/staff/receptionists/${id}`, body), {
+  const update = useAction(({ id, ...body }: { id: string; isActive?: boolean }) => api.patch(`/staff/${kind}/${id}`, body), {
     success: 'Đã cập nhật tài khoản',
-    invalidate: ['receptionists'],
+    invalidate: [kind],
   });
 
   return (
     <Card>
       <PageHeader
-        title="Tài khoản lễ tân"
+        title={k.title}
         onSearch={list.search}
         searchPlaceholder="Tìm theo tên hoặc SĐT"
         onAdd={() => {
           createForm.resetFields();
           setCreating(true);
         }}
-        addLabel="Thêm lễ tân"
+        addLabel={k.add}
       />
       <Table<User>
         rowKey="id"
@@ -58,7 +65,7 @@ export function ReceptionistsPage() {
         ]}
       />
       <Modal
-        title="Thêm tài khoản lễ tân"
+        title={k.add}
         open={creating}
         okText="Tạo"
         cancelText="Hủy"
@@ -82,7 +89,7 @@ export function ReceptionistsPage() {
             name="password"
             rules={initialPasswordRules}
             dependencies={['phone']}
-            extra="Ít nhất 8 ký tự, có cả chữ và số. Lễ tân sẽ phải đổi mật khẩu này ở lần đăng nhập đầu."
+            extra={`Ít nhất 8 ký tự, có cả chữ và số. ${k.who} sẽ phải đổi mật khẩu này ở lần đăng nhập đầu.`}
           >
             <Input.Password />
           </Form.Item>
@@ -91,3 +98,6 @@ export function ReceptionistsPage() {
     </Card>
   );
 }
+
+export const ReceptionistsPage = () => <StaffAccountsPage kind="receptionists" />;
+export const NursesPage = () => <StaffAccountsPage kind="nurses" />;

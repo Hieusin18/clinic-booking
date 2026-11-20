@@ -5,6 +5,7 @@ import com.clinic.dto.PageQuery;
 import com.clinic.dto.catalog.ReceptionistPatch;
 import com.clinic.dto.catalog.ReceptionistRequest;
 import com.clinic.entity.enums.Role;
+import com.clinic.exception.ApiException;
 import com.clinic.security.Roles;
 import com.clinic.service.StaffService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "staff")
 @Roles(Role.ADMIN)
 @RestController
-@RequestMapping("/staff/receptionists")
+@RequestMapping("/staff")
 public class StaffController {
   private final StaffService service;
   private final BodyReader body;
@@ -34,19 +35,28 @@ public class StaffController {
     this.body = body;
   }
 
-  @GetMapping
-  public Map<String, Object> list(@Valid PageQuery q) {
-    return service.list(q);
+  /** "receptionists" → lễ tân, "nurses" → điều dưỡng; loại khác thì 404 */
+  static Role roleOf(String kind) {
+    return switch (kind) {
+      case "receptionists" -> Role.RECEPTIONIST;
+      case "nurses" -> Role.NURSE;
+      default -> throw ApiException.notFound("Cannot GET /api/staff/" + kind);
+    };
   }
 
-  @PostMapping
+  @GetMapping("/{kind}")
+  public Map<String, Object> list(@PathVariable String kind, @Valid PageQuery q) {
+    return service.list(roleOf(kind), q);
+  }
+
+  @PostMapping("/{kind}")
   @ResponseStatus(HttpStatus.CREATED)
-  public Map<String, Object> create(@Valid @RequestBody ReceptionistRequest dto) {
-    return service.create(dto);
+  public Map<String, Object> create(@PathVariable String kind, @Valid @RequestBody ReceptionistRequest dto) {
+    return service.create(roleOf(kind), dto);
   }
 
-  @PatchMapping("/{id}")
-  public Map<String, Object> update(@PathVariable String id, @RequestBody(required = false) JsonNode dto) {
-    return service.update(id, body.read(dto, ReceptionistPatch.class));
+  @PatchMapping("/{kind}/{id}")
+  public Map<String, Object> update(@PathVariable String kind, @PathVariable String id, @RequestBody(required = false) JsonNode dto) {
+    return service.update(roleOf(kind), id, body.read(dto, ReceptionistPatch.class));
   }
 }

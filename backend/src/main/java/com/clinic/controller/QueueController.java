@@ -45,6 +45,7 @@ public class QueueController {
   public static final String NEEDS_DOCTOR = "Bạn chưa đặt lịch hôm nay, vui lòng chọn bác sĩ";
 
   private final QueueService queue;
+  private final com.clinic.service.VitalsService vitals;
   private final AppointmentRepository appointments;
   private final VisitRepository visits;
   private final PatientScope scope;
@@ -52,7 +53,9 @@ public class QueueController {
   private final TransactionTemplate tx;
 
   public QueueController(QueueService queue, AppointmentRepository appointments, VisitRepository visits, PatientScope scope, AppEnv env,
-      PlatformTransactionManager txm) {
+      PlatformTransactionManager txm,
+      com.clinic.service.VitalsService vitals) {
+    this.vitals = vitals;
     this.queue = queue;
     this.appointments = appointments;
     this.visits = visits;
@@ -167,7 +170,8 @@ public class QueueController {
   @Roles(Role.DOCTOR)
   @GetMapping("/doctor")
   public List<Map<String, Object>> doctorQueue(@CurrentUser AuthUser user) {
-    return queue.today(queue.doctorIdOf(user.sub()), Instant.now());
+    // Kèm sinh hiệu điều dưỡng đã đo để bác sĩ biết ai đã đo
+    return vitals.attach(queue.today(queue.doctorIdOf(user.sub()), Instant.now()));
   }
 
   /** Gọi số tiếp theo theo thứ tự ưu tiên */
