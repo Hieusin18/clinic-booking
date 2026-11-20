@@ -33,6 +33,7 @@ import { arrivalTag, byCallOrder, VISIT_STATUS } from '../reception/visitStatus'
 import { MedicineSelect, medicineLabel } from './MedicineSelect';
 import { LabCard } from './LabCard';
 import { ExportButtons, RecordCard } from './RecordCard';
+import { FollowUpCard } from './FollowUpCard';
 import { summary, warnings } from '../nurse/vitals';
 
 type ItemForm = { medicineId: string; quantity: number; dosePerTime: string; timesPerDay: number; days: number; note?: string };
@@ -364,6 +365,9 @@ export function VisitPanel({ visitId, onDone }: { visitId: string; onDone: () =>
       </Card>
 
       <RecordCard visitId={visitId} visitDate={v.date} reason={v.reason} record={v.medicalRecord} vitals={v.vitals} />
+      {v.medicalRecord?.followUpDate && (
+        <FollowUpCard key={v.medicalRecord.followUpDate} visitId={visitId} doctorId={v.doctor.id} followUpDate={v.medicalRecord.followUpDate} appointment={v.followUpAppointment} />
+      )}
 
       <LabCard visitId={visitId} orders={v.labOrders} readOnly={done} />
 

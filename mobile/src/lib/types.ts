@@ -185,6 +185,8 @@ export interface Appointment {
   /** Có ở /appointments/mine: khung giờ được check-in */
   checkinOpensAt?: string;
   checkinClosesAt?: string;
+  /** Lịch tái khám bác sĩ đặt cho một lượt khám */
+  followUpOfVisitId?: string | null;
   /** Lễ tân duyệt lịch đặt online: thời điểm duyệt/từ chối và lý do từ chối */
   reviewedAt?: string | null;
   rejectReason?: string | null;
@@ -265,6 +267,8 @@ export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   prescriptions?: Prescription[];
   prescription: Prescription | null;
   labOrders?: LabOrder[];
+  /** Lịch tái khám bác sĩ đã đặt sẵn (null = chưa đặt, tự đặt trong app) */
+  followUpAppointment?: Appointment | null;
 }
 
 /** Đánh giá của bệnh nhân cho một lượt khám */

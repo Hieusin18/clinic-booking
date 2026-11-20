@@ -74,6 +74,11 @@ function UpcomingStub({ a, cancelling, onCancel }: { a: Appointment; cancelling:
       <View style={{ flex: 1, padding: 14, gap: 4 }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{doctorName(a.schedule.doctor)}</Text>
         {a.schedule.doctor.specialty ? <Muted>{a.schedule.doctor.specialty.name}</Muted> : null}
+        {a.followUpOfVisitId ? (
+          <View style={{ alignSelf: 'flex-start' }}>
+            <Badge label="Tái khám · bác sĩ đặt" tone="success" />
+          </View>
+        ) : null}
         {a.reason ? <Muted>Lý do: {a.reason}</Muted> : null}
         {a.status === 'PENDING' ? (
           <Text style={{ fontSize: 13.5, lineHeight: 19, color: colors.muted }}>Phòng khám sẽ xác nhận lịch này sớm; bạn sẽ nhận được thông báo.</Text>

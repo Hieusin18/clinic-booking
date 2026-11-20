@@ -37,6 +37,21 @@ function VitalWarnings({ v }: { v: Vitals }) {
   );
 }
 
+/** Chọn nhanh ngày tái khám */
+export const FOLLOW_UP_PRESETS = [
+  { label: '3 ngày', days: 3 },
+  { label: '7 ngày', days: 7 },
+  { label: '14 ngày', days: 14 },
+  { label: '1 tháng', months: 1 },
+  { label: '3 tháng', months: 3 },
+] as const;
+
+/** Ngày tái khám = ngày khám + N ngày / N tháng */
+export function followUpAfter(visitDate: string, p: { days?: number; months?: number }) {
+  const base = dayjs(visitDate.slice(0, 10));
+  return 'months' in p && p.months ? base.add(p.months, 'month') : base.add(p.days ?? 0, 'day');
+}
+
 /** BMI = cân nặng (kg) / chiều cao (m)², làm tròn 1 chữ số. */
 export const bmi = (weight?: number | null, height?: number | null) =>
   weight && height ? Math.round((weight / (height / 100) ** 2) * 10) / 10 : null;
@@ -339,13 +354,23 @@ export function RecordCard({
             </Form.Item>
           </Col>
           <Col xs={24} md={8}>
-            <Form.Item label="Hẹn tái khám" name="followUpDate">
-              <DatePicker
-                placeholder="Chọn ngày"
-                format="DD/MM/YYYY"
-                style={{ width: '100%' }}
-                disabledDate={(d) => !d.isAfter(dayjs(visitDate.slice(0, 10)), 'day')}
-              />
+            <Form.Item label="Hẹn tái khám" style={{ marginBottom: 8 }}>
+              <Form.Item name="followUpDate" noStyle>
+                <DatePicker
+                  placeholder="Chọn ngày"
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  disabledDate={(d) => !d.isAfter(dayjs(visitDate.slice(0, 10)), 'day')}
+                />
+              </Form.Item>
+              {/* Chọn nhanh "tái khám sau N ngày" tính từ ngày khám */}
+              <Flex gap={4} wrap style={{ marginTop: 6 }}>
+                {FOLLOW_UP_PRESETS.map((p) => (
+                  <Button key={p.label} size="small" onClick={() => form.setFieldValue('followUpDate', followUpAfter(visitDate, p))}>
+                    {p.label}
+                  </Button>
+                ))}
+              </Flex>
             </Form.Item>
           </Col>
         </Row>

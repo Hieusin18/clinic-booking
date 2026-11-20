@@ -115,4 +115,13 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update Appointment a set a.status = :to where a.id = :id and a.status in :from")
   int moveStatus(@Param("id") String id, @Param("from") Collection<AppointmentStatus> from, @Param("to") AppointmentStatus to);
+
+  /** Lịch tái khám bác sĩ đã đặt cho lượt khám (còn hiệu lực) */
+  java.util.Optional<Appointment> findFirstByFollowUpOfVisitIdAndStatusIn(String visitId, Collection<AppointmentStatus> statuses);
+
+  /** Bệnh nhân đã có lịch (còn hiệu lực hoặc đã khám) trong khoảng ngày, đặt sau mốc {@code after}: khỏi nhắc tái khám */
+  @Query("select count(a) > 0 from Appointment a join a.schedule s where a.patientId = :pid and a.status in :statuses "
+      + "and s.date >= :from and s.date <= :to and a.createdAt >= :after")
+  boolean hasBookingBetween(@Param("pid") String patientId, @Param("statuses") Collection<AppointmentStatus> statuses,
+      @Param("from") LocalDate from, @Param("to") LocalDate to, @Param("after") Instant after);
 }

@@ -11,10 +11,11 @@ import { experienceText } from '@/lib/doctor';
 import { errorMessage } from '@/lib/errors';
 import { dayLabel, dayParts, doctorName, formatDate, formatTime, ymd } from '@/lib/format';
 import { standingNotice } from '@/lib/queue';
+import { BOOK_DAYS, BOOK_MAX_OFFSET, bookWindowStart } from '@/lib/followUp';
 import type { Appointment, BookingStanding, DayAvailability, Doctor, Slot } from '@/lib/types';
 import { withLogin } from '@/components/LoginRequired';
 
-const DAYS = 7;
+const DAYS = BOOK_DAYS;
 
 /** Ô giờ trong bảng giờ: còn trống, đã có người đặt (gạch ngang) hoặc đang chọn (tô mực dấu). */
 function SlotCell({ slot, selected, onPress }: { slot: Slot; selected: boolean; onPress: () => void }) {
@@ -56,8 +57,10 @@ function SlotCell({ slot, selected, onPress }: { slot: Slot; selected: boolean; 
 function BookDoctor() {
   const { doctorId, day } = useLocalSearchParams<{ doctorId: string; day?: string }>();
   const queryClient = useQueryClient();
-  // Mở từ hồ sơ bác sĩ với một ngày đã chọn (số ngày tính từ hôm nay)
-  const [offset, setOffset] = useState(() => Math.min(Math.max(Number(day) || 0, 0), DAYS - 1));
+  // Mở từ hồ sơ bác sĩ / hẹn tái khám với một ngày đã chọn (số ngày tính từ hôm nay); ngày xa thì dải 7 ngày dời tới quanh ngày đó
+  const target = Math.min(Math.max(Number(day) || 0, 0), BOOK_MAX_OFFSET);
+  const start = bookWindowStart(target);
+  const [offset, setOffset] = useState(target);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [reason, setReason] = useState('');
   const date = ymd(offset);
@@ -134,7 +137,7 @@ function BookDoctor() {
       ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-        {Array.from({ length: DAYS }, (_, i) => {
+        {Array.from({ length: DAYS }, (_, k) => start + k).map((i) => {
           const p = dayParts(i);
           const free = freeOf(i);
           const on = offset === i;
