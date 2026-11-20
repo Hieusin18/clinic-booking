@@ -52,6 +52,8 @@ export interface Doctor {
   avatarVersion: number | null;
   specialty: { id: string; name: string };
   user: { fullName: string };
+  /** Điểm đánh giá của bệnh nhân; average null = chưa có đánh giá */
+  rating?: { average: number | null; count: number };
   /** Có ở danh sách bác sĩ: số chỗ trống hôm nay, công việc hiện tại */
   freeToday?: number;
   currentPosition?: string | null;
@@ -263,4 +265,37 @@ export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   prescriptions?: Prescription[];
   prescription: Prescription | null;
   labOrders?: LabOrder[];
+}
+
+/** Đánh giá của bệnh nhân cho một lượt khám */
+export interface MyReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  /** Admin đã ẩn (góp ý không phù hợp) */
+  hidden: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** GET /visits/:id/review */
+export interface VisitReviewState {
+  review: MyReview | null;
+  canReview: boolean;
+  reviewableUntil: string | null;
+}
+
+export interface RatingSummary {
+  average: number | null;
+  count: number;
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+}
+
+/** GET /doctors/:id/reviews */
+export interface DoctorReviews {
+  items: { id: string; rating: number; comment: string; createdAt: string; patientName: string }[];
+  total: number;
+  page: number;
+  pageSize: number;
+  summary: RatingSummary;
 }
