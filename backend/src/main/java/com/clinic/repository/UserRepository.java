@@ -2,6 +2,7 @@ package com.clinic.repository;
 
 import com.clinic.entity.User;
 import com.clinic.entity.enums.Role;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,4 +25,7 @@ public interface UserRepository extends JpaRepository<User, String> {
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update User u set u.tokenVersion = u.tokenVersion + 1 where u.id = :id")
   int bumpTokenVersion(@Param("id") String id);
+
+  @Query("select u from User u where u.role = :role and u.active = true order by u.fullName asc")
+  List<User> activeByRole(@Param("role") Role role);
 }

@@ -28,4 +28,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, String> {
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update Schedule s set s.isBooked = false where s.id = :id")
   int release(@Param("id") String id);
+
+  /** Khung giờ của mọi bác sĩ trong khoảng ngày (admin xem lịch làm việc). */
+  @Query("select s from Schedule s where s.date >= :from and s.date <= :to order by s.doctorId asc, s.startTime asc")
+  List<Schedule> findAllRange(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }

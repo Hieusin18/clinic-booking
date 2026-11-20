@@ -37,6 +37,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
   ADMIN: [
     item('/admin/stats', 'Thống kê', <BarChartOutlined />),
     item('/admin/specialties', 'Chuyên khoa', <ApartmentOutlined />),
+    item('/admin/work-schedule', 'Lịch làm việc', <CalendarOutlined />),
     item('/admin/doctors', 'Bác sĩ', <TeamOutlined />),
     item('/admin/receptionists', 'Lễ tân', <IdcardOutlined />),
     item('/admin/medicines', 'Danh mục thuốc', <MedicineBoxOutlined />),
@@ -52,6 +53,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
     item('/reception', 'Tiếp đón', <UserOutlined />),
     item('/reception/pending', 'Duyệt lịch hẹn', <CheckSquareOutlined />),
     item('/reception/queue', 'Hàng đợi hôm nay', <UnorderedListOutlined />),
+    item('/reception/shifts', 'Ca trực của tôi', <CalendarOutlined />),
     item('/counter', 'Màn hình quầy (QR)', <QrcodeOutlined />),
   ],
 };

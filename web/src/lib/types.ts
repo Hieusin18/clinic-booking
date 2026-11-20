@@ -259,3 +259,37 @@ export interface PendingAppointment extends Appointment {
     waiting: number;
   };
 }
+
+/** Ca khám của bác sĩ: các khung giờ liền nhau trong một ngày được gộp lại */
+export interface DoctorShift {
+  date: string;
+  startTime: string;
+  endTime: string;
+  slots: number;
+  booked: number;
+}
+
+/** Ca trực của lễ tân do admin xếp */
+export interface StaffShift {
+  id: string;
+  userId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  note: string | null;
+}
+
+/** GET /work-schedule: lịch làm việc của bác sĩ và lễ tân trong khoảng ngày */
+export interface WorkSchedule {
+  from: string;
+  to: string;
+  doctors: {
+    id: string;
+    fullName: string;
+    title: string | null;
+    room: string | null;
+    specialty: { id: string; name: string };
+    shifts: DoctorShift[];
+  }[];
+  receptionists: { id: string; fullName: string; phone: string; shifts: StaffShift[] }[];
+}
