@@ -69,3 +69,14 @@ export const toVnDateInput = (iso: string) => {
 };
 
 export const PHONE_REGEX = /^0\d{9}$/;
+
+/** "DD/MM/YYYY" → Date (0 giờ theo giờ máy) để mở lịch đúng ngày; sai định dạng thì null. */
+export function vnInputToDate(input: string): Date | null {
+  const iso = parseVnDate(input);
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Ngày chọn trên lịch (giờ máy) → "DD/MM/YYYY" cho ô nhập. */
+export const dateToVnInput = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;

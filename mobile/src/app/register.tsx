@@ -1,4 +1,5 @@
 import { Stack, router } from 'expo-router';
+import { DateField } from '@/components/DateField';
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { PhoneVerify, type VerifiedPhone } from '@/components/PhoneVerify';
@@ -26,7 +27,7 @@ export default function Register() {
     const dateOfBirth = parseVnDate(form.dob);
     if (form.fullName.trim().length < 2) return setError('Nhập họ tên');
     if (!PHONE_REGEX.test(form.phone.trim())) return setError('Số điện thoại gồm 10 chữ số, bắt đầu bằng 0');
-    if (!dateOfBirth) return setError('Ngày sinh không hợp lệ, nhập theo dạng ngày/tháng/năm, ví dụ 05/03/1998');
+    if (!dateOfBirth) return setError('Chọn ngày sinh');
     if (!gender) return setError('Chọn giới tính');
     const weak = passwordProblem(form.password, form.phone.trim());
     if (weak) return setError(weak);
@@ -78,7 +79,7 @@ export default function Register() {
       <Card>
         <Field label="Họ và tên" value={form.fullName} onChangeText={set('fullName')} autoCapitalize="words" />
         <Field label="Số điện thoại" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" />
-        <Field label="Ngày sinh" value={form.dob} onChangeText={set('dob')} placeholder="ngày/tháng/năm" keyboardType="numbers-and-punctuation" />
+        <DateField label="Ngày sinh" value={form.dob} onChange={set('dob')} placeholder="Chọn ngày sinh" />
         <View style={{ gap: 6 }}>
           <Text style={styles.label}>Giới tính</Text>
           <View style={styles.wrap}>
