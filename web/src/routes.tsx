@@ -14,6 +14,7 @@ import { RecordsPage } from './features/exam/RecordsPage';
 import { CounterPage } from './features/reception/CounterPage';
 import { PendingAppointmentsPage } from './features/reception/PendingAppointmentsPage';
 import { ReviewsPage } from './features/admin/ReviewsPage';
+import { BannersPage } from './features/admin/BannersPage';
 import { AdminRecordsPage } from './features/admin/records/AdminRecordsPage';
 import { MyShiftsPage } from './features/work-schedule/MyShiftsPage';
 import { WorkSchedulePage } from './features/work-schedule/WorkSchedulePage';
@@ -66,6 +67,7 @@ export const routes: RouteObject[] = [
       { path: '/admin/sms', element: <RequireRole roles={['ADMIN']}><SmsPage /></RequireRole> },
       { path: '/admin/stats', element: <RequireRole roles={['ADMIN']}><StatsPage /></RequireRole> },
       { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><SpecialtiesPage /></RequireRole> },
+      { path: '/admin/banners', element: <RequireRole roles={['ADMIN']}><BannersPage /></RequireRole> },
       { path: '/admin/reviews', element: <RequireRole roles={['ADMIN']}><ReviewsPage /></RequireRole> },
       { path: '/admin/records', element: <RequireRole roles={['ADMIN']}><AdminRecordsPage /></RequireRole> },
       { path: '/admin/work-schedule', element: <RequireRole roles={['ADMIN']}><WorkSchedulePage /></RequireRole> },
