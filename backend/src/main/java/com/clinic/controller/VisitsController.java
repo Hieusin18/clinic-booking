@@ -64,14 +64,14 @@ public class VisitsController {
     return service.patientHistory(user, patientId);
   }
 
-  @Roles({Role.DOCTOR, Role.PATIENT})
+  @Roles({Role.DOCTOR, Role.PATIENT, Role.ADMIN})
   @GetMapping("/visits/{id}")
   public Map<String, Object> detail(@CurrentUser AuthUser user, @PathVariable String id) {
     return service.detail(user, id);
   }
 
   /** Xem trước bệnh án và đơn thuốc (HTML, không có JavaScript) */
-  @Roles({Role.DOCTOR, Role.PATIENT})
+  @Roles({Role.DOCTOR, Role.PATIENT, Role.ADMIN})
   @GetMapping("/visits/{id}/record.html")
   public ResponseEntity<String> previewHtml(@CurrentUser AuthUser user, @PathVariable String id) {
     return ResponseEntity.ok()
@@ -89,17 +89,34 @@ public class VisitsController {
   }
 
   /** Tải bệnh án và đơn thuốc dạng PDF */
-  @Roles({Role.DOCTOR, Role.PATIENT})
+  @Roles({Role.DOCTOR, Role.PATIENT, Role.ADMIN})
   @GetMapping("/visits/{id}/record.pdf")
   public ResponseEntity<byte[]> exportPdf(@CurrentUser AuthUser user, @PathVariable String id) throws IOException {
     return download(service.export(user, id, "pdf"));
   }
 
   /** Tải bệnh án và đơn thuốc dạng Word (.docx) */
-  @Roles({Role.DOCTOR, Role.PATIENT})
+  @Roles({Role.DOCTOR, Role.PATIENT, Role.ADMIN})
   @GetMapping("/visits/{id}/record.docx")
   public ResponseEntity<byte[]> exportDocx(@CurrentUser AuthUser user, @PathVariable String id) throws IOException {
     return download(service.export(user, id, "docx"));
+  }
+
+  /** Lịch sử sửa bệnh án và các mốc đơn thuốc (admin; bác sĩ phụ trách) */
+  @Roles({Role.DOCTOR, Role.ADMIN})
+  @GetMapping("/visits/{id}/record/history")
+  public List<Map<String, Object>> recordHistory(@CurrentUser AuthUser user, @PathVariable String id) {
+    return service.recordHistory(user, id);
+  }
+
+  /** Admin tra cứu bệnh án của mọi bác sĩ: q = tên/SĐT/chẩn đoán/ICD; doctorId, from, to (YYYY-MM-DD) tùy chọn */
+  @Roles(Role.ADMIN)
+  @GetMapping("/admin/records")
+  public Map<String, Object> allRecords(@Valid PageQuery q, @RequestParam(required = false) String doctorId,
+      @RequestParam(required = false) String from, @RequestParam(required = false) String to) {
+    SchedulesController.checkDate("from", from, false);
+    SchedulesController.checkDate("to", to, false);
+    return service.allRecords(q, doctorId, from, to);
   }
 
   /** Ghi hoặc sửa bệnh án (chỉ bác sĩ phụ trách) */

@@ -38,6 +38,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
     item('/admin/stats', 'Thống kê', <BarChartOutlined />),
     item('/admin/specialties', 'Chuyên khoa', <ApartmentOutlined />),
     item('/admin/work-schedule', 'Lịch làm việc', <CalendarOutlined />),
+    item('/admin/records', 'Hồ sơ bệnh án', <FileSearchOutlined />),
     item('/admin/doctors', 'Bác sĩ', <TeamOutlined />),
     item('/admin/receptionists', 'Lễ tân', <IdcardOutlined />),
     item('/admin/medicines', 'Danh mục thuốc', <MedicineBoxOutlined />),

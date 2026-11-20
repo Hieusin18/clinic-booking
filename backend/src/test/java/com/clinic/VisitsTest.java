@@ -101,7 +101,9 @@ class VisitsTest extends IntegrationTest {
       api.put("/api/visits/" + visitId + "/record").auth(other.token()).send(RECORD).expect(404);
       api.put("/api/visits/" + visitId + "/record").auth(reception).send(RECORD).expect(403);
       api.get("/api/visits/" + visitId).auth(reception).expect(403);
-      api.get("/api/visits/" + visitId).auth(admin.token()).expect(403);
+      // Admin xem được (chỉ đọc) để tra cứu bệnh án, nhưng không sửa được
+      api.get("/api/visits/" + visitId).auth(admin.token()).expect(200);
+      api.put("/api/visits/" + visitId + "/record").auth(admin.token()).send(RECORD).expect(403);
       api.get("/api/visits/" + visitId).auth(other.token()).expect(404);
     }
 
