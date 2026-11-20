@@ -59,5 +59,6 @@ describe('Lịch làm việc (admin)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: /Sáng 07:00–12:00/ }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Xếp ca' }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/shifts', { userId: 'r1', date: today, start: '07:00', end: '12:00', note: undefined }));
-  });
+    // Bảng 7 cột + hộp thoại có DatePicker/TimePicker: máy CI chậm có lúc quá 15 giây
+  }, 40_000);
 });
