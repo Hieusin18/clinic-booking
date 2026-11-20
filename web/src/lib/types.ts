@@ -315,3 +315,17 @@ export type AdminRecordRow = Visit & {
   recordUpdatedAt: string;
   history: { revisions: number; editedAfterDone: boolean };
 };
+
+/** GET /admin/reviews */
+export interface AdminReview {
+  id: string;
+  visitId: string;
+  rating: number;
+  comment: string | null;
+  hidden: boolean;
+  hiddenReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  patient: { id: string; fullName: string };
+  doctor: { id: string; title: string | null; user: { fullName: string } };
+}

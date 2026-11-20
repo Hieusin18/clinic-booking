@@ -3,6 +3,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { LabResults } from '@/components/LabResults';
 import { RecordActions } from '@/components/RecordActions';
+import { ReviewCard } from '@/components/ReviewCard';
 import { Icon } from '@/components/Icon';
 import { Text } from '@/components/Text';
 import { Badge, Button, Card, Empty, ErrorBox, Loading, Muted, Perforation, Screen, SectionLabel, colors, styles } from '@/components/ui';
@@ -156,6 +157,8 @@ function VisitScreen() {
       ) : v.status === 'DONE' ? (
         <Empty title="Lần khám này không kê đơn" />
       ) : null}
+
+      {v.status === 'DONE' ? <ReviewCard visitId={v.id} /> : null}
 
       {r && (
         <Card>

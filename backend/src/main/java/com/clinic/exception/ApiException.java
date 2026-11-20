@@ -60,6 +60,16 @@ public class ApiException extends RuntimeException {
     return new ApiException(HttpStatus.TOO_MANY_REQUESTS, message);
   }
 
+  /** 400 kèm mã lỗi để app xử lý riêng (vd. INAPPROPRIATE_COMMENT). */
+  public static ApiException badRequestWithCode(String code, String message) {
+    Map<String, Object> b = new LinkedHashMap<>();
+    b.put("statusCode", 400);
+    b.put("error", "Bad Request");
+    b.put("code", code);
+    b.put("message", message);
+    return new ApiException(HttpStatus.BAD_REQUEST, b);
+  }
+
   /** 409 kèm mã lỗi và dữ liệu thêm (vd. CHECKIN_TOO_EARLY kèm giờ mở check-in). */
   public static ApiException conflictWithCode(String code, String message, Map<String, Object> extra) {
     Map<String, Object> b = new LinkedHashMap<>();

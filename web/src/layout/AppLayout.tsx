@@ -14,6 +14,7 @@ import {
   IdcardOutlined,
   KeyOutlined,
   MessageOutlined,
+  StarOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Avatar, Badge, Button, Dropdown, Flex, Layout, Menu, Spin, Typography } from 'antd';
@@ -39,6 +40,7 @@ export const MENU_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Item[]> = {
     item('/admin/specialties', 'Chuyên khoa', <ApartmentOutlined />),
     item('/admin/work-schedule', 'Lịch làm việc', <CalendarOutlined />),
     item('/admin/records', 'Hồ sơ bệnh án', <FileSearchOutlined />),
+    item('/admin/reviews', 'Đánh giá', <StarOutlined />),
     item('/admin/doctors', 'Bác sĩ', <TeamOutlined />),
     item('/admin/receptionists', 'Lễ tân', <IdcardOutlined />),
     item('/admin/medicines', 'Danh mục thuốc', <MedicineBoxOutlined />),

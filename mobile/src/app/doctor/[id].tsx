@@ -1,14 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
+import { Stars } from '@/components/Stars';
 import { Text } from '@/components/Text';
 import { Badge, Button, Card, ErrorBox, Loading, Muted, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { availabilitySummary, experienceText, isEmptyProfile, yearRange } from '@/lib/doctor';
 import { errorMessage } from '@/lib/errors';
-import { dayLabel, doctorName } from '@/lib/format';
-import type { DayAvailability, Doctor, HistoryItem } from '@/lib/types';
+import { dayLabel, doctorName, formatDate } from '@/lib/format';
+import { distributionBars, formatAverage, ratingText } from '@/lib/review';
+import type { DayAvailability, Doctor, DoctorReviews, HistoryItem } from '@/lib/types';
 
 /** Danh sách mốc năm dạng dòng thời gian: năm bên trái (phông số), chức vụ/văn bằng và nơi bên phải. */
 function Timeline({ items, currentLabel }: { items: HistoryItem[]; currentLabel?: string }) {
@@ -32,6 +35,59 @@ function Timeline({ items, currentLabel }: { items: HistoryItem[]; currentLabel?
         );
       })}
     </View>
+  );
+}
+
+/** Điểm trung bình, phân bố sao và góp ý của bệnh nhân (tên đã rút gọn). */
+function Reviews({ doctorId }: { doctorId: string }) {
+  const [size, setSize] = useState(5);
+  const reviews = useQuery({
+    queryKey: ['doctor', doctorId, 'reviews', size],
+    queryFn: async () => (await api.get<DoctorReviews>(`/doctors/${doctorId}/reviews`, { params: { pageSize: size } })).data,
+    placeholderData: (prev) => prev,
+  });
+  const r = reviews.data;
+  if (!r) return null;
+  const { summary } = r;
+  return (
+    <Card style={{ gap: 12 }}>
+      <Text style={styles.title}>Đánh giá của bệnh nhân</Text>
+      {summary.count === 0 ? (
+        <Muted>Chưa có đánh giá. Bệnh nhân đánh giá được sau khi khám xong.</Muted>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+          <View style={{ alignItems: 'center', width: 88 }}>
+            <Text style={{ fontFamily: 'num', fontWeight: '700', fontSize: 44, lineHeight: 48, color: colors.text }}>{formatAverage(summary.average)}</Text>
+            <Stars value={summary.average ?? 0} size={14} />
+            <Muted>{summary.count} đánh giá</Muted>
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            {distributionBars(summary.distribution, summary.count).map((b) => (
+              <View key={b.stars} style={[styles.row, { gap: 8 }]}>
+                <Text style={{ width: 14, fontSize: 12.5, color: colors.muted }}>{b.stars}</Text>
+                <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.seg, overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.round(b.ratio * 100)}%`, height: 6, backgroundColor: '#D99A0B' }} />
+                </View>
+                <Text style={{ width: 24, fontSize: 12.5, color: colors.muted, textAlign: 'right' }}>{b.n}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+      {r.items.map((it) => (
+        <View key={it.id} style={{ borderTopWidth: 1, borderTopColor: colors.seg, paddingTop: 10, gap: 4 }}>
+          <View style={[styles.row, { justifyContent: 'space-between' }]}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{it.patientName}</Text>
+            <Muted>{formatDate(it.createdAt)}</Muted>
+          </View>
+          <Stars value={it.rating} size={14} />
+          <Text style={{ fontSize: 15, lineHeight: 22, color: colors.text }}>{it.comment}</Text>
+        </View>
+      ))}
+      {r.total > r.items.length ? (
+        <Button title={`Xem thêm góp ý (${r.total - r.items.length})`} variant="secondary" loading={reviews.isFetching} onPress={() => setSize((n) => Math.min(n + 10, 100))} />
+      ) : null}
+    </Card>
   );
 }
 
@@ -66,6 +122,12 @@ export default function DoctorProfile() {
             <Text style={{ fontSize: 21, fontWeight: '700', lineHeight: 26, color: colors.text }}>{doctorName(d)}</Text>
             <Muted>{d.specialty.name}</Muted>
             {exp ? <Badge label={exp} tone="primary" /> : null}
+            {d.rating?.count ? (
+              <View style={[styles.row, { gap: 6 }]}>
+                <Stars value={d.rating.average ?? 0} size={14} />
+                <Muted>{ratingText(d.rating)}</Muted>
+              </View>
+            ) : null}
           </View>
         </View>
         {current ? (
@@ -111,6 +173,8 @@ export default function DoctorProfile() {
           <Timeline items={d.education} currentLabel="Đang học" />
         </Card>
       ) : null}
+
+      <Reviews doctorId={d.id} />
 
       <Card>
         <Text style={styles.title}>Lịch còn trống</Text>

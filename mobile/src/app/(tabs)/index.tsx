@@ -9,6 +9,7 @@ import { Text } from '@/components/Text';
 import { Chip, Empty, ErrorBox, Loading, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
 import { experienceText } from '@/lib/doctor';
+import { ratingText } from '@/lib/review';
 import { errorMessage } from '@/lib/errors';
 import { doctorName } from '@/lib/format';
 import type { Doctor, Page, Specialty } from '@/lib/types';
@@ -77,6 +78,11 @@ export default function BookHome() {
                   <View style={{ flex: 1, gap: 3 }}>
                     <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{doctorName(d)}</Text>
                     <Text style={{ fontSize: 14, color: colors.muted }}>{[d.specialty.name, exp].filter(Boolean).join(' · ')}</Text>
+                    {d.rating?.count ? (
+                      <Text style={{ fontSize: 13.5, color: colors.muted }}>
+                        <Text style={{ color: '#D99A0B' }}>★</Text> {ratingText(d.rating).replace(' ★', '')}
+                      </Text>
+                    ) : null}
                     {d.expertise.length ? (
                       <Text style={{ fontSize: 14, lineHeight: 20, color: colors.text }} numberOfLines={2}>
                         {d.expertise.join(', ')}
