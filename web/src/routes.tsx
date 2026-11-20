@@ -12,6 +12,8 @@ import { ExamPage } from './features/exam/ExamPage';
 import { RecordsPage } from './features/exam/RecordsPage';
 import { CounterPage } from './features/reception/CounterPage';
 import { PendingAppointmentsPage } from './features/reception/PendingAppointmentsPage';
+import { MyShiftsPage } from './features/work-schedule/MyShiftsPage';
+import { WorkSchedulePage } from './features/work-schedule/WorkSchedulePage';
 import { QueueBoardPage } from './features/reception/QueueBoardPage';
 import { ReceptionPage } from './features/reception/ReceptionPage';
 import { SchedulePage } from './features/schedule/SchedulePage';
@@ -61,6 +63,7 @@ export const routes: RouteObject[] = [
       { path: '/admin/sms', element: <RequireRole roles={['ADMIN']}><SmsPage /></RequireRole> },
       { path: '/admin/stats', element: <RequireRole roles={['ADMIN']}><StatsPage /></RequireRole> },
       { path: '/admin/specialties', element: <RequireRole roles={['ADMIN']}><SpecialtiesPage /></RequireRole> },
+      { path: '/admin/work-schedule', element: <RequireRole roles={['ADMIN']}><WorkSchedulePage /></RequireRole> },
       { path: '/admin/doctors', element: <RequireRole roles={['ADMIN']}><DoctorsPage /></RequireRole> },
       { path: '/admin/receptionists', element: <RequireRole roles={['ADMIN']}><ReceptionistsPage /></RequireRole> },
       { path: '/admin/medicines', element: <RequireRole roles={['ADMIN']}><MedicinesPage /></RequireRole> },
@@ -70,6 +73,7 @@ export const routes: RouteObject[] = [
       { path: '/doctor/profile', element: <RequireRole roles={['DOCTOR']}><MyProfilePage /></RequireRole> },
       { path: '/reception', element: <RequireRole roles={['RECEPTIONIST']}><ReceptionPage /></RequireRole> },
       { path: '/reception/queue', element: <RequireRole roles={['RECEPTIONIST']}><QueueBoardPage /></RequireRole> },
+      { path: '/reception/shifts', element: <RequireRole roles={['RECEPTIONIST']}><MyShiftsPage /></RequireRole> },
       { path: '/reception/pending', element: <RequireRole roles={['RECEPTIONIST']}><PendingAppointmentsPage /></RequireRole> },
     ],
   },
