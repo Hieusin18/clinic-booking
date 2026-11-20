@@ -98,7 +98,12 @@ public class FollowUpService {
     }
     Schedule slot = schedules.findById(scheduleId).filter(s -> s.getDoctorId().equals(visit.getDoctorId()))
         .orElseThrow(() -> ApiException.notFound("Không tìm thấy khung giờ"));
-    if (!slot.getDate().isAfter(visit.getDate())) throw ApiException.badRequest("Ngày tái khám phải sau ngày khám");
+    // Đọc trước: câu lệnh giữ chỗ bên dưới xóa bộ nhớ đệm của Hibernate, đối tượng nạp lười sau đó không đọc được nữa
+    String userId = visit.getPatient().getUserId();
+    String doctorLabel = NotificationsService.doctorLabel(visit.getDoctor());
+    LocalDate slotDate = slot.getDate();
+    Instant slotStart = slot.getStartTime();
+    if (!slotDate.isAfter(visit.getDate())) throw ApiException.badRequest("Ngày tái khám phải sau ngày khám");
     if (schedules.book(slot.getId(), Instant.now()) == 0) throw ApiException.conflict("Khung giờ này vừa có người đặt, vui lòng chọn giờ khác");
     Appointment a = new Appointment();
     a.setPatientId(visit.getPatientId());
@@ -109,14 +114,13 @@ public class FollowUpService {
     a.setReviewedById(user.sub());
     a.setFollowUpOfVisitId(visitId);
     appointments.saveAndFlush(a);
-    record.setFollowUpDate(slot.getDate());
-    record.setFollowUpRemindedAt(null);
-    records.saveAndFlush(record);
+    MedicalRecord fresh = records.findById(record.getId()).orElseThrow();
+    fresh.setFollowUpDate(slotDate);
+    fresh.setFollowUpRemindedAt(null);
+    records.saveAndFlush(fresh);
     realtime.staffChanged();
-    String userId = visit.getPatient().getUserId();
-    Doctor d = visit.getDoctor();
     notifications.notifyLater(userId, new NotificationsService.NewNotification(NotificationType.FOLLOW_UP, "Bác sĩ đã đặt lịch tái khám cho bạn",
-        when(slot.getStartTime()) + " với " + NotificationsService.doctorLabel(d) + ". Lịch đã được xác nhận, đến quầy quét mã QR để check-in.",
+        when(slotStart) + " với " + doctorLabel + ". Lịch đã được xác nhận, đến quầy quét mã QR để check-in.",
         "/appointments", visitId, a.getId()));
     return AppointmentViews.view(refresher.refresh(a));
   }
@@ -127,14 +131,17 @@ public class FollowUpService {
     ownVisit(user, visitId);
     Appointment a = appointments.findFirstByFollowUpOfVisitIdAndStatusIn(visitId, ACTIVE)
         .orElseThrow(() -> ApiException.notFound("Lượt khám này chưa có lịch tái khám"));
-    if (!a.getSchedule().getStartTime().isAfter(Instant.now())) throw ApiException.conflict("Lịch tái khám đã đến giờ, không hủy được");
+    Instant start = a.getSchedule().getStartTime();
+    if (!start.isAfter(Instant.now())) throw ApiException.conflict("Lịch tái khám đã đến giờ, không hủy được");
+    String userId = a.getPatient().getUserId();
+    String appointmentId = a.getId();
     a.setStatus(AppointmentStatus.CANCELLED);
     appointments.saveAndFlush(a);
     schedules.release(a.getScheduleId());
     realtime.staffChanged();
-    notifications.notifyLater(a.getPatient().getUserId(), new NotificationsService.NewNotification(NotificationType.FOLLOW_UP,
-        "Lịch tái khám đã được hủy", "Lịch " + when(a.getSchedule().getStartTime()) + " đã được bác sĩ hủy. Bạn có thể tự đặt giờ khác trong app.",
-        "/appointments", visitId, a.getId()));
+    notifications.notifyLater(userId, new NotificationsService.NewNotification(NotificationType.FOLLOW_UP,
+        "Lịch tái khám đã được hủy", "Lịch " + when(start) + " đã được bác sĩ hủy. Bạn có thể tự đặt giờ khác trong app.",
+        "/appointments", visitId, appointmentId));
   }
 
   /** Khám xong mà có hẹn tái khám nhưng bác sĩ chưa đặt giờ: báo bệnh nhân ngày hẹn để tự đặt lịch. */
