@@ -140,6 +140,12 @@ public class NotificationsService {
     }));
   }
 
+  /** Gửi một thông báo sau khi transaction hiện tại ghi xong (không làm chậm API). */
+  public void notifyLater(String userId, NewNotification n) {
+    if (userId == null) return;
+    later(() -> notify(userId, n));
+  }
+
   // ---- Các sự kiện của lượt khám ----
 
   /** Thông tin lượt khám cần để soạn thông báo. */

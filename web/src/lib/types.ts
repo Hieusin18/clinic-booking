@@ -158,6 +158,8 @@ export interface Appointment {
   createdAt: string;
   reviewedAt?: string | null;
   rejectReason?: string | null;
+  /** Lịch tái khám bác sĩ đặt cho lượt khám này */
+  followUpOfVisitId?: string | null;
   schedule: { id: string; startTime: string; endTime: string; doctor: DoctorRef };
   patient: { id: string; fullName: string; phone: string };
   visit?: { id: string; queueNumber: number; source: 'ONLINE' | 'WALK_IN'; status: VisitStatus } | null;
@@ -259,6 +261,8 @@ export interface VisitDetail extends Omit<Visit, 'labOrders'> {
   medicalRecord: MedicalRecord | null;
   /** Có ở bác sĩ/admin: sinh hiệu đo trước (null = chưa đo) */
   vitals?: Vitals | null;
+  /** Lịch tái khám bác sĩ đã đặt sẵn (null = chưa đặt) */
+  followUpAppointment?: Appointment | null;
   prescriptions?: Prescription[];
   prescription: Prescription | null;
   labOrders: LabOrder[];

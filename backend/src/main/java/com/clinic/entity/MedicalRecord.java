@@ -51,6 +51,8 @@ public class MedicalRecord extends BaseEntity {
   // VI. Điều trị
   private String treatment;
   private LocalDate followUpDate;
+  /** Đã nhắc bệnh nhân đặt lịch tái khám */
+  private Instant followUpRemindedAt;
 
   private Instant createdAt;
   private Instant updatedAt;

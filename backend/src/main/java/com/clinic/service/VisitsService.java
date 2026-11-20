@@ -82,14 +82,16 @@ public class VisitsService {
   private final com.clinic.repository.Refresher refresher;
   private final RecordHistoryService history;
   private final VitalsService vitals;
+  private final FollowUpService followUps;
   private final String secret;
 
   public VisitsService(VisitRepository visits, DoctorRepository doctors, PatientRepository patients, MedicalRecordRepository records,
       PrescriptionRepository prescriptions, PrescriptionItemRepository items, MedicineRepository medicines, LabOrderRepository labOrders,
       LabFileRepository labFiles, AppointmentRepository appointments, PatientScope scope, AccountLinkService link, RealtimeService realtime,
       NotificationsService notifications, QueueService queue, AppEnv env, com.clinic.repository.Refresher refresher,
-      RecordHistoryService history, VitalsService vitals) {
+      RecordHistoryService history, VitalsService vitals, FollowUpService followUps) {
     this.vitals = vitals;
+    this.followUps = followUps;
     this.visits = visits;
     this.doctors = doctors;
     this.patients = patients;
@@ -189,6 +191,8 @@ public class VisitsService {
     String secondary = blank(dto.secondaryIcdCodes());
     r.setSecondaryIcdCodes(secondary == null ? null : String.join(", ", secondary.split("\\s*,\\s*")));
     r.setTreatment(blank(dto.treatment()));
+    // Đổi ngày tái khám thì nhắc lại theo ngày mới
+    if (!java.util.Objects.equals(r.getFollowUpDate(), followUp)) r.setFollowUpRemindedAt(null);
     r.setFollowUpDate(followUp);
     MedicalRecord saved = records.saveAndFlush(r);
     // Lịch sử sửa để admin tra lại (lần lưu không đổi gì thì không ghi)
@@ -224,6 +228,7 @@ public class VisitsService {
     visits.saveAndFlush(visit);
     realtime.visitChanged(visitId);
     notifications.visitDone(visitId);
+    followUps.visitCompleted(visit);
     return queue.view(visit);
   }
 
@@ -252,6 +257,8 @@ public class VisitsService {
     List<LabOrder> orders = labOrders.findByVisitIdOrderByCreatedAtAsc(visitId);
     Map<String, Object> out = queue.view(found);
     out.put("medicalRecord", records.findByVisitId(visitId).map(Rows::record).orElse(null));
+    // Lịch tái khám bác sĩ đã đặt sẵn (null = chưa đặt)
+    out.put("followUpAppointment", followUps.appointmentOf(visitId));
     Prescription current = ClinicalViews.current(list);
     if (user.role() == Role.PATIENT) {
       PatientScope.Scope s = scope.scopeOf(user);

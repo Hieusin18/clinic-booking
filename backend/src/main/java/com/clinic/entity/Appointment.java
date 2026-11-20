@@ -35,6 +35,8 @@ public class Appointment extends BaseEntity {
   private Instant reviewedAt;
   private String reviewedById;
   private String rejectReason;
+  /** Lịch tái khám bác sĩ đặt cho lượt khám này (null = bệnh nhân tự đặt) */
+  private String followUpOfVisitId;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "patientId", insertable = false, updatable = false)
