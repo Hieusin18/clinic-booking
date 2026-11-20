@@ -5,7 +5,7 @@ export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export type VisitStatus = 'WAITING' | 'IN_PROGRESS' | 'AWAITING_RESULTS' | 'DONE' | 'LEFT';
 /** Cách nhận kết quả cận lâm sàng: quay lại phòng khám hoặc nhận online */
 export type ResultMode = 'RETURN' | 'ONLINE';
-export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
 
 export interface Page<T> {
   items: T[];
@@ -180,6 +180,9 @@ export interface Appointment {
   /** Có ở /appointments/mine: khung giờ được check-in */
   checkinOpensAt?: string;
   checkinClosesAt?: string;
+  /** Lễ tân duyệt lịch đặt online: thời điểm duyệt/từ chối và lý do từ chối */
+  reviewedAt?: string | null;
+  rejectReason?: string | null;
 }
 
 /** Bệnh án ngoại trú theo bố cục mẫu Bộ Y tế */

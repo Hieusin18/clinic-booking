@@ -82,7 +82,10 @@ function BookDoctor() {
     onSuccess: (appt) => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       queryClient.invalidateQueries({ queryKey: ['availability'] });
-      Alert.alert('Đặt lịch thành công', `${doctorName(appt.schedule.doctor)}\n${formatTime(appt.schedule.startTime)}, ${formatDate(appt.schedule.startTime)}`);
+      Alert.alert(
+        'Đã gửi yêu cầu đặt lịch',
+        `${doctorName(appt.schedule.doctor)}\n${formatTime(appt.schedule.startTime)}, ${formatDate(appt.schedule.startTime)}\n\nPhòng khám sẽ xác nhận lịch này; bạn sẽ nhận được thông báo khi có kết quả.`,
+      );
       router.replace('/(tabs)/appointments');
     },
     onError: () => {
