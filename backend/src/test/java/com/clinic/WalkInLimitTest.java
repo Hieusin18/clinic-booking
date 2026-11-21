@@ -76,6 +76,12 @@ class WalkInLimitTest extends IntegrationTest {
     open(70, 1, true);
     assertThat(capacity().get("remaining").asInt()).isEqualTo(2);
     JsonNode first = walkIn(201, null);
+    // Lễ tân xem được từng khung: khung đầu vãng lai giữ, khung sau còn trống, khung cuối có người đặt
+    JsonNode slots = capacity().get("slots");
+    assertThat(slots).hasSize(3);
+    assertThat(slots.get(0).get("state").asText()).isEqualTo("WALK_IN");
+    assertThat(slots.get(1).get("state").asText()).isEqualTo("FREE");
+    assertThat(slots.get(2).get("state").asText()).isEqualTo("BOOKED");
     walkIn(201, null);
     JsonNode c = capacity();
     assertThat(c.get("remaining").asInt()).isZero();

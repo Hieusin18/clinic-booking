@@ -28,6 +28,14 @@ public final class WalkInCapacity {
     }
   }
 
+  /** Trạng thái một khung để lễ tân xem: trống, người đặt lịch, vãng lai giữ, đã qua (không ai giữ) */
+  public enum State { FREE, BOOKED, WALK_IN, PAST }
+
+  public static State state(Slot s, Instant now, boolean heldByWalkIn) {
+    if (s.booked()) return heldByWalkIn ? State.WALK_IN : State.BOOKED;
+    return s.end().isAfter(now) ? State.FREE : State.PAST;
+  }
+
   static boolean open(Slot s, Instant now) {
     return !s.booked() && s.end().isAfter(now);
   }

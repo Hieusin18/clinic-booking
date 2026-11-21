@@ -117,11 +117,21 @@ public class QueueService {
    */
   public List<Map<String, Object>> capacities(Instant now) {
     boolean limit = settings.walkInLimit();
+    LocalDate date = VnTime.today(now);
     return tx.execute(s -> doctors.allActive().stream().map(d -> {
-      WalkInCapacity.Result c = capacity(d.getId(), now);
+      List<WalkInCapacity.Slot> slots = slotsToday(d.getId(), now);
+      WalkInCapacity.Result c = WalkInCapacity.of(slots, now);
       boolean open = c.hasShift() && !c.shiftOver(now) && c.remaining() > 0;
+      // Khung nào do khách vãng lai giữ (còn lại là người đặt lịch); không kèm tên bệnh nhân
+      java.util.Set<String> walkIn = new java.util.HashSet<>();
+      if (!slots.isEmpty()) {
+        for (Visit v : visits.ofDay(date, d.getId())) if (v.getScheduleId() != null) walkIn.add(v.getScheduleId());
+      }
+      List<Map<String, Object>> slotViews = slots.stream()
+          .map(sl -> Json.obj("id", sl.id(), "start", sl.start(), "end", sl.end(), "state", WalkInCapacity.state(sl, now, walkIn.contains(sl.id())).name()))
+          .toList();
       return Json.obj("doctorId", d.getId(), "hasShift", c.hasShift(), "shiftEnd", c.shiftEnd(), "shiftOver", c.shiftOver(now),
-          "remaining", c.remaining(), "accepting", !limit || open);
+          "remaining", c.remaining(), "accepting", !limit || open, "slots", slotViews);
     }).toList());
   }
 
