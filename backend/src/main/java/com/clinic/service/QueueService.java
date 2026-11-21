@@ -101,19 +101,19 @@ public class QueueService {
     }
   }
 
-  /** Sức chứa khách vãng lai hôm nay của một bác sĩ (theo các khung giờ đã mở và người vãng lai đang chờ). */
+  private List<WalkInCapacity.Slot> slotsToday(String doctorId, Instant now) {
+    return schedules.findDay(doctorId, VnTime.today(now)).stream()
+        .map(s -> new WalkInCapacity.Slot(s.getId(), s.getStartTime(), s.getEndTime(), s.isBooked())).toList();
+  }
+
+  /** Sức chứa hôm nay của một bác sĩ theo khung giờ (mỗi khung một lượt khám). */
   public WalkInCapacity.Result capacity(String doctorId, Instant now) {
-    LocalDate date = VnTime.today(now);
-    List<WalkInCapacity.Slot> slots = schedules.findDay(doctorId, date).stream()
-        .map(s -> new WalkInCapacity.Slot(s.getStartTime(), s.getEndTime(), s.isBooked())).toList();
-    int walkIns = (int) visits.withStatus(doctorId, date, List.of(VisitStatus.WAITING, VisitStatus.IN_PROGRESS)).stream()
-        .filter(v -> v.getSource() == VisitSource.WALK_IN).count();
-    return WalkInCapacity.of(slots, now, walkIns, rules.avgExamMinutes());
+    return WalkInCapacity.of(slotsToday(doctorId, now), now);
   }
 
   /**
-   * Mọi bác sĩ đang làm: có ca hôm nay không, ca hết lúc mấy giờ, còn nhận bao nhiêu khách vãng lai. accepting = còn
-   * nhận (luôn true khi admin tắt giới hạn).
+   * Mọi bác sĩ đang làm: có ca hôm nay không, ca hết lúc mấy giờ, còn bao nhiêu khung trống (= còn nhận bao nhiêu
+   * người). accepting = còn nhận khách vãng lai (luôn true khi admin tắt giới hạn).
    */
   public List<Map<String, Object>> capacities(Instant now) {
     boolean limit = settings.walkInLimit();
@@ -121,15 +121,19 @@ public class QueueService {
       WalkInCapacity.Result c = capacity(d.getId(), now);
       boolean open = c.hasShift() && !c.shiftOver(now) && c.remaining() > 0;
       return Json.obj("doctorId", d.getId(), "hasShift", c.hasShift(), "shiftEnd", c.shiftEnd(), "shiftOver", c.shiftOver(now),
-          "waitingWalkIns", c.waitingWalkIns(), "remaining", c.remaining(), "accepting", !limit || open);
+          "remaining", c.remaining(), "accepting", !limit || open);
     }).toList());
   }
 
-  /** Còn nhận khách vãng lai không; không thì báo lý do (không có ca, hết ca, kín lịch). */
-  private void checkCapacity(Doctor doctor, Instant now) {
-    WalkInCapacity.Result c = capacity(doctor.getId(), now);
+  /**
+   * Giữ khung trống sớm nhất cho khách vãng lai; không còn khung thì báo lý do (không có ca, hết ca, kín lịch).
+   * Trả id khung đã giữ.
+   */
+  private String holdSlot(Doctor doctor, Instant now) {
     String who = NotificationsService.doctorLabel(doctor);
-    Map<String, Object> extra = Json.obj("remaining", c.remaining(), "shiftEnd", c.shiftEnd(), "waitingWalkIns", c.waitingWalkIns());
+    List<WalkInCapacity.Slot> slots = slotsToday(doctor.getId(), now);
+    WalkInCapacity.Result c = WalkInCapacity.of(slots, now);
+    Map<String, Object> extra = Json.obj("remaining", c.remaining(), "shiftEnd", c.shiftEnd());
     if (!c.hasShift()) {
       throw ApiException.conflictWithCode("DOCTOR_OFF", who + " hôm nay không có ca khám. Vui lòng chọn bác sĩ khác.", extra);
     }
@@ -137,10 +141,12 @@ public class QueueService {
       throw ApiException.conflictWithCode("DOCTOR_OFF", who + " đã hết ca khám hôm nay (ca kết thúc lúc " + VnTime.time(c.shiftEnd()) + "). Vui lòng chọn bác sĩ khác.",
           extra);
     }
-    if (c.remaining() <= 0) {
-      throw ApiException.conflictWithCode("DOCTOR_FULL", who + " đã kín lịch đến hết ca hôm nay (" + VnTime.time(c.shiftEnd()) + "), đang có "
-          + c.waitingWalkIns() + " người vãng lai chờ. Vui lòng chọn bác sĩ khác.", extra);
+    // Người đặt lịch online có thể vừa giữ cùng khung: thử lần lượt các khung trống
+    for (WalkInCapacity.Slot slot : WalkInCapacity.openSlots(slots, now)) {
+      if (schedules.holdForWalkIn(slot.id(), now) == 1) return slot.id();
     }
+    throw ApiException.conflictWithCode("DOCTOR_FULL", who + " đã kín lịch đến hết ca hôm nay (" + VnTime.time(c.shiftEnd())
+        + "): mọi khung giờ đã có người đặt hoặc vãng lai. Vui lòng chọn bác sĩ khác.", extra);
   }
 
   /** Một người trong hàng đợi, dùng cho thuật toán chọn thứ tự gọi. */
@@ -197,8 +203,8 @@ public class QueueService {
         Doctor doctor = doctors.findById(input.doctorId()).orElse(null);
         if (doctor == null || !doctor.getUser().isActive()) throw ApiException.notFound("Không tìm thấy bác sĩ");
         advisoryLock("queue:" + input.doctorId() + ":" + date);
-        // Vãng lai chỉ nhận khi bác sĩ có ca và còn thời gian rảnh trong ca (người đặt lịch đã có khung giờ riêng)
-        if (input.source() == VisitSource.WALK_IN && !input.overCapacity() && settings.walkInLimit()) checkCapacity(doctor, Instant.now());
+        // Vãng lai giữ một khung giờ trống của bác sĩ (mỗi khung một lượt khám, dùng chung với người đặt lịch)
+        String heldSlot = input.source() == VisitSource.WALK_IN && !input.overCapacity() && settings.walkInLimit() ? holdSlot(doctor, Instant.now()) : null;
 
         // Mỗi bệnh nhân chỉ giữ một số đang chờ cho mỗi chuyên khoa trong ngày
         List<Visit> waiting = visits.waitingForSpecialty(input.patientId(), date, doctor.getSpecialtyId());
@@ -217,6 +223,7 @@ public class QueueService {
         v.setAppointmentId(input.appointmentId());
         v.setAppointmentAt(input.appointmentAt());
         v.setCheckinOverride(input.checkinOverride());
+        v.setScheduleId(heldSlot);
         visits.saveAndFlush(v);
         return view(refresher.refresh(v));
       });
@@ -422,6 +429,10 @@ public class QueueService {
       if (v == null || (doctorId != null && !v.getDoctorId().equals(doctorId))) throw ApiException.notFound("Không tìm thấy phiếu khám");
       int count = visits.moveStatus(visitId, List.of(VisitStatus.WAITING, VisitStatus.IN_PROGRESS, VisitStatus.AWAITING_RESULTS), VisitStatus.LEFT);
       if (count == 0) throw ApiException.conflict("Phiếu khám đã kết thúc");
+      // Vãng lai bỏ về khi khung giờ chưa đến: trả khung cho người khác
+      if (v.getScheduleId() != null && v.getStatus() == VisitStatus.WAITING) {
+        schedules.findById(v.getScheduleId()).filter(sc -> sc.getStartTime().isAfter(Instant.now())).ifPresent(sc -> schedules.release(sc.getId()));
+      }
       if (v.getAppointmentId() != null) {
         Appointment a = appointments.findById(v.getAppointmentId()).orElseThrow();
         a.setStatus(AppointmentStatus.NO_SHOW);
