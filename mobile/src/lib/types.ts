@@ -143,6 +143,9 @@ export interface Visit {
   /** Cận lâm sàng: cách nhận kết quả (null = chưa gửi đi), lúc quay lại hàng chờ với kết quả */
   resultMode?: ResultMode | null;
   resultsReadyAt?: string | null;
+  /** Điều dưỡng gọi vào đo sinh hiệu lúc nào / đo xong lúc nào */
+  vitalsCalledAt?: string | null;
+  vitalsMeasuredAt?: string | null;
   /** Tên các chỉ định cận lâm sàng và đã có kết quả chưa */
   labOrders?: { id: string; name: string; doneAt: string | null }[];
   createdAt: string;

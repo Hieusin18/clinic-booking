@@ -34,9 +34,11 @@ public class VitalsService {
   private final QueueService queue;
   private final RealtimeService realtime;
   private final DoctorRepository doctors;
+  private final NotificationsService notifications;
 
   public VitalsService(VisitVitalsRepository vitals, VisitRepository visits, UserRepository users, QueueService queue, RealtimeService realtime,
-      DoctorRepository doctors) {
+      DoctorRepository doctors, NotificationsService notifications) {
+    this.notifications = notifications;
     this.doctors = doctors;
     this.vitals = vitals;
     this.visits = visits;
@@ -82,6 +84,20 @@ public class VitalsService {
     return attach(queue.today(doctorId, Instant.now()));
   }
 
+  /** Điều dưỡng gọi bệnh nhân vào đo: app bệnh nhân báo mời vào khu đo; gọi lại được nếu bệnh nhân chưa đến. */
+  @Transactional
+  public Map<String, Object> callIn(String visitId) {
+    Visit visit = visits.findById(visitId).orElseThrow(() -> ApiException.notFound("Không tìm thấy phiếu khám"));
+    if (!visit.getDate().equals(VnTime.today(Instant.now())) || visit.getStatus() != VisitStatus.WAITING) {
+      throw ApiException.conflict("Chỉ gọi đo cho bệnh nhân đang chờ khám hôm nay");
+    }
+    visit.setVitalsCalledAt(Instant.now());
+    visits.saveAndFlush(visit);
+    realtime.visitChanged(visitId);
+    notifications.vitalsCalled(visitId);
+    return queue.view(visit);
+  }
+
   /** Ghi hoặc sửa sinh hiệu: chỉ lượt khám hôm nay đang chờ hoặc đang khám. */
   @Transactional
   public Map<String, Object> save(AuthUser user, String visitId, VitalsRequest dto) {
@@ -117,8 +133,11 @@ public class VitalsService {
     v.setMeasuredById(user.sub());
     v.setMeasuredAt(Instant.now());
     vitals.saveAndFlush(v);
-    // Bác sĩ đang mở phiếu và màn hình điều dưỡng khác thấy ngay
-    realtime.staffChanged();
+    // Đo xong: bác sĩ gọi được vào khám
+    visit.setVitalsMeasuredAt(v.getMeasuredAt());
+    visits.saveAndFlush(visit);
+    // Bác sĩ đang mở phiếu, màn hình điều dưỡng khác và app bệnh nhân thấy ngay
+    realtime.visitChanged(visitId);
     return view(v, users.findById(user.sub()).orElse(null));
   }
 }

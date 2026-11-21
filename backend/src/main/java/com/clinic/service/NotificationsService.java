@@ -178,6 +178,17 @@ public class NotificationsService {
     });
   }
 
+  /** Điều dưỡng mời bệnh nhân vào đo sinh hiệu trước khi khám. */
+  public void vitalsCalled(String visitId) {
+    later(() -> {
+      VisitInfo v = load(visitId);
+      if (v == null) return;
+      notify(v.userId(), new NewNotification(NotificationType.VITALS_CALLED, "Mời số " + v.label() + " vào đo sinh hiệu",
+          "Mời bạn đến khu đo sinh hiệu (đo huyết áp, nhiệt độ, cân nặng) trước khi vào khám với " + doctorLabel(v.doctor()) + ".", "/ticket", visitId,
+          null));
+    });
+  }
+
   /** Có kết quả cận lâm sàng, bệnh nhân quay lại để bác sĩ đọc kết quả (được gọi trước). */
   public void resultsReady(String visitId) {
     later(() -> {

@@ -21,9 +21,10 @@ import {
   Tag,
   Tooltip,
   Typography,
+  App,
 } from 'antd';
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, errorData, errorMessage } from '../../lib/api';
 import { useRealtime } from '../../lib/realtime';
 import { C } from '../../lib/theme';
 import { age, formatDay, formatTime, GENDER_LABEL, isToday, ticketLabel } from '../../lib/format';
@@ -35,6 +36,7 @@ import { LabCard } from './LabCard';
 import { ExportButtons, RecordCard } from './RecordCard';
 import { FollowUpCard } from './FollowUpCard';
 import { summary, warnings } from '../nurse/vitals';
+import { useClinicSettings } from '../../lib/settings';
 
 type ItemForm = { medicineId: string; quantity: number; dosePerTime: string; timesPerDay: number; days: number; note?: string };
 type PrescriptionForm = { advice?: string; items: ItemForm[] };
@@ -63,7 +65,25 @@ export function ExamPage() {
   const activeId = selectedId ?? current?.id ?? null;
   const waiting = list.filter((v) => v.status === 'WAITING').length;
 
-  const callNext = useAction(async () => (await api.post<Visit>('/queue/call-next')).data, { invalidate: ['queue'] });
+  const { modal } = App.useApp();
+  const settings = useClinicSettings();
+  const needVitals = settings.data?.vitalsBeforeExam ?? false;
+  const ready = list.filter((v) => v.status === 'WAITING' && (v.vitalsMeasuredAt || v.resultsReadyAt)).length;
+  const callNext = useAction(async (skipVitals: boolean) => (await api.post<Visit>('/queue/call-next', null, { params: skipVitals ? { skipVitals: true } : {} })).data, {
+    invalidate: ['queue'],
+    // Chưa ai đo sinh hiệu xong: hỏi bác sĩ có gọi không chờ đo không (cấp cứu, điều dưỡng vắng)
+    handleError: (err) => {
+      if (errorData(err)?.code !== 'VITALS_NOT_READY') return false;
+      modal.confirm({
+        title: 'Chưa có bệnh nhân nào đo sinh hiệu xong',
+        content: `${errorMessage(err)}. Chờ điều dưỡng đo, hoặc gọi người tiếp theo không chờ đo (cấp cứu, điều dưỡng vắng).`,
+        okText: 'Gọi không chờ đo',
+        cancelText: 'Chờ điều dưỡng',
+        onOk: () => callNext.mutate(true, { onSuccess: (v) => setSelectedId(v.id) }),
+      });
+      return true;
+    },
+  });
   const callOne = useAction(async (id: string) => (await api.post<Visit>(`/queue/${id}/call`)).data, { invalidate: ['queue'] });
 
   return (
@@ -79,11 +99,16 @@ export function ExamPage() {
             block
             disabled={!!current || waiting === 0}
             loading={callNext.isPending}
-            onClick={() => callNext.mutate(undefined, { onSuccess: (v) => setSelectedId(v.id) })}
+            onClick={() => callNext.mutate(false, { onSuccess: (v) => setSelectedId(v.id) })}
             style={{ marginBottom: 8 }}
           >
             {current ? `Đang khám số ${ticketLabel(current)}` : waiting === 0 ? 'Không còn ai đang chờ' : 'Gọi số tiếp theo'}
           </Button>
+          {needVitals && !current && waiting > 0 && (
+            <Typography.Paragraph style={{ fontSize: 13, marginBottom: 8 }}>
+              {ready > 0 ? `${ready} người đã đo sinh hiệu, sẵn sàng vào khám` : 'Chưa ai đo sinh hiệu xong: điều dưỡng đang đo'}
+            </Typography.Paragraph>
+          )}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>
             Thứ tự gọi: người quay lại với kết quả cận lâm sàng được gọi trước; rồi người đặt lịch (số A) đã đến giờ hẹn; còn lại theo
             thứ tự đến quầy. Sau vài lượt ưu tiên giờ hẹn liên tiếp sẽ gọi một người vãng lai (số B) đang chờ.
@@ -134,6 +159,8 @@ export function ExamPage() {
                           <Tooltip title={summary(v.vitals)}>
                             <Tag color={warnings(v.vitals).some((w) => w.severe) ? 'error' : 'cyan'}>Đã đo sinh hiệu</Tag>
                           </Tooltip>
+                        ) : needVitals && v.status === 'WAITING' && !v.resultsReadyAt ? (
+                          <Tag>{v.vitalsCalledAt ? 'Đang đo sinh hiệu' : 'Chờ đo sinh hiệu'}</Tag>
                         ) : null}
                       </Space>
                       <div>

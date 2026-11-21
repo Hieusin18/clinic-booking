@@ -177,8 +177,9 @@ public class QueueController {
   /** Gọi số tiếp theo theo thứ tự ưu tiên */
   @Roles(Role.DOCTOR)
   @PostMapping("/call-next")
-  public Map<String, Object> callNext(@CurrentUser AuthUser user) {
-    return queue.callNext(queue.doctorIdOf(user.sub()), Instant.now());
+  public Map<String, Object> callNext(@CurrentUser AuthUser user, @RequestParam(required = false) String skipVitals) {
+    // skipVitals=true: gọi không chờ điều dưỡng đo sinh hiệu (cấp cứu, điều dưỡng vắng)
+    return queue.callNext(queue.doctorIdOf(user.sub()), Instant.now(), "true".equals(skipVitals));
   }
 
   /** Bác sĩ gọi đích danh một người đang chờ, bỏ qua thứ tự ưu tiên */

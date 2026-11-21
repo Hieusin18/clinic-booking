@@ -5,7 +5,7 @@
 import { formatTime } from './format';
 import type { Appointment } from './types';
 
-export type NotificationType = 'CALLED' | 'RESULTS_READY' | 'VISIT_DONE' | 'APPOINTMENT_REMINDER' | 'APPOINTMENT_CONFIRMED' | 'APPOINTMENT_REJECTED' | 'FOLLOW_UP';
+export type NotificationType = 'CALLED' | 'RESULTS_READY' | 'VISIT_DONE' | 'APPOINTMENT_REMINDER' | 'APPOINTMENT_CONFIRMED' | 'APPOINTMENT_REJECTED' | 'FOLLOW_UP' | 'VITALS_CALLED';
 
 export interface AppNotification {
   id: string;

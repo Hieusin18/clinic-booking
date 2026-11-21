@@ -57,11 +57,13 @@ public class QueueService {
   private final JdbcTemplate jdbc;
   private final Refresher refresher;
   private final QueueRules rules;
+  private final SettingsService settings;
   private final TransactionTemplate tx;
 
   public QueueService(VisitRepository visits, AppointmentRepository appointments, DoctorRepository doctors, LabOrderRepository labOrders,
       RealtimeService realtime, NotificationsService notifications, JdbcTemplate jdbc, Refresher refresher, QueueRules rules,
-      PlatformTransactionManager txm) {
+      PlatformTransactionManager txm, SettingsService settings) {
+    this.settings = settings;
     this.visits = visits;
     this.appointments = appointments;
     this.doctors = doctors;
@@ -262,8 +264,24 @@ public class QueueService {
 
   /** Bác sĩ gọi số tiếp theo theo thứ tự ưu tiên (xem QueueOrder). */
   public Map<String, Object> callNext(String doctorId, Instant now) {
+    return callNext(doctorId, now, false);
+  }
+
+  /**
+   * Gọi số tiếp theo. Khi phòng khám bật "đo sinh hiệu trước khi khám", chỉ xét người đã đo (hoặc quay lại đọc kết quả
+   * cận lâm sàng); {@code skipVitals} = bác sĩ chủ động gọi không chờ đo (cấp cứu, điều dưỡng vắng).
+   */
+  public Map<String, Object> callNext(String doctorId, Instant now, boolean skipVitals) {
+    boolean needVitals = !skipVitals && settings.vitalsBeforeExam();
     return call(doctorId, now, date -> {
-      List<Entry> waiting = visits.withStatus(doctorId, date, List.of(VisitStatus.WAITING)).stream().map(Entry::new).toList();
+      List<Visit> all = visits.withStatus(doctorId, date, List.of(VisitStatus.WAITING));
+      if (all.isEmpty()) throw ApiException.notFound("Không còn bệnh nhân nào đang chờ");
+      List<Entry> waiting = all.stream().filter(v -> !needVitals || v.getVitalsMeasuredAt() != null || v.getResultsReadyAt() != null).map(Entry::new)
+          .toList();
+      if (waiting.isEmpty()) {
+        throw ApiException.conflictWithCode("VITALS_NOT_READY", "Còn " + all.size() + " bệnh nhân đang chờ nhưng chưa ai đo sinh hiệu xong",
+            Json.obj("waiting", all.size()));
+      }
       QueueOrder.Pick<Entry> pick = QueueOrder.pickNext(waiting, streak(doctorId, date), now, rules);
       if (pick == null) throw ApiException.notFound("Không còn bệnh nhân nào đang chờ");
       return new Choice(pick.entry().visit().getId(), pick.rule());

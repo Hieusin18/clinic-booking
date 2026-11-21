@@ -38,6 +38,8 @@ public final class VisitViews {
         "appointmentAt", v.getAppointmentAt(),
         "checkinOverride", v.isCheckinOverride(),
         "calledAt", v.getCalledAt(),
+        "vitalsCalledAt", v.getVitalsCalledAt(),
+        "vitalsMeasuredAt", v.getVitalsMeasuredAt(),
         "callRule", v.getCallRule(),
         "resultMode", v.getResultMode(),
         "sentForTestsAt", v.getSentForTestsAt(),

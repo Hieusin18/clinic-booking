@@ -32,6 +32,8 @@ public abstract class IntegrationTest {
     setDefault("CLINIC_ID", "phong-kham-test");
     setDefault("QUEUE_SWEEP_SECONDS", "0");
     setDefault("REMINDER_SWEEP_SECONDS", "0");
+    // Test cũ gọi bệnh nhân không qua bước đo sinh hiệu; VitalsFlowTest bật lại qua PUT /api/settings
+    setDefault("VITALS_BEFORE_EXAM", "false");
     // Test cũ đăng ký không qua bước nhắn tin xác minh; PhoneVerifyTest bật lại khi cần
     setDefault("REQUIRE_PHONE_VERIFICATION", "false");
     setDefault("SOCKET_PORT", String.valueOf(freePort()));

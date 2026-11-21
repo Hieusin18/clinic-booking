@@ -66,4 +66,19 @@ describe('Điều dưỡng đo sinh hiệu', () => {
       }),
     );
   }, 40_000);
+
+  it('gọi bệnh nhân vào đo, đã gọi thì hiện trạng thái và cho gọi lại', async () => {
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) =>
+      url === '/vitals/today'
+        ? { data: [visit('v1', 1, 'Lê Chưa Gọi'), visit('v3', 3, 'Phạm Đã Gọi', { vitalsCalledAt: '2026-11-20T01:20:00.000Z' })] }
+        : { data: { items: [], total: 0, page: 1, pageSize: 100 } },
+    );
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: {} });
+    renderPage([page('/', <NursePage />)], { user: fakeUser('NURSE') });
+
+    expect(await screen.findByText('Đã gọi vào đo lúc 08:20')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gọi lại B03' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Gọi vào đo B01' }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/visits/v1/vitals/call'));
+  }, 40_000);
 });
