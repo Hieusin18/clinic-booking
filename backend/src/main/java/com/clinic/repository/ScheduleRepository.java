@@ -25,6 +25,11 @@ public interface ScheduleRepository extends JpaRepository<Schedule, String> {
   @Query("update Schedule s set s.isBooked = true where s.id = :id and s.isBooked = false and s.startTime > :now")
   int book(@Param("id") String id, @Param("now") Instant now);
 
+  /** Khách vãng lai giữ khung giờ (kể cả khung đang diễn ra): chỉ đánh dấu khi còn trống và chưa kết thúc. */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("update Schedule s set s.isBooked = true where s.id = :id and s.isBooked = false and s.endTime > :now")
+  int holdForWalkIn(@Param("id") String id, @Param("now") Instant now);
+
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("update Schedule s set s.isBooked = false where s.id = :id")
   int release(@Param("id") String id);
