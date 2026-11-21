@@ -72,6 +72,13 @@ public class AuthService {
     String weak = Passwords.problem(dto.password(), dto.phone());
     if (weak != null) throw ApiException.badRequest(weak);
     if (users.findByPhone(dto.phone()).isPresent()) throw ApiException.conflict("Số điện thoại đã được đăng ký");
+    String relativeName = dto.relativeName().strip();
+    if (relativeName.length() < 2) throw ApiException.badRequest("Nhập họ tên người thân");
+    if (dto.relativePhone().equals(dto.phone())) throw ApiException.badRequest("Số điện thoại người thân phải khác số của bạn");
+    // CCCD là duy nhất: đã gắn với hồ sơ của người khác (khác số điện thoại) thì không đăng ký được, ra quầy để kiểm tra
+    patients.findByNationalId(dto.nationalId()).filter(p -> !dto.phone().equals(p.getPhone())).ifPresent(p -> {
+      throw ApiException.conflict("Số CCCD này đã có trong hồ sơ khác của phòng khám. Vui lòng kiểm tra lại hoặc liên hệ quầy lễ tân.");
+    });
     boolean hasVerification = dto.verificationId() != null && !dto.verificationId().isEmpty() && dto.ticket() != null && !dto.ticket().isEmpty();
     Instant now = Instant.now();
 
@@ -96,6 +103,10 @@ public class AuthService {
       // chưa thì ẩn bệnh án cũ cho tới khi xác minh bằng mã liên kết / tại quầy (AccountLinkService)
       existing.setUserId(created.getId());
       existing.setVerifyFailures(0);
+      // Hồ sơ lễ tân đã ghi thì giữ nguyên; chỉ bổ sung ô còn trống
+      if (existing.getNationalId() == null) existing.setNationalId(dto.nationalId());
+      if (existing.getRelativeName() == null) existing.setRelativeName(relativeName);
+      if (existing.getRelativePhone() == null) existing.setRelativePhone(dto.relativePhone());
       if (phoneProven) {
         existing.setHistoryLockedBefore(null);
         existing.setVerifiedAt(now);
@@ -109,6 +120,9 @@ public class AuthService {
       p.setPhone(dto.phone());
       p.setDateOfBirth(LocalDate.parse(dto.dateOfBirth().substring(0, 10)));
       p.setGender(dto.gender());
+      p.setNationalId(dto.nationalId());
+      p.setRelativeName(relativeName);
+      p.setRelativePhone(dto.relativePhone());
       patients.saveAndFlush(p);
     }
     return issueToken(created);

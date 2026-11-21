@@ -28,7 +28,9 @@ class AccountLinkTest extends IntegrationTest {
   String oldVisitId;
 
   static Map<String, Object> register(String phone) {
-    return new HashMap<>(Map.of("fullName", "Người Đăng Ký", "phone", phone, "password", "xuanhoa2026", "dateOfBirth", "1980-02-02", "gender", "FEMALE"));
+    Map<String, Object> m = new HashMap<>(Map.of("fullName", "Người Đăng Ký", "phone", phone, "password", "xuanhoa2026", "dateOfBirth", "1980-02-02", "gender", "FEMALE"));
+    m.putAll(Map.of("nationalId", "00" + phone, "relativeName", "Người Nhà", "relativePhone", "0912000111"));
+    return m;
   }
 
   /** Bà A khám vãng lai (lễ tân tạo hồ sơ, có bệnh án), chưa có tài khoản app. */
