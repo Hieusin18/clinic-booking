@@ -33,7 +33,7 @@ export function StaffAccountsPage({ kind }: { kind: keyof typeof KIND }) {
 
   return (
     <>
-    {kind === 'nurses' && <VitalsSettingCard />}
+    <VitalsSettingCard />
     <Card>
       <PageHeader
         title={k.title}

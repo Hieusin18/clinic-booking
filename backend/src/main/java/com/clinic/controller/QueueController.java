@@ -70,7 +70,8 @@ public class QueueController {
    */
   public record ScanRequest(@NotNull String token, String doctorId, @Size(max = 500) String reason) {}
 
-  public record WalkInRequest(@NotNull String patientId, @NotNull String doctorId, @Size(max = 500) String reason) {}
+  /** @param overCapacity vẫn nhận dù bác sĩ không có ca / đã kín ca (bác sĩ đồng ý khám thêm) */
+  public record WalkInRequest(@NotNull String patientId, @NotNull String doctorId, @Size(max = 500) String reason, Boolean overCapacity) {}
 
   /** @param override lễ tân check-in ngoài khung giờ (đến quá sớm hoặc quá trễ) */
   public record CheckInRequest(@NotNull String appointmentId, Boolean override) {}
@@ -148,7 +149,15 @@ public class QueueController {
   @PostMapping("/tickets")
   @ResponseStatus(HttpStatus.CREATED)
   public Map<String, Object> walkIn(@Valid @RequestBody WalkInRequest dto) {
-    return queue.issueTicket(QueueService.TicketInput.walkIn(dto.patientId(), dto.doctorId(), CheckinMethod.RECEPTION, dto.reason()));
+    return queue.issueTicket(
+        QueueService.TicketInput.walkIn(dto.patientId(), dto.doctorId(), CheckinMethod.RECEPTION, dto.reason(), Boolean.TRUE.equals(dto.overCapacity())));
+  }
+
+  /** Bác sĩ nào hôm nay còn nhận khách vãng lai (lễ tân chọn bác sĩ, app lấy số bằng QR) */
+  @Roles({Role.RECEPTIONIST, Role.ADMIN, Role.PATIENT})
+  @GetMapping("/capacity")
+  public List<Map<String, Object>> capacity() {
+    return queue.capacities(Instant.now());
   }
 
   /** Lễ tân check-in cho bệnh nhân đã đặt lịch; override = cho phép ngoài khung giờ */

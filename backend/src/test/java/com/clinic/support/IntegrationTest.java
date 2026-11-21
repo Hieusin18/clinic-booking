@@ -34,6 +34,8 @@ public abstract class IntegrationTest {
     setDefault("REMINDER_SWEEP_SECONDS", "0");
     // Test cũ gọi bệnh nhân không qua bước đo sinh hiệu; VitalsFlowTest bật lại qua PUT /api/settings
     setDefault("VITALS_BEFORE_EXAM", "false");
+    // Test cũ cấp số vãng lai cho bác sĩ chưa mở ca; WalkInCapacityTest bật lại qua PUT /api/settings
+    setDefault("WALK_IN_LIMIT", "false");
     // Test cũ đăng ký không qua bước nhắn tin xác minh; PhoneVerifyTest bật lại khi cần
     setDefault("REQUIRE_PHONE_VERIFICATION", "false");
     setDefault("SOCKET_PORT", String.valueOf(freePort()));

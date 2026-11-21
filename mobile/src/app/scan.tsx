@@ -34,6 +34,14 @@ function Scan() {
     queryFn: async () => (await api.get<Page<Doctor>>('/doctors', { params: { pageSize: 100 } })).data.items,
   });
 
+  // Bác sĩ nào còn nhận khách vãng lai hôm nay (có ca, còn thời gian rảnh)
+  const capacity = useQuery({
+    queryKey: ['queue', 'capacity'],
+    enabled: needDoctor,
+    queryFn: async () => (await api.get<{ doctorId: string; accepting: boolean; hasShift: boolean; shiftOver: boolean }[]>('/queue/capacity')).data,
+  });
+  const capOf = (id: string) => capacity.data?.find((c) => c.doctorId === id);
+
   const scan = useMutation({
     mutationFn: async (vars: { token: string; doctorId?: string }) => (await api.post<Visit>('/queue/scan', vars)).data,
     onSuccess: () => {
@@ -70,9 +78,23 @@ function Scan() {
         <Muted>{needDoctorReason || 'Bạn chưa đặt lịch hôm nay. Chọn bác sĩ muốn khám để lấy số.'}</Muted>
         {doctors.isLoading ? <Loading /> : null}
         <View style={{ gap: 8 }}>
-          {doctors.data?.map((d) => (
-            <Chip key={d.id} label={`${doctorName(d)} · ${d.specialty.name}`} selected={doctorId === d.id} onPress={() => setDoctorId(d.id)} />
-          ))}
+          {/* Bác sĩ hết chỗ hôm nay vẫn hiện nhưng không chọn được, xếp xuống cuối */}
+          {[...(doctors.data ?? [])]
+            .sort((a, b) => Number(capOf(a.id)?.accepting === false) - Number(capOf(b.id)?.accepting === false))
+            .map((d) => {
+              const c = capOf(d.id);
+              const closed = c?.accepting === false;
+              const why = !closed ? '' : !c.hasShift ? ' · không có ca hôm nay' : c.shiftOver ? ' · đã hết ca' : ' · đã kín lịch';
+              return (
+                <Chip
+                  key={d.id}
+                  label={`${doctorName(d)} · ${d.specialty.name}${why}`}
+                  selected={doctorId === d.id}
+                  disabled={closed}
+                  onPress={() => setDoctorId(d.id)}
+                />
+              );
+            })}
         </View>
         <ErrorBox
           message={scan.isError && scan.error && ![NEEDS_DOCTOR, needDoctorReason].includes(errorMessage(scan.error)) ? errorMessage(scan.error) : null}
