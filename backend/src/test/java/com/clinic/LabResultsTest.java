@@ -234,7 +234,9 @@ class LabResultsTest extends IntegrationTest {
     assertThat(html.text()).contains("4. Chỉ định cận lâm sàng: </span><span class=\"\">X-quang ngực thẳng (kết quả ở phiếu kết quả cận lâm sàng)");
     assertThat(html.text()).contains("Đám mờ thùy dưới phổi phải");
     assertThat(html.text()).contains("<img src=\"data:image/png;base64,");
-    assertThat(html.text()).contains("Tệp đính kèm (xem trên hệ thống): ket-qua-goc.pdf");
+    // Chú thích ảnh theo tên chỉ định, không in tên tệp gốc
+    assertThat(html.text()).contains("Hình 1.1: X-quang ngực thẳng").doesNotContain("phim-ph").doesNotContain("ket-qua-goc");
+    assertThat(html.text()).contains("Kèm 1 tệp PDF kết quả gốc (xem trên hệ thống phòng khám).");
 
     var pdf = api.get("/api/visits/" + e.visitId() + "/record.pdf").auth(patient.token()).expect(200);
     assertThat(new String(pdf.bytes(), 0, 5, StandardCharsets.US_ASCII)).isEqualTo("%PDF-");

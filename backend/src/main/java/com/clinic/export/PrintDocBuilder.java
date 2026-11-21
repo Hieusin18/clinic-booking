@@ -263,7 +263,12 @@ public final class PrintDocBuilder {
         (clinic.phone() != null && !clinic.phone().isEmpty() ? "Số điện thoại liên hệ: " + clinic.phone() + ". " : "") + "Khám lại xin mang theo đơn này.");
   }
 
-  /** Phiếu kết quả cận lâm sàng: mỗi chỉ định gồm mô tả, kết luận và ảnh; tệp PDF ghi tên để tra trên hệ thống. */
+  /** "Hình 1.1: X-quang ngực thẳng"; chỉ định có nhiều ảnh thì thêm "(ảnh 2/3)". */
+  public static String imageCaption(int order, int index, int total, String orderName) {
+    return "Hình " + order + "." + index + ": " + orderName + (total > 1 ? " (ảnh " + index + "/" + total + ")" : "");
+  }
+
+  /** Phiếu kết quả cận lâm sàng: mỗi chỉ định gồm mô tả, kết luận và ảnh; tệp PDF ghi số lượng để tra trên hệ thống. */
   private static Page labPage(ExportVisit v, List<ExportVisit.Lab> done, List<String> headerLeft, String recordNo, String doctorName) {
     Patient p = v.patient();
     List<Block> blocks = new ArrayList<>();
@@ -276,20 +281,25 @@ public final class PrintDocBuilder {
       if (o.note() != null && !o.note().isEmpty()) blocks.add(Fields.of(new Field("Yêu cầu", o.note())));
       blocks.add(Fields.of(new Field("Kết quả", o.resultText())));
       List<ExportVisit.File> others = new ArrayList<>();
-      int k = 0;
+      List<ExportVisit.File> pictures = new ArrayList<>();
+      List<int[]> sizes = new ArrayList<>();
       for (ExportVisit.File f : o.files()) {
         boolean image = "image/jpeg".equals(f.mimeType()) || "image/png".equals(f.mimeType());
         int[] size = image ? imageSize(f.data()) : null;
         if (size != null) {
-          k++;
-          blocks.add(new PrintDoc.Image(f.data(), f.mimeType(), size[0], size[1], "Hình " + (i + 1) + "." + k + ": " + f.fileName()));
+          pictures.add(f);
+          sizes.add(size);
         } else {
           others.add(f);
         }
       }
+      for (int k = 0; k < pictures.size(); k++) {
+        ExportVisit.File f = pictures.get(k);
+        // Chú thích theo tên chỉ định, không in tên tệp: ảnh tải từ máy chụp/web thường có tên là chuỗi ký tự vô nghĩa
+        blocks.add(new PrintDoc.Image(f.data(), f.mimeType(), sizes.get(k)[0], sizes.get(k)[1], imageCaption(i + 1, k + 1, pictures.size(), o.name())));
+      }
       if (!others.isEmpty()) {
-        blocks.add(new Text("Tệp đính kèm (xem trên hệ thống): " + others.stream().map(ExportVisit.File::fileName).collect(Collectors.joining(", ")),
-            true, false, false));
+        blocks.add(new Text("Kèm " + others.size() + " tệp PDF kết quả gốc (xem trên hệ thống phòng khám).", true, false, false));
       }
     }
     Instant last = done.stream().map(ExportVisit.Lab::doneAt).max(Instant::compareTo).orElseThrow();
