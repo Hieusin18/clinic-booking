@@ -19,6 +19,7 @@ import com.clinic.repository.VisitRepository;
 import com.clinic.util.QueueOrder;
 import com.clinic.util.QueueRules;
 import com.clinic.util.VnTime;
+import com.clinic.util.WalkInCapacity;
 import com.clinic.view.Json;
 import com.clinic.view.VisitViews;
 import java.time.Instant;
@@ -52,6 +53,7 @@ public class QueueService {
   private final AppointmentRepository appointments;
   private final DoctorRepository doctors;
   private final LabOrderRepository labOrders;
+  private final com.clinic.repository.ScheduleRepository schedules;
   private final RealtimeService realtime;
   private final NotificationsService notifications;
   private final JdbcTemplate jdbc;
@@ -62,8 +64,9 @@ public class QueueService {
 
   public QueueService(VisitRepository visits, AppointmentRepository appointments, DoctorRepository doctors, LabOrderRepository labOrders,
       RealtimeService realtime, NotificationsService notifications, JdbcTemplate jdbc, Refresher refresher, QueueRules rules,
-      PlatformTransactionManager txm, SettingsService settings) {
+      PlatformTransactionManager txm, SettingsService settings, com.clinic.repository.ScheduleRepository schedules) {
     this.settings = settings;
+    this.schedules = schedules;
     this.visits = visits;
     this.appointments = appointments;
     this.doctors = doctors;
@@ -82,9 +85,61 @@ public class QueueService {
 
   /** Thông tin cấp một số thứ tự. */
   public record TicketInput(String patientId, String doctorId, VisitSource source, CheckinMethod checkinMethod, String reason,
-      String appointmentId, Instant appointmentAt, boolean checkinOverride) {
+      String appointmentId, Instant appointmentAt, boolean checkinOverride, boolean overCapacity) {
+    public TicketInput(String patientId, String doctorId, VisitSource source, CheckinMethod checkinMethod, String reason, String appointmentId,
+        Instant appointmentAt, boolean checkinOverride) {
+      this(patientId, doctorId, source, checkinMethod, reason, appointmentId, appointmentAt, checkinOverride, false);
+    }
+
     public static TicketInput walkIn(String patientId, String doctorId, CheckinMethod method, String reason) {
-      return new TicketInput(patientId, doctorId, VisitSource.WALK_IN, method, reason, null, null, false);
+      return walkIn(patientId, doctorId, method, reason, false);
+    }
+
+    /** overCapacity: lễ tân vẫn nhận dù bác sĩ đã kín ca (bác sĩ đồng ý khám thêm giờ) */
+    public static TicketInput walkIn(String patientId, String doctorId, CheckinMethod method, String reason, boolean overCapacity) {
+      return new TicketInput(patientId, doctorId, VisitSource.WALK_IN, method, reason, null, null, false, overCapacity);
+    }
+  }
+
+  /** Sức chứa khách vãng lai hôm nay của một bác sĩ (theo các khung giờ đã mở và người vãng lai đang chờ). */
+  public WalkInCapacity.Result capacity(String doctorId, Instant now) {
+    LocalDate date = VnTime.today(now);
+    List<WalkInCapacity.Slot> slots = schedules.findDay(doctorId, date).stream()
+        .map(s -> new WalkInCapacity.Slot(s.getStartTime(), s.getEndTime(), s.isBooked())).toList();
+    int walkIns = (int) visits.withStatus(doctorId, date, List.of(VisitStatus.WAITING, VisitStatus.IN_PROGRESS)).stream()
+        .filter(v -> v.getSource() == VisitSource.WALK_IN).count();
+    return WalkInCapacity.of(slots, now, walkIns, rules.avgExamMinutes());
+  }
+
+  /**
+   * Mọi bác sĩ đang làm: có ca hôm nay không, ca hết lúc mấy giờ, còn nhận bao nhiêu khách vãng lai. accepting = còn
+   * nhận (luôn true khi admin tắt giới hạn).
+   */
+  public List<Map<String, Object>> capacities(Instant now) {
+    boolean limit = settings.walkInLimit();
+    return tx.execute(s -> doctors.allActive().stream().map(d -> {
+      WalkInCapacity.Result c = capacity(d.getId(), now);
+      boolean open = c.hasShift() && !c.shiftOver(now) && c.remaining() > 0;
+      return Json.obj("doctorId", d.getId(), "hasShift", c.hasShift(), "shiftEnd", c.shiftEnd(), "shiftOver", c.shiftOver(now),
+          "waitingWalkIns", c.waitingWalkIns(), "remaining", c.remaining(), "accepting", !limit || open);
+    }).toList());
+  }
+
+  /** Còn nhận khách vãng lai không; không thì báo lý do (không có ca, hết ca, kín lịch). */
+  private void checkCapacity(Doctor doctor, Instant now) {
+    WalkInCapacity.Result c = capacity(doctor.getId(), now);
+    String who = NotificationsService.doctorLabel(doctor);
+    Map<String, Object> extra = Json.obj("remaining", c.remaining(), "shiftEnd", c.shiftEnd(), "waitingWalkIns", c.waitingWalkIns());
+    if (!c.hasShift()) {
+      throw ApiException.conflictWithCode("DOCTOR_OFF", who + " hôm nay không có ca khám. Vui lòng chọn bác sĩ khác.", extra);
+    }
+    if (c.shiftOver(now)) {
+      throw ApiException.conflictWithCode("DOCTOR_OFF", who + " đã hết ca khám hôm nay (ca kết thúc lúc " + VnTime.time(c.shiftEnd()) + "). Vui lòng chọn bác sĩ khác.",
+          extra);
+    }
+    if (c.remaining() <= 0) {
+      throw ApiException.conflictWithCode("DOCTOR_FULL", who + " đã kín lịch đến hết ca hôm nay (" + VnTime.time(c.shiftEnd()) + "), đang có "
+          + c.waitingWalkIns() + " người vãng lai chờ. Vui lòng chọn bác sĩ khác.", extra);
     }
   }
 
@@ -142,6 +197,8 @@ public class QueueService {
         Doctor doctor = doctors.findById(input.doctorId()).orElse(null);
         if (doctor == null || !doctor.getUser().isActive()) throw ApiException.notFound("Không tìm thấy bác sĩ");
         advisoryLock("queue:" + input.doctorId() + ":" + date);
+        // Vãng lai chỉ nhận khi bác sĩ có ca và còn thời gian rảnh trong ca (người đặt lịch đã có khung giờ riêng)
+        if (input.source() == VisitSource.WALK_IN && !input.overCapacity() && settings.walkInLimit()) checkCapacity(doctor, Instant.now());
 
         // Mỗi bệnh nhân chỉ giữ một số đang chờ cho mỗi chuyên khoa trong ngày
         List<Visit> waiting = visits.waitingForSpecialty(input.patientId(), date, doctor.getSpecialtyId());

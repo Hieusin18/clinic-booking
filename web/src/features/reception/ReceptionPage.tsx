@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert, App, Button, Card, Col, DatePicker, Descriptions, Empty, Form, Input, List, Modal, Row, Select, Tag, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useState } from 'react';
-import { api, errorData } from '../../lib/api';
+import { api, errorData, errorMessage } from '../../lib/api';
 import { age, doctorName, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
 import type { Appointment, Gender, Page, Patient, Visit } from '../../lib/types';
@@ -11,6 +11,7 @@ import { C } from '../../lib/theme';
 import { AppAccount } from './AppAccount';
 import { TicketModal } from './TicketPrint';
 import { useDoctorOptions } from './useDoctorOptions';
+import { capacityNote, useCapacity } from './capacity';
 
 type NewPatient = {
   fullName: string;
@@ -71,11 +72,58 @@ export function ReceptionPage() {
       ).data,
     { success: 'Đã tạo hồ sơ bệnh nhân', invalidate: ['patients'] },
   );
-  const issue = useAction(
-    async (v: { patientId: string; doctorId: string; reason?: string }) => (await api.post<Visit>('/queue/tickets', v)).data,
-    { invalidate: ['queue'] },
-  );
   const { modal } = App.useApp();
+  const capacity = useCapacity();
+  const capOf = (doctorId: string) => capacity.data?.find((c) => c.doctorId === doctorId);
+  // Ô chọn bác sĩ: ghi chú còn nhận bao nhiêu / không có ca / kín lịch; bác sĩ kín lịch xếp xuống cuối nhóm
+  const doctorOptions = doctors.options.map((g) => ({
+    ...g,
+    options: [...g.options]
+      .sort((a, b) => Number(capacityNote(capOf(a.value))?.full ?? false) - Number(capacityNote(capOf(b.value))?.full ?? false))
+      .map((o) => {
+        const note = capacityNote(capOf(o.value));
+        return {
+          ...o,
+          label: note ? (
+            <span>
+              {o.label} <span style={{ color: note.full ? C.amber : C.muted, fontSize: 12.5 }}>· {note.text}</span>
+            </span>
+          ) : (
+            o.label
+          ),
+          searchText: o.label,
+        };
+      }),
+  }));
+  const issue = useAction(
+    async (v: { patientId: string; doctorId: string; reason?: string; overCapacity?: boolean }) => (await api.post<Visit>('/queue/tickets', v)).data,
+    {
+      invalidate: ['queue'],
+      // Bác sĩ không có ca / kín lịch: hỏi lễ tân chọn bác sĩ khác hay vẫn nhận (bác sĩ đồng ý khám thêm giờ)
+      handleError: (err, vars) => {
+        const data = errorData(err);
+        if (data?.code !== 'DOCTOR_FULL' && data?.code !== 'DOCTOR_OFF') return false;
+        modal.confirm({
+          title: data.code === 'DOCTOR_OFF' ? 'Bác sĩ không có ca khám lúc này' : 'Bác sĩ đã kín lịch trong ca',
+          content: `${errorMessage(err)} Chỉ nhận thêm khi bác sĩ đã đồng ý khám quá giờ.`,
+          okText: 'Bác sĩ đồng ý, vẫn nhận',
+          cancelText: 'Chọn bác sĩ khác',
+          onOk: () =>
+            issue.mutate(
+              { ...vars, overCapacity: true },
+              {
+                onSuccess: (visit) => {
+                  setTicket(visit);
+                  ticketForm.resetFields();
+                  setSelected(null);
+                },
+              },
+            ),
+        });
+        return true;
+      },
+    },
+  );
   const checkIn = useAction(
     async ({ id, override }: { id: string; override?: boolean }) =>
       (await api.post<Visit>('/queue/checkin', { appointmentId: id, ...(override ? { override: true } : {}) })).data,
@@ -199,7 +247,7 @@ export function ReceptionPage() {
                 }
               >
                 <Form.Item label="Bác sĩ" name="doctorId" rules={[{ required: true, message: 'Chọn bác sĩ' }]}>
-                  <Select showSearch optionFilterProp="label" options={doctors.options} placeholder="Chọn bác sĩ theo chuyên khoa" />
+                  <Select showSearch optionFilterProp="searchText" options={doctorOptions} placeholder="Chọn bác sĩ theo chuyên khoa" />
                 </Form.Item>
                 <Form.Item label="Lý do khám" name="reason">
                   <Input.TextArea rows={2} maxLength={500} />

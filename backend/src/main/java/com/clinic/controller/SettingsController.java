@@ -22,7 +22,8 @@ public class SettingsController {
     this.service = service;
   }
 
-  public record SettingsRequest(Boolean vitalsBeforeExam) {}
+  /** Gửi trường nào thì đổi trường đó */
+  public record SettingsRequest(Boolean vitalsBeforeExam, Boolean walkInLimit) {}
 
   @Roles({Role.ADMIN, Role.DOCTOR, Role.NURSE, Role.RECEPTIONIST})
   @GetMapping("/settings")
@@ -33,7 +34,12 @@ public class SettingsController {
   @Roles(Role.ADMIN)
   @PutMapping("/settings")
   public Map<String, Object> update(@CurrentUser AuthUser user, @RequestBody(required = false) SettingsRequest body) {
-    if (body == null || body.vitalsBeforeExam() == null) throw new com.clinic.exception.ValidationException("vitalsBeforeExam must be a boolean value");
-    return service.setVitalsBeforeExam(user, body.vitalsBeforeExam());
+    if (body == null || (body.vitalsBeforeExam() == null && body.walkInLimit() == null)) {
+      throw new com.clinic.exception.ValidationException("vitalsBeforeExam or walkInLimit must be a boolean value");
+    }
+    Map<String, Object> out = null;
+    if (body.vitalsBeforeExam() != null) out = service.set(user, SettingsService.VITALS_BEFORE_EXAM, body.vitalsBeforeExam());
+    if (body.walkInLimit() != null) out = service.set(user, SettingsService.WALK_IN_LIMIT, body.walkInLimit());
+    return out;
   }
 }

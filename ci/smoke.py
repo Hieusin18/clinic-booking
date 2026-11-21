@@ -57,7 +57,8 @@ print("✓ kết nối realtime qua /api/socket.io (WebSocket và long-polling)"
 
 phone = "098" + str(int(time.time()))[-7:]
 patient = ok("POST", "/patients", {"fullName": "Kiểm Tra Nhanh", "phone": phone, "dateOfBirth": "1990-01-01", "gender": "MALE"}, reception)
-ticket = ok("POST", "/queue/tickets", {"patientId": patient["id"], "doctorId": doctor["id"], "reason": "Kiểm tra"}, reception)
+# overCapacity: bác sĩ mẫu có thể chưa mở ca hôm nay (quy định giới hạn vãng lai đang bật)
+ticket = ok("POST", "/queue/tickets", {"patientId": patient["id"], "doctorId": doctor["id"], "reason": "Kiểm tra", "overCapacity": True}, reception)
 print(f"✓ cấp số {ticket.get('label', ticket.get('queueNumber'))}")
 wait_for(ws_events, "queue:changed", "WebSocket")
 wait_for(poll_events, "queue:changed", "long-polling")
