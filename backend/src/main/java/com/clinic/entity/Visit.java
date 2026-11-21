@@ -49,6 +49,8 @@ public class Visit extends BaseEntity {
   /** Lễ tân check-in ngoài khung giờ cho phép (đến quá sớm hoặc quá trễ) */
   private boolean checkinOverride;
   private Instant calledAt;
+  /** Khung giờ khách vãng lai giữ (null = người đặt lịch, hoặc nhận ngoài ca) */
+  private String scheduleId;
   /** Điều dưỡng gọi vào đo sinh hiệu lúc nào */
   private Instant vitalsCalledAt;
   /** Đo sinh hiệu xong lúc nào (null = chưa đo) */
