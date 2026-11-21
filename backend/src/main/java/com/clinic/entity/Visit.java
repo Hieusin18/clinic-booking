@@ -49,6 +49,10 @@ public class Visit extends BaseEntity {
   /** Lễ tân check-in ngoài khung giờ cho phép (đến quá sớm hoặc quá trễ) */
   private boolean checkinOverride;
   private Instant calledAt;
+  /** Điều dưỡng gọi vào đo sinh hiệu lúc nào */
+  private Instant vitalsCalledAt;
+  /** Đo sinh hiệu xong lúc nào (null = chưa đo) */
+  private Instant vitalsMeasuredAt;
 
   @Enumerated(EnumType.STRING)
   private CallRule callRule;

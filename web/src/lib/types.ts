@@ -133,6 +133,9 @@ export interface Visit {
   createdAt: string;
   patient: { id: string; fullName: string; phone: string; dateOfBirth: string; gender: Gender; allergies: string | null };
   doctor: DoctorRef;
+  /** Điều dưỡng gọi vào đo sinh hiệu lúc nào / đo xong lúc nào */
+  vitalsCalledAt?: string | null;
+  vitalsMeasuredAt?: string | null;
   /** Có ở /queue/doctor và /vitals/today: sinh hiệu điều dưỡng đã đo (null = chưa đo) */
   vitals?: Vitals | null;
   /** Có ở /queue/today và /queue/doctor: thứ tự gọi dự kiến (0 = người tiếp theo) của người đang chờ */

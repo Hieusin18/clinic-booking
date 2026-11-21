@@ -72,6 +72,10 @@ function TicketCard({ visitId }: { visitId: string }) {
             <Badge label={visit.resultMode === 'ONLINE' ? 'Đi làm cận lâm sàng · nhận kết quả online' : 'Đi làm cận lâm sàng'} tone="primary" />
           ) : visit.status === 'WAITING' && visit.resultsReadyAt ? (
             <Badge label="Có kết quả · được gọi trước" tone="success" />
+          ) : visit.status === 'WAITING' && visit.vitalsCalledAt && !visit.vitalsMeasuredAt ? (
+            <Badge label="Mời vào khu đo sinh hiệu" tone="success" />
+          ) : visit.status === 'WAITING' && visit.vitalsMeasuredAt ? (
+            <Badge label="Đã đo sinh hiệu · chờ bác sĩ gọi" tone="primary" />
           ) : active && due ? (
             <Badge label="Đến giờ hẹn · đang được ưu tiên" tone="primary" />
           ) : null}

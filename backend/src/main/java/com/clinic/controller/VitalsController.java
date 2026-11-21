@@ -40,4 +40,11 @@ public class VitalsController {
   public Map<String, Object> save(@CurrentUser AuthUser user, @PathVariable String id, @Valid @RequestBody VitalsRequest dto) {
     return service.save(user, id, dto);
   }
+
+  /** Điều dưỡng gọi bệnh nhân vào đo sinh hiệu (app bệnh nhân nhận thông báo) */
+  @Roles(Role.NURSE)
+  @org.springframework.web.bind.annotation.PostMapping("/visits/{id}/vitals/call")
+  public Map<String, Object> callIn(@PathVariable String id) {
+    return service.callIn(id);
+  }
 }
