@@ -75,10 +75,6 @@ public class AuthService {
     String relativeName = dto.relativeName().strip();
     if (relativeName.length() < 2) throw ApiException.badRequest("Nhập họ tên người thân");
     if (dto.relativePhone().equals(dto.phone())) throw ApiException.badRequest("Số điện thoại người thân phải khác số của bạn");
-    // CCCD là duy nhất: đã gắn với hồ sơ của người khác (khác số điện thoại) thì không đăng ký được, ra quầy để kiểm tra
-    patients.findByNationalId(dto.nationalId()).filter(p -> !dto.phone().equals(p.getPhone())).ifPresent(p -> {
-      throw ApiException.conflict("Số CCCD này đã có trong hồ sơ khác của phòng khám. Vui lòng kiểm tra lại hoặc liên hệ quầy lễ tân.");
-    });
     boolean hasVerification = dto.verificationId() != null && !dto.verificationId().isEmpty() && dto.ticket() != null && !dto.ticket().isEmpty();
     Instant now = Instant.now();
 
@@ -88,6 +84,11 @@ public class AuthService {
       phoneVerify.consume(dto.verificationId(), dto.ticket(), PhoneVerifyPurpose.REGISTER, dto.phone(), now);
       phoneProven = true;
     }
+    // Kiểm tra sau bước xác minh số điện thoại để không ai dò được CCCD nào đã có trong hệ thống.
+    // CCCD là duy nhất: đã gắn với hồ sơ của người khác (khác số điện thoại) thì không đăng ký được, ra quầy để kiểm tra
+    patients.findByNationalId(dto.nationalId()).filter(p -> !dto.phone().equals(p.getPhone())).ifPresent(p -> {
+      throw ApiException.conflict("Số CCCD này đã có trong hồ sơ khác của phòng khám. Vui lòng kiểm tra lại hoặc liên hệ quầy lễ tân.");
+    });
     User created = new User();
     created.setFullName(dto.fullName());
     created.setPhone(dto.phone());
