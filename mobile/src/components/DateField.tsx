@@ -3,7 +3,7 @@ import { createElement, useState } from 'react';
 import { Modal, Platform, Pressable, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { Text } from '@/components/Text';
-import { Button, colors, styles } from '@/components/ui';
+import { Button, FieldLabel, colors, styles } from '@/components/ui';
 import { dateToVnInput, vnInputToDate } from '@/lib/format';
 
 /** Ngày mở lịch khi ô còn trống (ngày sinh: đỡ phải lùi nhiều năm) */
@@ -22,6 +22,7 @@ export function DateField({
   error,
   placeholder = 'Chọn ngày',
   maximumDate = new Date(),
+  required,
 }: {
   label: string;
   value: string;
@@ -29,6 +30,7 @@ export function DateField({
   error?: string;
   placeholder?: string;
   maximumDate?: Date;
+  required?: boolean;
 }) {
   const [iosOpen, setIosOpen] = useState(false);
   const [draft, setDraft] = useState<Date>(DEFAULT_OPEN);
@@ -38,7 +40,7 @@ export function DateField({
     const iso = current ? `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}` : '';
     return (
       <View style={{ gap: 6 }}>
-        <Text style={styles.label}>{label}</Text>
+        <FieldLabel label={label} required={required} />
         <View style={[styles.inputBox, error ? { borderColor: colors.danger } : null]}>
           <Icon name="calendar" color={colors.muted} size={20} />
           {createElement('input', {
@@ -79,7 +81,7 @@ export function DateField({
 
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <FieldLabel label={label} required={required} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${value || 'chưa chọn'}`}

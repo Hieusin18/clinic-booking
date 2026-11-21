@@ -15,6 +15,7 @@ class UniqueErrorTest extends IntegrationTest {
   static Map<String, Object> patient(String phone, String email) {
     Map<String, Object> m = new HashMap<>(Map.of("fullName", "Người Đăng Ký", "phone", phone, "password", "xuanhoa2026", "dateOfBirth", "1990-01-01",
         "gender", "MALE"));
+    m.putAll(Map.of("nationalId", "00" + phone, "relativeName", "Người Nhà", "relativePhone", "0912000111"));
     if (email != null) m.put("email", email);
     return m;
   }

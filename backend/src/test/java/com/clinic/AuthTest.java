@@ -21,6 +21,7 @@ class AuthTest extends IntegrationTest {
   static Map<String, Object> register(Object... overrides) {
     Map<String, Object> m = new HashMap<>(Map.of("fullName", "Nguyễn Thị Hoa", "phone", "0987654321", "password", "xuanhoa2026",
         "dateOfBirth", "1998-03-20", "gender", "FEMALE"));
+    m.putAll(Map.of("nationalId", "001198012345", "relativeName", "Nguyễn Văn Tú", "relativePhone", "0912000111"));
     for (int i = 0; i < overrides.length; i += 2) m.put((String) overrides[i], overrides[i + 1]);
     return m;
   }
@@ -75,6 +76,40 @@ class AuthTest extends IntegrationTest {
     void badPhone() {
       var res = api.post("/api/auth/register").send(register("phone", "12345")).expect(400);
       assertThat(res.body().get("message").toString()).contains("Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0");
+    }
+
+    @Test
+    @DisplayName("bắt buộc CCCD (12 số) và người thân liên hệ; lưu vào hồ sơ")
+    void requiredInfo() {
+      for (String f : List.of("nationalId", "relativeName", "relativePhone")) {
+        Map<String, Object> body = register();
+        body.remove(f);
+        api.post("/api/auth/register").send(body).expect(400);
+      }
+      assertThat(api.post("/api/auth/register").send(register("nationalId", "12345")).expect(400).body().get("message").toString()).contains("12 chữ số");
+      assertThat(api.post("/api/auth/register").send(register("relativePhone", "0987654321")).expect(400).body().get("message").asText())
+          .contains("khác số của bạn");
+      assertThat(users.count()).isZero();
+
+      api.post("/api/auth/register").send(register()).expect(201);
+      Patient p = patients.findByPhone("0987654321").orElseThrow();
+      assertThat(p.getNationalId()).isEqualTo("001198012345");
+      assertThat(p.getRelativeName()).isEqualTo("Nguyễn Văn Tú");
+      assertThat(p.getRelativePhone()).isEqualTo("0912000111");
+    }
+
+    @Test
+    @DisplayName("CCCD đã thuộc hồ sơ người khác thì không đăng ký được")
+    void nationalIdTaken() {
+      Patient other = new Patient();
+      other.setFullName("Người Khác");
+      other.setPhone("0911222333");
+      other.setDateOfBirth(LocalDate.parse("1970-01-01"));
+      other.setGender(Gender.MALE);
+      other.setNationalId("001198012345");
+      patients.saveAndFlush(other);
+      assertThat(api.post("/api/auth/register").send(register()).expect(409).body().get("message").asText()).contains("Số CCCD này đã có");
+      assertThat(users.count()).isZero();
     }
 
     @Test

@@ -139,13 +139,23 @@ const buttonVariants = {
   danger: { box: { backgroundColor: colors.dangerSoft }, text: { color: colors.danger } },
 };
 
-export function Field({ label, error, icon, ...input }: TextInputProps & { label: string; error?: string; icon?: IconName }) {
+/** Nhãn ô nhập; {@code required} thêm dấu * đỏ */
+export function FieldLabel({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <Text style={styles.label}>
+      {label}
+      {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
+    </Text>
+  );
+}
+
+export function Field({ label, error, icon, required, ...input }: TextInputProps & { label: string; error?: string; icon?: IconName; required?: boolean }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <FieldLabel label={label} required={required} />
       <View style={[styles.inputBox, error ? { borderColor: colors.danger } : null]}>
         {icon ? <Icon name={icon} color={colors.muted} size={20} /> : null}
-        <TextInput placeholderTextColor={colors.faint} style={styles.input} {...input} />
+        <TextInput placeholderTextColor={colors.faint} style={styles.input} accessibilityLabel={required ? `${label}, bắt buộc` : label} {...input} />
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
