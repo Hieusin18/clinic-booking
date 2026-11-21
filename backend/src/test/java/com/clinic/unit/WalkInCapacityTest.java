@@ -59,4 +59,14 @@ class WalkInCapacityTest {
     assertThat(over.remaining()).isZero();
     assertThat(WalkInCapacity.first(List.of(slot(-120, -60, false)), NOW)).isEmpty();
   }
+
+  @Test
+  @DisplayName("trạng thái khung cho lễ tân xem: trống, đã đặt, vãng lai giữ, đã qua")
+  void states() {
+    assertThat(WalkInCapacity.state(slot(0, 30, false), NOW, false)).isEqualTo(WalkInCapacity.State.FREE);
+    assertThat(WalkInCapacity.state(slot(-10, 20, false), NOW, false)).isEqualTo(WalkInCapacity.State.FREE);
+    assertThat(WalkInCapacity.state(slot(0, 30, true), NOW, false)).isEqualTo(WalkInCapacity.State.BOOKED);
+    assertThat(WalkInCapacity.state(slot(0, 30, true), NOW, true)).isEqualTo(WalkInCapacity.State.WALK_IN);
+    assertThat(WalkInCapacity.state(slot(-60, -30, false), NOW, false)).isEqualTo(WalkInCapacity.State.PAST);
+  }
 }

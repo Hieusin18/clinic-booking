@@ -2,6 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { formatTime } from '../../lib/format';
 
+export type SlotState = 'FREE' | 'BOOKED' | 'WALK_IN' | 'PAST';
+
+/** Một khung giờ hôm nay của bác sĩ (mỗi khung một lượt khám) */
+export interface CapacitySlot {
+  id: string;
+  start: string;
+  end: string;
+  state: SlotState;
+}
+
+export const SLOT_STATE_LABEL: Record<SlotState, string> = { FREE: 'Trống', BOOKED: 'Đã đặt lịch', WALK_IN: 'Vãng lai giữ', PAST: 'Đã qua' };
+
 /** GET /queue/capacity: bác sĩ nào hôm nay còn nhận khách vãng lai */
 export interface DoctorCapacity {
   doctorId: string;
@@ -12,6 +24,8 @@ export interface DoctorCapacity {
   remaining: number;
   /** Còn nhận (luôn true khi admin tắt giới hạn) */
   accepting: boolean;
+  /** Các khung giờ hôm nay, sớm nhất trước */
+  slots: CapacitySlot[];
 }
 
 export function useCapacity() {

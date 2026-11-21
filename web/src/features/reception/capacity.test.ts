@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { capacityNote, type DoctorCapacity } from './capacity';
 
-const base: DoctorCapacity = { doctorId: 'd', hasShift: true, shiftEnd: '2026-11-21T04:30:00.000Z', shiftOver: false, remaining: 5, accepting: true };
+const base: DoctorCapacity = { doctorId: 'd', hasShift: true, shiftEnd: '2026-11-21T04:30:00.000Z', shiftOver: false, remaining: 5, accepting: true, slots: [] };
 
 describe('sức chứa khách vãng lai', () => {
   it('ghi chú cạnh tên bác sĩ', () => {
