@@ -14,6 +14,7 @@ import com.clinic.entity.Schedule;
 import com.clinic.entity.Specialty;
 import com.clinic.entity.User;
 import com.clinic.entity.Visit;
+import com.clinic.util.DoctorProfile;
 import java.util.Map;
 
 /**
@@ -30,7 +31,7 @@ public final class Rows {
   }
 
   public static Map<String, Object> specialty(Specialty s) {
-    return Json.obj("id", s.getId(), "name", s.getName(), "description", s.getDescription());
+    return Json.obj("id", s.getId(), "name", s.getName(), "description", s.getDescription(), "symptoms", DoctorProfile.splitExpertise(s.getSymptoms()));
   }
 
   public static Map<String, Object> doctor(Doctor d) {

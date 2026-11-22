@@ -10,7 +10,8 @@ import { api } from '@/lib/api';
 import { errorMessage } from '@/lib/errors';
 import { doctorName } from '@/lib/format';
 import { NEEDS_DOCTOR } from '@/lib/queue';
-import type { Doctor, Page, Visit } from '@/lib/types';
+import type { Doctor, Page, Specialty, Visit } from '@/lib/types';
+import { SymptomPicker } from '@/components/SymptomPicker';
 import { withLogin } from '@/components/LoginRequired';
 
 /**
@@ -28,6 +29,13 @@ function Scan() {
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const locked = useRef(false);
 
+  /** Lọc bác sĩ theo khoa gợi ý từ triệu chứng (null = mọi bác sĩ) */
+  const [specialtyId, setSpecialtyId] = useState<string | null>(null);
+  const specialties = useQuery({
+    queryKey: ['specialties'],
+    enabled: needDoctor,
+    queryFn: async () => (await api.get<Page<Specialty>>('/specialties', { params: { pageSize: 100 } })).data.items,
+  });
   const doctors = useQuery({
     queryKey: ['doctors', 'all-active'],
     enabled: needDoctor,
@@ -76,10 +84,20 @@ function Scan() {
       <Screen>
         <Stack.Screen options={{ title: 'Chọn bác sĩ' }} />
         <Muted>{needDoctorReason || 'Bạn chưa đặt lịch hôm nay. Chọn bác sĩ muốn khám để lấy số.'}</Muted>
+        <SymptomPicker specialties={specialties.data ?? []} pickedSpecialtyId={specialtyId} onPick={setSpecialtyId} />
         {doctors.isLoading ? <Loading /> : null}
+        {specialtyId ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 14, color: colors.muted }}>
+              Bác sĩ khoa {specialties.data?.find((x) => x.id === specialtyId)?.name ?? ''}
+            </Text>
+            <Chip label="Xem tất cả bác sĩ" onPress={() => setSpecialtyId(null)} />
+          </View>
+        ) : null}
         <View style={{ gap: 8 }}>
           {/* Bác sĩ hết chỗ hôm nay vẫn hiện nhưng không chọn được, xếp xuống cuối */}
           {[...(doctors.data ?? [])]
+            .filter((d) => !specialtyId || d.specialty.id === specialtyId)
             .sort((a, b) => Number(capOf(a.id)?.accepting === false) - Number(capOf(b.id)?.accepting === false))
             .map((d) => {
               const c = capOf(d.id);

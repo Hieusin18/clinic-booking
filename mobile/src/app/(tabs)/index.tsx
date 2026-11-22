@@ -6,6 +6,7 @@ import { BannerStrip } from '@/components/BannerStrip';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { Icon } from '@/components/Icon';
 import { NotificationBell } from '@/components/NotificationBell';
+import { SymptomPicker } from '@/components/SymptomPicker';
 import { Text } from '@/components/Text';
 import { Chip, Empty, ErrorBox, Loading, Screen, colors, styles } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -41,7 +42,7 @@ export default function BookHome() {
     <Screen
       title="Đặt lịch khám"
       action={<NotificationBell />}
-      subtitle="Chọn chuyên khoa, xem hồ sơ rồi chọn giờ"
+      subtitle="Chọn chuyên khoa (hoặc chọn triệu chứng), xem hồ sơ rồi chọn giờ"
       refreshing={doctors.isRefetching}
       onRefresh={() => void Promise.all([specialties.refetch(), doctors.refetch(), queryClient.invalidateQueries({ queryKey: ['banners'] })])}
     >
@@ -63,6 +64,7 @@ export default function BookHome() {
           <Chip key={s.id} label={s.name} selected={specialtyId === s.id} onPress={() => setSpecialtyId(s.id)} />
         ))}
       </ScrollView>
+      <SymptomPicker specialties={specialties.data ?? []} pickedSpecialtyId={specialtyId} onPick={setSpecialtyId} />
 
       <ErrorBox message={doctors.error ? errorMessage(doctors.error) : null} />
       {doctors.isLoading ? (

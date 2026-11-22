@@ -74,10 +74,18 @@ public class SeedService {
     }
 
     for (SeedData.Specialty s : SeedData.SPECIALTIES) {
+      // Chuyên khoa đã có từ trước nhưng chưa có triệu chứng: bổ sung để gợi ý khoa hoạt động
+      for (Specialty old : specialties.findByNameIgnoreCase(s.name())) {
+        if (old.getSymptoms() == null) {
+          old.setSymptoms(String.join("\n", s.symptoms()));
+          specialties.saveAndFlush(old);
+        }
+      }
       if (specialties.findByNameIgnoreCase(s.name()).isEmpty()) {
         Specialty e = new Specialty();
         e.setName(s.name());
         e.setDescription(s.description());
+        e.setSymptoms(String.join("\n", s.symptoms()));
         specialties.saveAndFlush(e);
       }
     }

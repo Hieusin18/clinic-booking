@@ -30,6 +30,8 @@ export interface Specialty {
   id: string;
   name: string;
   description: string | null;
+  /** Triệu chứng thường gặp (gợi ý bệnh nhân chọn đúng khoa) */
+  symptoms?: string[];
   _count?: { doctors: number };
 }
 

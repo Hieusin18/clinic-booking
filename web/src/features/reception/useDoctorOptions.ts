@@ -10,10 +10,13 @@ export function useDoctorOptions() {
     queryFn: async () => (await api.get<Page<Doctor>>('/doctors', { params: { pageSize: 100 } })).data.items,
   });
   const groups = new Map<string, { label: string; options: { value: string; label: string }[] }>();
+  /** Bác sĩ → chuyên khoa (gợi ý khoa theo triệu chứng) */
+  const specialtyOf = new Map<string, string>();
   for (const d of query.data ?? []) {
+    specialtyOf.set(d.id, d.specialty.id);
     const g = groups.get(d.specialty.id) ?? { label: d.specialty.name, options: [] };
     g.options.push({ value: d.id, label: doctorName(d) });
     groups.set(d.specialty.id, g);
   }
-  return { ...query, options: [...groups.values()] };
+  return { ...query, options: [...groups.values()], specialtyOf };
 }
