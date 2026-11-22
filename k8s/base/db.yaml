@@ -1,0 +1,66 @@
+# PostgreSQL: StatefulSet 1 bản + ổ đĩa riêng (PVC), tương đương service "db" + volume "pgdata" trong docker compose.
+# StatefulSet (không phải Deployment) vì CSDL cần tên ổn định và gắn cố định với ổ đĩa của nó.
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  labels: { app: db }
+spec:
+  # Headless: tên "db" trỏ thẳng tới pod CSDL, backend vẫn gọi "db:5432" như trong compose
+  clusterIP: None
+  selector: { app: db }
+  ports:
+    - name: postgres
+      port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  labels: { app: db }
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      # Không tạo biến môi trường kiểu DB_PORT=tcp://... cho mọi service (dễ đè nhầm cấu hình)
+      enableServiceLinks: false
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: clinic-env, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: clinic-env, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: clinic-env, key: POSTGRES_DB } }
+            # Thư mục con: ổ đĩa mới có thể chứa sẵn lost+found, Postgres không chịu khởi tạo vào thư mục không trống
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+  # Mỗi pod CSDL được cấp một ổ đĩa riêng; xóa pod (hay khởi động lại máy) dữ liệu vẫn còn
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

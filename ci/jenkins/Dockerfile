@@ -13,7 +13,11 @@ RUN apt-get update \
  # Node.js 22
  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
  && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin nodejs \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ # kubectl + k3d cho bước Deploy Kubernetes (k8s/deploy.sh)
+ && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.30.4/bin/linux/$(dpkg --print-architecture)/kubectl" \
+ && curl -fsSL -o /usr/local/bin/k3d "https://github.com/k3d-io/k3d/releases/download/v5.7.4/k3d-linux-$(dpkg --print-architecture)" \
+ && chmod +x /usr/local/bin/kubectl /usr/local/bin/k3d
 
 USER jenkins
 # Plugin cài sẵn, khỏi bấm tay trong giao diện
