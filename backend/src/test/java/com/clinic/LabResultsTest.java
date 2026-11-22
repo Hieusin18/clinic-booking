@@ -177,7 +177,10 @@ class LabResultsTest extends IntegrationTest {
     var file = api.get("/api" + url).expect(200);
     assertThat(file.header("Content-Type")).isEqualTo("application/pdf");
     assertThat(file.header("Content-Disposition")).startsWith("inline");
-    api.get("/api" + url.replaceFirst("sig=.", "sig=x")).expect(404);
+    // Đổi ký tự đầu của chữ ký thành ký tự khác (chữ ký ngẫu nhiên có thể vốn bắt đầu bằng "x")
+    int at = url.indexOf("sig=") + 4;
+    String tampered = url.substring(0, at) + (url.charAt(at) == 'x' ? 'y' : 'x') + url.substring(at + 1);
+    api.get("/api" + tampered).expect(404);
   }
 
   @Test

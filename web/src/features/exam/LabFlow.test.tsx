@@ -49,7 +49,9 @@ describe('Cận lâm sàng trên màn hình khám', () => {
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: {} });
     renderPage([page('/', <ExamPage />)], { user: fakeUser('DOCTOR') });
 
-    await userEvent.type(await screen.findByRole('combobox', { name: 'Tên chỉ định cận lâm sàng' }), 'Siêu âm ổ bụng');
+    // Dán cả chuỗi một lần: gõ từng ký tự làm ô gợi ý vẽ lại 14 lần, chậm trên máy CI
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Tên chỉ định cận lâm sàng' }));
+    await userEvent.paste('Siêu âm ổ bụng');
     await userEvent.click(screen.getByRole('button', { name: /Thêm/ }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/visits/v1/lab-orders', { name: 'Siêu âm ổ bụng' }));
 
@@ -69,7 +71,8 @@ describe('Cận lâm sàng trên màn hình khám', () => {
     renderPage([page('/', <ExamPage />)], { user: fakeUser('DOCTOR') });
     const box = await screen.findByRole('textbox', { name: 'Kết quả X-quang ngực thẳng' });
     expect(screen.getByRole('button', { name: /Trả kết quả/ })).toBeDisabled();
-    await userEvent.type(box, 'Đám mờ thùy dưới phổi phải');
+    await userEvent.click(box);
+    await userEvent.paste('Đám mờ thùy dưới phổi phải');
     await userEvent.click(screen.getByRole('button', { name: /Trả kết quả/ }));
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/lab-orders/o1', { resultText: 'Đám mờ thùy dưới phổi phải', done: true }));
   });

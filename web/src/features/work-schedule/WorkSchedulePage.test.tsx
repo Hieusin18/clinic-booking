@@ -54,11 +54,11 @@ describe('Lịch làm việc (admin)', () => {
     expect(await screen.findByText('Trần Lễ Tân')).toBeInTheDocument();
     expect(screen.getByText('13:00–17:00')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: new RegExp(`Xếp ca cho Trần Lễ Tân ngày ${dayjs(today).format('DD/MM')}`) }));
+    // Tìm theo aria-label: getByRole trên bảng 7 cột phải tính tên cho mọi phần tử, rất chậm trong jsdom
+    await userEvent.click(screen.getByLabelText(`Xếp ca cho Trần Lễ Tân ngày ${dayjs(today).format('DD/MM')}`));
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: /Sáng 07:00–12:00/ }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Xếp ca' }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/shifts', { userId: 'r1', date: today, start: '07:00', end: '12:00', note: undefined }));
-    // Bảng 7 cột + hộp thoại có DatePicker/TimePicker: máy CI chậm có lúc quá 15 giây
-  }, 40_000);
+  });
 });

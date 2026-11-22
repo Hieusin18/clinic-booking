@@ -65,7 +65,7 @@ describe('Điều dưỡng đo sinh hiệu', () => {
         height: null,
       }),
     );
-  }, 40_000);
+  });
 
   it('gọi bệnh nhân vào đo, đã gọi thì hiện trạng thái và cho gọi lại', async () => {
     vi.spyOn(api, 'get').mockImplementation(async (url: string) =>
@@ -80,5 +80,5 @@ describe('Điều dưỡng đo sinh hiệu', () => {
     expect(screen.getByRole('button', { name: 'Gọi lại B03' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Gọi vào đo B01' }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/visits/v1/vitals/call'));
-  }, 40_000);
+  });
 });
