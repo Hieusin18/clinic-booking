@@ -1,5 +1,0 @@
-# Mọi thứ của hệ thống nằm trong namespace "clinic": xóa cả hệ thống chỉ cần xóa namespace này
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: clinic
