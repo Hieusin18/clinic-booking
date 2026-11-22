@@ -62,5 +62,5 @@ describe('Banner trên app', () => {
     await waitFor(() =>
       expect(post).toHaveBeenCalledWith('/admin/banners', expect.objectContaining({ kind: 'NOTICE', title: 'Đổi giờ làm việc', link: null, active: true })),
     );
-  }, 40_000);
+  });
 });
