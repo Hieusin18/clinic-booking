@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { api, errorData, errorMessage } from '../../lib/api';
 import { age, doctorName, formatDay, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
-import type { Appointment, Gender, Page, Patient, Visit } from '../../lib/types';
+import type { Appointment, Gender, Page, Patient, Specialty, Visit } from '../../lib/types';
+import { allSymptoms, suggestSpecialties } from '../../lib/symptoms';
 import { useRealtime } from '../../lib/realtime';
 import { C } from '../../lib/theme';
 import { AppAccount } from './AppAccount';
@@ -40,7 +41,7 @@ export function ReceptionPage() {
   const [prefill, setPrefill] = useState<Partial<NewPatient>>({});
   const [ticket, setTicket] = useState<Visit | null>(null);
   const [createForm] = Form.useForm<NewPatient>();
-  const [ticketForm] = Form.useForm<{ doctorId: string; reason?: string }>();
+  const [ticketForm] = Form.useForm<{ doctorId: string; reason?: string; symptoms?: string[] }>();
   const doctors = useDoctorOptions();
 
   const results = useQuery({
@@ -76,9 +77,31 @@ export function ReceptionPage() {
   const { modal } = App.useApp();
   const capacity = useCapacity();
   const capOf = (doctorId: string) => capacity.data?.find((c) => c.doctorId === doctorId);
-  // Ô chọn bác sĩ: ghi chú còn nhận bao nhiêu / không có ca / kín lịch; bác sĩ kín lịch xếp xuống cuối nhóm
-  const doctorOptions = doctors.options.map((g) => ({
+  const specialties = useQuery({
+    queryKey: ['specialties', 'all'],
+    queryFn: async () => (await api.get<Page<Specialty>>('/specialties', { params: { pageSize: 100 } })).data.items,
+  });
+  const symptomOptions = allSymptoms(specialties.data ?? []).map((x) => ({ value: x, label: x }));
+  const pickedSymptoms = Form.useWatch('symptoms', ticketForm) ?? [];
+  const suggestions = suggestSpecialties(specialties.data ?? [], pickedSymptoms);
+  const rankOf = (doctorId: string) => {
+    const i = suggestions.findIndex((x) => x.specialty.id === doctors.specialtyOf.get(doctorId));
+    return i < 0 ? suggestions.length : i;
+  };
+  // Bác sĩ nên chọn: khoa phù hợp nhất, còn nhận và còn nhiều khung trống nhất
+  const bestDoctor = suggestions.length
+    ? doctors.options
+        .flatMap((g) => g.options)
+        .filter((o) => rankOf(o.value) === 0 && capOf(o.value)?.accepting !== false)
+        .sort((a, b) => (capOf(b.value)?.remaining ?? 0) - (capOf(a.value)?.remaining ?? 0))[0]
+    : undefined;
+  // Ô chọn bác sĩ: ghi chú còn nhận bao nhiêu / không có ca / kín lịch; bác sĩ kín lịch xếp xuống cuối nhóm;
+  // đã chọn triệu chứng thì khoa phù hợp lên đầu
+  const doctorOptions = [...doctors.options]
+    .sort((a, b) => (a.options[0] ? rankOf(a.options[0].value) : 99) - (b.options[0] ? rankOf(b.options[0].value) : 99))
+    .map((g) => ({
     ...g,
+    label: g.options[0] && rankOf(g.options[0].value) < suggestions.length ? `${g.label} · phù hợp triệu chứng` : g.label,
     options: [...g.options]
       .sort((a, b) => Number(capacityNote(capOf(a.value))?.full ?? false) - Number(capacityNote(capOf(b.value))?.full ?? false))
       .map((o) => {
@@ -95,7 +118,7 @@ export function ReceptionPage() {
           searchText: o.label,
         };
       }),
-  }));
+    }));
   const pickedDoctor = Form.useWatch('doctorId', ticketForm);
   const pickedCap = pickedDoctor ? capOf(pickedDoctor) : undefined;
   // Bảng khung giờ hôm nay: bác sĩ có ca theo chuyên khoa; bác sĩ không có ca chỉ đếm
@@ -243,7 +266,7 @@ export function ReceptionPage() {
                 requiredMark={false}
                 onFinish={(v) =>
                   issue.mutate(
-                    { patientId: selected.id, ...v },
+                    { patientId: selected.id, doctorId: v.doctorId, reason: v.reason?.trim() || (v.symptoms?.length ? v.symptoms.join(', ') : undefined) },
                     {
                       onSuccess: (visit) => {
                         setTicket(visit);
@@ -254,6 +277,37 @@ export function ReceptionPage() {
                   )
                 }
               >
+                <Form.Item label="Triệu chứng" name="symptoms" extra={suggestions.length ? undefined : 'Hỏi bệnh nhân rồi chọn triệu chứng để được gợi ý khoa và bác sĩ'}>
+                  <Select mode="multiple" allowClear options={symptomOptions} placeholder="Ví dụ: Đau họng, Sốt" optionFilterProp="label" aria-label="Triệu chứng" />
+                </Form.Item>
+                {suggestions.length > 0 && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginTop: -12, marginBottom: 16 }}
+                    title={
+                      <span>
+                        Nên khám: <b>{suggestions[0].specialty.name}</b> ({suggestions[0].matched.join(', ')})
+                        {suggestions.length > 1 && (
+                          <Typography.Text type="secondary"> · hoặc {suggestions.slice(1, 3).map((x) => x.specialty.name).join(', ')}</Typography.Text>
+                        )}
+                      </span>
+                    }
+                    description={
+                      bestDoctor ? (
+                        <span>
+                          {bestDoctor.label}
+                          {capOf(bestDoctor.value)?.hasShift ? ` còn ${capOf(bestDoctor.value)!.remaining} khung trống` : ''}{' '}
+                          <Button size="small" type="link" onClick={() => ticketForm.setFieldValue('doctorId', bestDoctor.value)} disabled={pickedDoctor === bestDoctor.value}>
+                            {pickedDoctor === bestDoctor.value ? 'Đã chọn' : 'Chọn bác sĩ này'}
+                          </Button>
+                        </span>
+                      ) : (
+                        'Bác sĩ khoa này hôm nay không còn nhận, xem khoa gợi ý khác hoặc hẹn ngày khác.'
+                      )
+                    }
+                  />
+                )}
                 <Form.Item label="Bác sĩ" name="doctorId" rules={[{ required: true, message: 'Chọn bác sĩ' }]}>
                   <Select showSearch optionFilterProp="searchText" options={doctorOptions} placeholder="Chọn bác sĩ theo chuyên khoa" />
                 </Form.Item>
@@ -285,7 +339,10 @@ export function ReceptionPage() {
       </Col>
 
       <Col xs={24} xl={10}>
-        <Card title="Khung giờ hôm nay" extra={<SlotLegend />} style={{ marginBottom: 16 }} loading={capacity.isLoading}>
+        <Card title="Khung giờ hôm nay" style={{ marginBottom: 16 }} loading={capacity.isLoading}>
+          <div style={{ marginBottom: 12 }}>
+            <SlotLegend />
+          </div>
           {shiftGroups.length === 0 ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Hôm nay chưa bác sĩ nào mở ca" />
           ) : (

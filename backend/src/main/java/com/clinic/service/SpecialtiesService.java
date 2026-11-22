@@ -8,6 +8,7 @@ import com.clinic.entity.Specialty;
 import com.clinic.exception.ApiException;
 import com.clinic.repository.DoctorRepository;
 import com.clinic.repository.SpecialtyRepository;
+import com.clinic.util.DoctorProfile;
 import com.clinic.view.Json;
 import com.clinic.view.Rows;
 import java.util.Map;
@@ -45,6 +46,7 @@ public class SpecialtiesService {
     Specialty s = new Specialty();
     s.setName(dto.name());
     s.setDescription(dto.description());
+    if (dto.symptoms() != null) s.setSymptoms(DoctorProfile.joinExpertise(dto.symptoms()));
     return Rows.specialty(specialties.saveAndFlush(s));
   }
 
@@ -55,6 +57,7 @@ public class SpecialtiesService {
     if (dto.name() != null && !dto.name().isEmpty()) ensureNameFree(dto.name(), id);
     if (patch.set("name")) s.setName(dto.name());
     if (patch.has("description")) s.setDescription(dto.description());
+    if (patch.has("symptoms")) s.setSymptoms(dto.symptoms() == null ? null : DoctorProfile.joinExpertise(dto.symptoms()));
     return Rows.specialty(specialties.saveAndFlush(s));
   }
 

@@ -35,6 +35,6 @@ describe('Trang chuyên khoa', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Tên chuyên khoa'), 'Tim mạch');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu' }));
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/specialties', { name: 'Tim mạch', description: '' }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/specialties', { name: 'Tim mạch', description: '', symptoms: [] }));
   });
 });

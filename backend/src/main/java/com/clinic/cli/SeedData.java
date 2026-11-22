@@ -6,7 +6,7 @@ import java.util.List;
 final class SeedData {
   private SeedData() {}
 
-  record Specialty(String name, String description) {}
+  record Specialty(String name, String description, List<String> symptoms) {}
 
   record Step(int fromYear, Integer toYear, String title, String place) {}
 
@@ -16,11 +16,16 @@ final class SeedData {
   record Medicine(String name, String activeIngredient, String strength, String unit) {}
 
   static final List<Specialty> SPECIALTIES = List.of(
-      new Specialty("Nội tổng quát", "Khám và điều trị các bệnh nội khoa thường gặp"),
-      new Specialty("Nhi khoa", "Khám sức khỏe và bệnh lý cho trẻ dưới 16 tuổi"),
-      new Specialty("Tai Mũi Họng", "Viêm họng, viêm xoang, viêm tai"),
-      new Specialty("Da liễu", "Mụn, viêm da, dị ứng da"),
-      new Specialty("Răng Hàm Mặt", "Khám răng, nhổ răng, lấy cao răng"));
+      new Specialty("Nội tổng quát", "Khám và điều trị các bệnh nội khoa thường gặp",
+          List.of("Sốt", "Mệt mỏi", "Đau đầu", "Chóng mặt", "Ho kéo dài", "Đau bụng", "Buồn nôn, nôn", "Tiêu chảy", "Táo bón", "Ợ chua, đầy bụng", "Tức ngực, khó thở", "Tăng huyết áp", "Tiểu đường", "Khám sức khỏe tổng quát")),
+      new Specialty("Nhi khoa", "Khám sức khỏe và bệnh lý cho trẻ dưới 16 tuổi",
+          List.of("Trẻ sốt", "Trẻ ho, sổ mũi", "Trẻ biếng ăn, chậm tăng cân", "Trẻ tiêu chảy, nôn", "Trẻ phát ban", "Tư vấn tiêm chủng", "Khám sức khỏe cho trẻ")),
+      new Specialty("Tai Mũi Họng", "Viêm họng, viêm xoang, viêm tai",
+          List.of("Đau họng", "Ho", "Sổ mũi, nghẹt mũi", "Viêm xoang", "Đau tai, ù tai", "Chảy máu mũi", "Khàn tiếng", "Ngáy khi ngủ")),
+      new Specialty("Da liễu", "Mụn, viêm da, dị ứng da",
+          List.of("Mụn", "Ngứa", "Nổi mẩn, mề đay", "Phát ban", "Nấm da", "Rụng tóc", "Dị ứng da", "Nám, tàn nhang")),
+      new Specialty("Răng Hàm Mặt", "Khám răng, nhổ răng, lấy cao răng",
+          List.of("Đau răng", "Sâu răng", "Chảy máu chân răng", "Hôi miệng", "Mọc răng khôn", "Lấy cao răng", "Ê buốt răng", "Nhiệt miệng")));
 
   // Hồ sơ mẫu (nhân vật hư cấu) để demo trang hồ sơ bác sĩ
   static final List<Doctor> DOCTORS = List.of(
