@@ -52,4 +52,11 @@ class PrintDocTest {
     assertThat(rx.blocks()).anyMatch(b -> b instanceof PrintDoc.Medicine m && m.quantity().equals("SL: 04 gói"));
     assertThat(doc.fileName()).isEqualTo("benh-an-BA-20261106-B003");
   }
+
+  @org.junit.jupiter.api.Test
+  @org.junit.jupiter.api.DisplayName("chú thích ảnh kết quả theo tên chỉ định, đánh số khi nhiều ảnh")
+  void imageCaption() {
+    org.assertj.core.api.Assertions.assertThat(com.clinic.export.PrintDocBuilder.imageCaption(1, 1, 1, "X-quang ngực thẳng")).isEqualTo("Hình 1.1: X-quang ngực thẳng");
+    org.assertj.core.api.Assertions.assertThat(com.clinic.export.PrintDocBuilder.imageCaption(2, 3, 3, "Siêu âm bụng")).isEqualTo("Hình 2.3: Siêu âm bụng (ảnh 3/3)");
+  }
 }

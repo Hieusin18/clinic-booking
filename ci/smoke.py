@@ -57,12 +57,14 @@ print("✓ kết nối realtime qua /api/socket.io (WebSocket và long-polling)"
 
 phone = "098" + str(int(time.time()))[-7:]
 patient = ok("POST", "/patients", {"fullName": "Kiểm Tra Nhanh", "phone": phone, "dateOfBirth": "1990-01-01", "gender": "MALE"}, reception)
-ticket = ok("POST", "/queue/tickets", {"patientId": patient["id"], "doctorId": doctor["id"], "reason": "Kiểm tra"}, reception)
+# overCapacity: bác sĩ mẫu có thể chưa mở ca hôm nay (quy định giới hạn vãng lai đang bật)
+ticket = ok("POST", "/queue/tickets", {"patientId": patient["id"], "doctorId": doctor["id"], "reason": "Kiểm tra", "overCapacity": True}, reception)
 print(f"✓ cấp số {ticket.get('label', ticket.get('queueNumber'))}")
 wait_for(ws_events, "queue:changed", "WebSocket")
 wait_for(poll_events, "queue:changed", "long-polling")
 
-called = ok("POST", "/queue/call-next", token=doctor_token)
+# Bỏ qua bước điều dưỡng đo sinh hiệu (quy định "đo trước khi khám" có thể đang bật)
+called = ok("POST", "/queue/call-next?skipVitals=true", token=doctor_token)
 wait_for(ws_events, "queue:called", "WebSocket")
 ok("PUT", f"/visits/{called['id']}/record", {"symptoms": "Ho, sốt", "diagnosis": "Viêm họng cấp", "icdCode": "J02.9"}, doctor_token)
 ok("POST", f"/visits/{called['id']}/complete", token=doctor_token)

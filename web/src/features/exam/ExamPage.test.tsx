@@ -35,7 +35,7 @@ describe('Màn hình khám bệnh', () => {
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: visit('IN_PROGRESS') });
     renderPage([page('/', <ExamPage />)], { user: fakeUser('DOCTOR') });
     await userEvent.click(await screen.findByRole('button', { name: 'Gọi số tiếp theo' }));
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/queue/call-next'));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/queue/call-next', null, { params: {} }));
   });
 
   it('đang khám: bấm "Gọi lại" để loa ở quầy đọc lại số', async () => {

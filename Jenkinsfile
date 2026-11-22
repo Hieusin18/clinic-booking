@@ -1,13 +1,14 @@
 // Pipeline CI/CD của hệ thống đặt lịch khám (chạy trên Jenkins trong ci/docker-compose.yml).
 //
 // Luồng: lấy code → cài thư viện → test backend → test web, mobile (+ độ phủ JaCoCo/vitest) → SonarQube → Quality Gate
-//        → build image → [đẩy Docker Hub] → [deploy laptop] → [deploy VPS qua SSH] → dọn image cũ
+//        → build image → [đẩy Docker Hub] → [deploy laptop] → [deploy Kubernetes] → [deploy VPS qua SSH] → dọn image cũ
 //
 // Các bước trong [ ] chỉ chạy khi bật bằng biến môi trường toàn cục của Jenkins
 // (Manage Jenkins → System → Global properties → Environment variables):
 //   PUSH_IMAGES=true   cần credential 'dockerhub' + biến DOCKERHUB_NAMESPACE (tên tài khoản Docker Hub)
 //   DEPLOY_LOCAL=true  cần credential 'clinic-env' (Secret file = nội dung file .env)
 //   DEPLOY_VPS=true    cần 'vps-ssh' (SSH key user deploy), 'vps-host' (IP), 'clinic-env-prod' (.env của VPS)
+//   DEPLOY_K8S=true    cần cụm k3d đã tạo bằng k8s/up.sh trên laptop + credential 'clinic-env' (xem k8s/README.md)
 pipeline {
   agent any
 
@@ -159,6 +160,16 @@ pipeline {
             echo "Health check thất bại" && docker compose -f docker-compose.prod.yml --env-file "$APP_ENV" logs backend --tail 50
             exit 1
           '''
+        }
+      }
+    }
+
+    stage('Deploy Kubernetes') {
+      when { environment name: 'DEPLOY_K8S', value: 'true' }
+      steps {
+        withCredentials([file(credentialsId: 'clinic-env', variable: 'APP_ENV')]) {
+          // Nạp image vừa build vào cụm k3d, áp dụng k8s/base với tag $TAG, chờ rollout và kiểm tra /api/health
+          sh 'bash k8s/deploy.sh "$APP_ENV"'
         }
       }
     }

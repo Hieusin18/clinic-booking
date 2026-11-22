@@ -18,6 +18,7 @@ const KIND: Record<AppNotification['type'], { icon: IconName; color: string; sof
   APPOINTMENT_CONFIRMED: { icon: 'check', color: colors.success, soft: colors.successSoft },
   APPOINTMENT_REJECTED: { icon: 'alert', color: colors.danger, soft: colors.dangerSoft },
   FOLLOW_UP: { icon: 'calendar', color: colors.success, soft: colors.successSoft },
+  VITALS_CALLED: { icon: 'bell', color: colors.success, soft: colors.successSoft },
 };
 
 /** Hộp thư: gọi số, có kết quả, khám xong, nhắc lịch. Bấm một tin để mở màn hình liên quan. */

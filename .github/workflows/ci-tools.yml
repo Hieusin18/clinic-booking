@@ -9,6 +9,7 @@ on:
       - "sonar-project.properties"
       - "docker-compose.prod.yml"
       - "web/Dockerfile"
+      - "k8s/**"
       - ".github/workflows/ci-tools.yml"
   push:
     branches: [main]
@@ -28,6 +29,8 @@ jobs:
           docker compose -f ci/docker-compose.yml exec -T jenkins docker compose version
           docker compose -f ci/docker-compose.yml exec -T jenkins node -v
           docker compose -f ci/docker-compose.yml exec -T jenkins npm -v
+          docker compose -f ci/docker-compose.yml exec -T jenkins kubectl version --client
+          docker compose -f ci/docker-compose.yml exec -T jenkins k3d version
           docker compose -f ci/docker-compose.yml exec -T jenkins ssh -V
           docker compose -f ci/docker-compose.yml exec -T jenkins ls /var/jenkins_home/plugins | grep -E '^(sonar|docker-workflow|ssh-agent|workflow-aggregator)\.jpi$'
       - name: Jenkins trả lời ở cổng 8080

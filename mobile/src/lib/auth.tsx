@@ -12,6 +12,10 @@ export interface RegisterInput {
   password: string;
   dateOfBirth: string;
   gender: Gender;
+  /** Bắt buộc: số CCCD 12 chữ số, người thân liên hệ */
+  nationalId: string;
+  relativeName: string;
+  relativePhone: string;
   /** Phiên xác minh số điện thoại bằng tin nhắn (components/PhoneVerify) */
   verificationId?: string;
   ticket?: string;

@@ -2,3 +2,6 @@
 node_modules
 dist
 coverage
+
+# Kubernetes: lớp phủ sinh tự động khi triển khai (có bản sao .env)
+k8s/.deploy

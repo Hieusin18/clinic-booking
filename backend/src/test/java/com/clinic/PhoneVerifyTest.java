@@ -45,6 +45,7 @@ class PhoneVerifyTest extends IntegrationTest {
 
   static Map<String, Object> register(Object... extra) {
     Map<String, Object> m = new HashMap<>(Map.of("fullName", "Trần Văn B", "phone", PHONE, "password", "xuanhoa2026", "dateOfBirth", "1990-01-01", "gender", "MALE"));
+    m.putAll(Map.of("nationalId", "00" + PHONE, "relativeName", "Trần Thị C", "relativePhone", "0912000111"));
     for (int i = 0; i < extra.length; i += 2) m.put((String) extra[i], extra[i + 1]);
     return m;
   }

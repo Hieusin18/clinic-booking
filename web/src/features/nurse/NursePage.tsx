@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { age, doctorName, formatTime, GENDER_LABEL, ticketLabel } from '../../lib/format';
 import { useAction } from '../../lib/hooks';
+import { useClinicSettings } from '../../lib/settings';
 import { C } from '../../lib/theme';
 import type { Visit, Vitals } from '../../lib/types';
 import { bmi } from '../exam/RecordCard';
@@ -145,6 +146,11 @@ export function NursePage() {
       // Người sắp được gọi lên trước
       .sort((a, b) => (a.predictedOrder ?? 999) - (b.predictedOrder ?? 999) || a.createdAt.localeCompare(b.createdAt));
   }, [list.data, show, term]);
+  const callIn = useAction((id: string) => api.post(`/visits/${id}/vitals/call`), {
+    success: 'Đã gọi bệnh nhân vào đo, app của bệnh nhân đã báo',
+    invalidate: ['queue'],
+  });
+  const settings = useClinicSettings();
   const todo = (list.data ?? []).filter((v) => (v.status === 'WAITING' || v.status === 'IN_PROGRESS') && !v.vitals).length;
 
   return (
@@ -155,7 +161,8 @@ export function NursePage() {
             Đo sinh hiệu
           </Typography.Title>
           <Typography.Text type="secondary">
-            Đo cho bệnh nhân đang chờ, người sắp được gọi ở trên cùng. Bác sĩ mở phiếu khám là có sẵn số đo.
+            Gọi bệnh nhân vào đo theo thứ tự (người sắp đến lượt ở trên cùng), nhập kết quả là xong.{' '}
+            {settings.data?.vitalsBeforeExam ? 'Bác sĩ chỉ gọi vào khám những người đã đo.' : 'Bác sĩ mở phiếu khám là có sẵn số đo.'}
           </Typography.Text>
         </div>
         <Flex gap={8} wrap>
@@ -253,18 +260,39 @@ export function NursePage() {
                       {v.vitals.measuredBy ? ` · ${v.vitals.measuredBy.fullName}` : ''}
                     </Typography.Text>
                   </Flex>
+                ) : v.vitalsCalledAt && v.status === 'WAITING' ? (
+                  <Tag color="processing">Đã gọi vào đo lúc {formatTime(v.vitalsCalledAt)}</Tag>
                 ) : (
                   <Tag color="default">Chưa đo</Tag>
                 ),
             },
             {
               title: '',
-              width: 100,
+              width: 190,
               render: (_, v) =>
                 v.status === 'WAITING' || v.status === 'IN_PROGRESS' ? (
-                  <Button type={v.vitals ? 'default' : 'primary'} size="small" onClick={() => setOpen(v)} aria-label={`Đo sinh hiệu ${ticketLabel(v)}`}>
-                    {v.vitals ? 'Sửa' : 'Đo'}
-                  </Button>
+                  <Flex gap={6} wrap onClick={(e) => e.stopPropagation()}>
+                    {/* Gọi vào đo: app bệnh nhân báo mời vào khu đo sinh hiệu */}
+                    {!v.vitals && v.status === 'WAITING' && (
+                      <Button
+                        size="small"
+                        type={v.vitalsCalledAt ? 'default' : 'primary'}
+                        loading={callIn.isPending && callIn.variables === v.id}
+                        onClick={() => callIn.mutate(v.id)}
+                        aria-label={`${v.vitalsCalledAt ? 'Gọi lại' : 'Gọi vào đo'} ${ticketLabel(v)}`}
+                      >
+                        {v.vitalsCalledAt ? 'Gọi lại' : 'Gọi vào đo'}
+                      </Button>
+                    )}
+                    <Button
+                      type={!v.vitals && v.vitalsCalledAt ? 'primary' : 'default'}
+                      size="small"
+                      onClick={() => setOpen(v)}
+                      aria-label={`Đo sinh hiệu ${ticketLabel(v)}`}
+                    >
+                      {v.vitals ? 'Sửa' : 'Nhập kết quả đo'}
+                    </Button>
+                  </Flex>
                 ) : null,
             },
           ]}

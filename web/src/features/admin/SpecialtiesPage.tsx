@@ -1,11 +1,11 @@
-import { Button, Card, Form, Input, Modal, Popconfirm, Space, Table } from 'antd';
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { useAction, usePagedList } from '../../lib/hooks';
 import type { Specialty } from '../../lib/types';
 import { PageHeader } from './PageHeader';
 
-type FormValues = { name: string; description?: string };
+type FormValues = { name: string; description?: string; symptoms?: string[] };
 
 export function SpecialtiesPage() {
   const list = usePagedList<Specialty>('specialties', '/specialties');
@@ -20,7 +20,7 @@ export function SpecialtiesPage() {
 
   const open = (s: Specialty | 'new') => {
     setEditing(s);
-    form.setFieldsValue(s === 'new' ? { name: '', description: '' } : { name: s.name, description: s.description ?? '' });
+    form.setFieldsValue(s === 'new' ? { name: '', description: '', symptoms: [] } : { name: s.name, description: s.description ?? '', symptoms: s.symptoms ?? [] });
   };
 
   return (
@@ -34,6 +34,20 @@ export function SpecialtiesPage() {
         columns={[
           { title: 'Tên chuyên khoa', dataIndex: 'name' },
           { title: 'Mô tả', dataIndex: 'description', render: (v) => v || '—' },
+          {
+            title: 'Triệu chứng gợi ý',
+            render: (_, s) =>
+              s.symptoms?.length ? (
+                <span>
+                  {s.symptoms.slice(0, 4).map((x) => (
+                    <Tag key={x} style={{ marginBottom: 4 }}>{x}</Tag>
+                  ))}
+                  {s.symptoms.length > 4 && <Typography.Text type="secondary">+{s.symptoms.length - 4}</Typography.Text>}
+                </span>
+              ) : (
+                <Typography.Text type="secondary">Chưa có</Typography.Text>
+              ),
+          },
           { title: 'Số bác sĩ', width: 110, align: 'center', render: (_, s) => s._count?.doctors ?? 0 },
           {
             title: '',
@@ -65,6 +79,14 @@ export function SpecialtiesPage() {
           </Form.Item>
           <Form.Item label="Mô tả" name="description">
             <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item
+            label="Triệu chứng thường gặp"
+            name="symptoms"
+            extra="Bệnh nhân và lễ tân chọn triệu chứng để được gợi ý khoa này. Gõ rồi nhấn Enter để thêm; dùng lời thường, ví dụ “Đau họng”, “Ù tai”."
+            rules={[{ type: 'array', max: 40, message: 'Tối đa 40 triệu chứng' }]}
+          >
+            <Select mode="tags" tokenSeparators={[';']} open={false} suffixIcon={null} placeholder="Ví dụ: Đau họng" aria-label="Triệu chứng thường gặp" />
           </Form.Item>
         </Form>
       </Modal>

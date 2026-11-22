@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useAction, usePagedList } from '../../lib/hooks';
 import type { User } from '../../lib/types';
 import { PageHeader } from './PageHeader';
+import { VitalsSettingCard } from './VitalsSettingCard';
 import { ResetPasswordButton } from './ResetPasswordButton';
 import { initialPasswordRules } from '../../lib/password';
 
@@ -31,6 +32,8 @@ export function StaffAccountsPage({ kind }: { kind: keyof typeof KIND }) {
   });
 
   return (
+    <>
+    <VitalsSettingCard />
     <Card>
       <PageHeader
         title={k.title}
@@ -96,6 +99,7 @@ export function StaffAccountsPage({ kind }: { kind: keyof typeof KIND }) {
         </Form>
       </Modal>
     </Card>
+    </>
   );
 }
 

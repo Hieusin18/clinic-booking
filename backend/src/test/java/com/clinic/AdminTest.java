@@ -48,6 +48,27 @@ class AdminTest extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("admin nhập triệu chứng thường gặp để gợi ý khoa; bỏ trùng, bỏ dòng trống")
+    void symptoms() {
+      var created = api.post("/api/specialties").auth(admin).send(Map.of("name", "Tai Mũi Họng", "symptoms", List.of("Đau họng", " Ho ", "Ho", ""))).expect(201).body();
+      assertThat(strings(created.get("symptoms"))).containsExactly("Đau họng", "Ho");
+      String id = created.get("id").asText();
+      api.patch("/api/specialties/" + id).auth(admin).send(Map.of("symptoms", List.of("Ù tai"))).expect(200);
+      var page = api.get("/api/specialties").expect(200).body();
+      assertThat(strings(page.at("/items/0/symptoms"))).containsExactly("Ù tai");
+      // Sửa mô tả không làm mất triệu chứng
+      api.patch("/api/specialties/" + id).auth(admin).send(Map.of("description", "Tai, mũi, họng")).expect(200);
+      assertThat(strings(api.get("/api/specialties").expect(200).body().at("/items/0/symptoms"))).containsExactly("Ù tai");
+      api.patch("/api/specialties/" + id).auth(fx.createUser(Role.RECEPTIONIST).token()).send(Map.of("symptoms", List.of("Ho"))).expect(403);
+    }
+
+    static List<String> strings(JsonNode array) {
+      List<String> out = new ArrayList<>();
+      array.forEach(n -> out.add(n.asText()));
+      return out;
+    }
+
+    @Test
     @DisplayName("không cho trùng tên (không phân biệt hoa thường)")
     void uniqueName() {
       api.post("/api/specialties").auth(admin).send(Map.of("name", "Nhi khoa")).expect(201);

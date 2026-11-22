@@ -12,4 +12,6 @@ import lombok.Setter;
 public class Specialty extends BaseEntity {
   private String name;
   private String description;
+  /** Triệu chứng thường gặp, mỗi dòng một mục (gợi ý bệnh nhân chọn khoa) */
+  private String symptoms;
 }
