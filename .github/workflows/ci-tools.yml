@@ -9,6 +9,9 @@ on:
       - "sonar-project.properties"
       - "docker-compose.prod.yml"
       - "web/Dockerfile"
+      # Cấu hình test chạy trong pipeline Jenkins (thời gian chờ, số luồng)
+      - "web/vite.config.ts"
+      - "mobile/vitest.config.ts"
       - ".github/workflows/ci-tools.yml"
   push:
     branches: [main]
