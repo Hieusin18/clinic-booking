@@ -1,0 +1,17 @@
+# Cửa vào từ bên ngoài cụm: mọi request HTTP → service web (Caddy), Caddy chia tiếp /api cho backend.
+# k3d/k3s có sẵn Traefik làm Ingress controller (hỗ trợ WebSocket cho realtime, không cần cấu hình thêm).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: clinic
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  name: http

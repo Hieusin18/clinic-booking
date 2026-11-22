@@ -1,0 +1,14 @@
+# Bộ cấu hình Kubernetes của hệ thống. Xem nhanh:  kubectl kustomize k8s/base
+# Triển khai thật dùng k8s/deploy.sh (thêm secret từ file .env và tag image của lần build).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: clinic
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: clinic-booking
+resources:
+  - namespace.yaml
+  - db.yaml
+  - backend.yaml
+  - web.yaml
+  - ingress.yaml

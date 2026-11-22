@@ -1,0 +1,84 @@
+# Backend Spring Boot (API + realtime Socket.IO), tương đương service "backend" trong docker-compose.prod.yml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels: { app: backend }
+spec:
+  # Tên "backend:3000" giữ nguyên như compose nên Caddyfile trong image web không phải sửa
+  selector: { app: backend }
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels: { app: backend }
+spec:
+  # CHỈ 1 bản: phòng realtime (Socket.IO) nằm trong bộ nhớ của tiến trình, và các tác vụ định kỳ
+  # (dọn hàng đợi, nhắc lịch) chạy trong từng bản. Muốn chạy nhiều bản phải chuyển realtime sang Redis
+  # và khóa tác vụ định kỳ (xem hướng dẫn).
+  replicas: 1
+  # Tắt bản cũ rồi mới bật bản mới: không bao giờ có 2 bản chạy cùng lúc (mất vài chục giây khi cập nhật)
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      enableServiceLinks: false
+      # Chờ CSDL sẵn sàng rồi mới chạy backend (giống depends_on: condition: service_healthy)
+      initContainers:
+        - name: wait-db
+          image: postgres:16-alpine
+          command: ["sh", "-c", "until pg_isready -h db -p 5432; do echo 'Chờ CSDL...'; sleep 2; done"]
+      containers:
+        - name: backend
+          image: clinic-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          # Toàn bộ biến trong file .env (secret clinic-env): JWT_SECRET, QR_SECRET, CLINIC_*, QUEUE_*...
+          envFrom:
+            - secretRef:
+                name: clinic-env
+          env:
+            - name: PORT
+              value: "3000"
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: clinic-env, key: POSTGRES_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: clinic-env, key: POSTGRES_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: clinic-env, key: POSTGRES_DB } }
+            # Ghép từ 3 biến ở trên, giống docker-compose.prod.yml
+            - name: DATABASE_URL
+              value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@db:5432/$(POSTGRES_DB)
+          # Lần đầu chạy Flyway cần thời gian: cho tối đa ~3 phút để khởi động
+          startupProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 5
+            failureThreshold: 36
+          # Chưa trả lời /api/health thì không nhận request
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          # Treo quá ~1 phút thì Kubernetes tự khởi động lại
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            # JVM dùng tối đa 75% giới hạn bộ nhớ (-XX:MaxRAMPercentage=75 trong Dockerfile)
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
