@@ -10,6 +10,16 @@
 name: clinic-monitoring
 
 services:
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    networks: [monitoring]
   prometheus:
     image: prom/prometheus:v3.5.0
     restart: unless-stopped
